@@ -39,3 +39,38 @@ config.h.in
 stamp-h1
 *.log
 *.tar.gz
+
+# Local IDE/editor files
+.idea/
+*.code-workspace
+
+# CMake and local build trees
+build/
+cmake-build-*/
+
+# Autotools-generated helper dirs/files
+autom4te.cache/
+m4/
+compile
+configure~
+.pre-commit-cache/
+test-driver
+.venv/
+
+# Generated artifacts in bundled sparsehash tree
+sparsehash/compile
+sparsehash/configure~
+sparsehash/test-driver
+sparsehash/hashtable_test
+sparsehash/libc_allocator_with_realloc_test
+sparsehash/simple_compat_test
+sparsehash/simple_test
+sparsehash/sparsetable_unittest
+sparsehash/template_util_unittest
+sparsehash/time_hash_map
+sparsehash/type_traits_unittest
+sparsehash/libsparsehash.pc
+sparsehash/src/.dirstamp
+sparsehash/src/config.h.in~
+sparsehash/src/sparsehash/internal/sparseconfig.h
+sparsehash/src/*.o

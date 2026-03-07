@@ -1,13 +1,15 @@
-#include <sparsehash/src/sparsehash/sparse_hash_map>
+//#include <sparsehash/src/sparsehash/sparse_hash_map>
+#include <unordered_map>
+#include <cstdint>
 
-typedef  google::sparse_hash_map<uint64_t, const void*> sparse_hash_t;
+typedef  std::unordered_map<uint64_t, const void*> sparse_hash_t;
 
 class pinba_lmap {
 	public:
 		sparse_hash_t hash_map;
 		~pinba_lmap() {};
 		pinba_lmap() {
-			hash_map.set_deleted_key((uint64_t)-1);
+			// std::unordered_map doesn't need set_deleted_key
 		}
 		int data_add(uint64_t index, const void *report);
 		int data_delete(uint64_t index);
@@ -58,7 +60,7 @@ void *pinba_lmap::data_next(uint64_t *next_index) /* {{{ */
 	if (it == hash_map.end()) {
 		return NULL;
 	}
-	it++;
+	++it;
 
 	if (it == hash_map.end()) {
 		return NULL;

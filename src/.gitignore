@@ -1,5 +1,7 @@
 config.h*
 pinba_config.h*
+!config.h.in
+!pinba_config.h
 Makefile
 Makefile.in
 stamp-h1

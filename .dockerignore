@@ -1,0 +1,40 @@
+# Ignored files for Docker build context
+
+# Build output
+build/
+build-*/
+*.o
+*.so
+*.a
+
+# Generated/autotools files
+autom4te.cache/
+config.log
+config.status
+Makefile
+Makefile.in
+*.cmake
+
+# Git
+.git/
+.gitignore
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Optional docs (uncomment if you want a minimal context)
+# *.md
+# STAGE*.md
+
+# Tests and benchmarks are not required in runtime images
+tests/
+benchmarks/
+
+# Temporary files
+*.tmp
+*.bak
+*.log
