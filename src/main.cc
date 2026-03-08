@@ -15,9 +15,14 @@
 */
 
 #include "pinba.h"
+#include "pinba_logging_modern.h"
+#include "pinba_monitoring_modern.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/epoll.h>
+#include <atomic>
+#include <vector>
 #include "pinba_map.h"
 #include "pinba_lmap.h"
 
@@ -52,32 +57,98 @@ static struct pinba_version_info version_info[] __attribute__((used)) = {
 
 #endif
 
-struct timeval null_timeval = {0, 0};
+pinba_timeval null_timeval = {0, 0};
 static pthread_t data_thread;
 static pthread_t *collector_threads;
 static pthread_t stats_thread;
 
-int pinba_get_time_interval(pinba_std_report *report) /* {{{ */
+struct pinba_udp_metrics {
+	std::atomic<uint64_t> packets_received{0};
+	std::atomic<uint64_t> packets_dropped{0};
+	std::atomic<uint64_t> decode_errors{0};
+};
+
+static pinba_udp_metrics g_udp_metrics;
+
+static inline void pinba_udp_record_receive(std::size_t packets) {
+	g_udp_metrics.packets_received.fetch_add(packets, std::memory_order_relaxed);
+}
+
+static inline void pinba_udp_record_drop(std::size_t packets) {
+	g_udp_metrics.packets_dropped.fetch_add(packets, std::memory_order_relaxed);
+}
+
+static inline void pinba_udp_record_decode_error() {
+	g_udp_metrics.decode_errors.fetch_add(1, std::memory_order_relaxed);
+}
+
+static void pinba_log_udp_metrics_periodically()
+{
+	static std::atomic<time_t> last_log_time{0};
+	const time_t now = time(nullptr);
+	time_t expected = last_log_time.load(std::memory_order_relaxed);
+	if (now - expected < 60) {
+		return;
+	}
+	if (!last_log_time.compare_exchange_strong(expected, now, std::memory_order_relaxed)) {
+		return;
+	}
+
+	const auto received = g_udp_metrics.packets_received.load(std::memory_order_relaxed);
+	const auto dropped = g_udp_metrics.packets_dropped.load(std::memory_order_relaxed);
+	const auto decode_errors = g_udp_metrics.decode_errors.load(std::memory_order_relaxed);
+
+	pinba_error(P_NOTICE, "UDP collector metrics: received=%llu dropped=%llu decode_errors=%llu",
+		(unsigned long long)received,
+		(unsigned long long)dropped,
+		(unsigned long long)decode_errors);
+}
+
+static void pinba_log_report_metrics_periodically()
+{
+	static std::atomic<time_t> last_log_time{0};
+	const time_t now = time(nullptr);
+	time_t expected = last_log_time.load(std::memory_order_relaxed);
+	if (now - expected < 60) {
+		return;
+	}
+	if (!last_log_time.compare_exchange_strong(expected, now, std::memory_order_relaxed)) {
+		return;
+	}
+
+	const pinba_tag_metrics_snapshot metrics = pinba_tag_metrics_get();
+	pinba_error(P_NOTICE, "Report metrics: tags_created=%llu tags_reused=%llu",
+		(unsigned long long)metrics.tags_created,
+		(unsigned long long)metrics.tags_reused);
+}
+
+int pinba_get_time_interval() /* {{{ */
 {
 	pinba_pool *p = &D->request_pool;
 	time_t start, end, res;
 
-	if (report->results_cnt < 2) {
-		return 1;
-	}
+	if (p->in != p->out) {
+		/* take the first and the last records and compute their time difference */
+		start = REQ_POOL(p)[p->out].time.tv_sec;
+		if (p->in > 0) {
+			end = REQ_POOL(p)[p->in - 1].time.tv_sec;
+		} else {
+			end = REQ_POOL(p)[p->size - 1].time.tv_sec;
+		}
 
-	start = REQ_POOL(p)[p->out].time.tv_sec;
-	if (p->in > 0) {
-		end = REQ_POOL(p)[p->in - 1].time.tv_sec;
+		res = end - start;
+		if (res <= 0) {
+			/* zero is ok, but negative value is definitely a sign of a problem */
+			if (res < 0) {
+				pinba_error(P_ERROR, "internal error: negative time_interval %ld", (long)res);
+			}
+			return 1;
+		}
+		return res;
 	} else {
-		end = REQ_POOL(p)[p->size - 1].time.tv_sec;
-	}
-
-	res = end - start;
-	if (res <= 0) {
+		/* empty pool, return 1 second just for user convenience */
 		return 1;
 	}
-	return res;
 }
 /* }}} */
 
@@ -93,7 +164,7 @@ int pinba_get_processors_number(void) /* {{{ */
 }
 /* }}} */
 
-int pinba_collector_init(pinba_daemon_settings settings) /* {{{ */
+int pinba_collector_init(const pinba_daemon_settings &settings) /* {{{ */
 {
 	size_t i;
 	int cpu_cnt, cpu_num;
@@ -185,25 +256,24 @@ int pinba_collector_init(pinba_daemon_settings settings) /* {{{ */
 	for (i = 0; i < (size_t)cpu_cnt; i++) {
 		char name[PINBA_POOL_NAME_SIZE];
 
-		sprintf(name, "per_thread_request_pool[0][%zd]", i);
+		sprintf(name, "per_thread_request_pool[0][%zu]", i);
 		if (pinba_pool_init(D->per_thread_request_pool[0] + i, settings.temp_pool_size, sizeof(Pinba__Request *), settings.temp_pool_size_limit, 0, pinba_per_thread_request_pool_dtor, name) != P_SUCCESS) {
 			return P_FAILURE;
 		}
 
-		sprintf(name, "per_thread_request_pool[1][%zd]", i);
+		sprintf(name, "per_thread_request_pool[1][%zu]", i);
 		if (pinba_pool_init(D->per_thread_request_pool[1] + i, settings.temp_pool_size, sizeof(Pinba__Request *), settings.temp_pool_size_limit, 0, pinba_per_thread_request_pool_dtor, name) != P_SUCCESS) {
 			return P_FAILURE;
 		}
 
-		sprintf(name, "per_thread_tmp_pool[%zd]", i);
+		sprintf(name, "per_thread_tmp_pool[%zu]", i);
 		if (pinba_pool_init(D->per_thread_tmp_pool + i, settings.temp_pool_size, sizeof(pinba_stats_record_ex), settings.temp_pool_size_limit, 0, pinba_per_thread_tmp_pool_dtor, name) != P_SUCCESS) {
 			return P_FAILURE;
 		}
 	}
 
-	D->pool_num = 0;
-	D->current_read_pool = D->per_thread_request_pool[D->pool_num];
-	D->current_write_pool = D->per_thread_request_pool[!D->pool_num];
+	D->current_read_pool = D->per_thread_request_pool[0];
+	D->current_write_pool = D->per_thread_request_pool[1];
 
 	D->collector_socket = pinba_socket_open(D->settings.address, D->settings.port);
 	if (!D->collector_socket) {
@@ -449,7 +519,7 @@ static inline int request_to_record(Pinba__Request *request, pinba_stats_record_
 	tag_values = record->data.tag_values;
 	tags_alloc_cnt = record->data.tags_alloc_cnt;
 
-	memset(record, 0, sizeof(*record));
+	*record = pinba_stats_record();
 
 	record->data.tag_names = tag_names;
 	record->data.tag_values = tag_values;
@@ -481,7 +551,6 @@ static inline int request_to_record(Pinba__Request *request, pinba_stats_record_
 	record_ex->words_cnt = 0;
 
 	if (request->n_tag_name > 0) {
-		pinba_word *word_ptr;
 		unsigned int i;
 
 		if (record_ex->words_alloc < request->n_dictionary) {
@@ -549,7 +618,7 @@ static inline int request_to_record(Pinba__Request *request, pinba_stats_record_
 	memcpy_static(record->data.script_name, request->script_name, strlen(request->script_name), record->data.script_name_len);
 	memcpy_static(record->data.server_name, request->server_name, strlen(request->server_name), record->data.server_name_len);
 	memcpy_static(record->data.hostname, request->hostname, strlen(request->hostname), record->data.hostname_len);
-	if (request->schema && request->schema[0]) {
+	if (request->schema[0]) {
 		memcpy_static(record->data.schema, request->schema, strlen(request->schema), record->data.schema_len);
 	}
 	req_time = (double)request->request_time;
@@ -686,7 +755,6 @@ inline static int _add_timers(pinba_stats_record *record, const pinba_stats_reco
 		timer_hit_cnt = request->timer_hit_count[ti];
 
 		timer = record_get_timer(timer_pool, record, i);
-		timer->index = record_get_timer_id(timer_pool, record, i);
 		timer->request_id = request_id;
 
 		if (request->n_timer_ru_stime > i) {
@@ -733,7 +801,6 @@ inline static int _add_timers(pinba_stats_record *record, const pinba_stats_reco
 			timer->value = float_to_timeval(0);
 		}
 		timer->hit_count = timer_hit_cnt;
-		timer->num_in_request = record->timers_cnt;
 
 		if (!timer->tag_ids || !timer->tag_values) {
 			timer->tag_num_allocated = 0;
@@ -767,42 +834,11 @@ inline static int _add_timers(pinba_stats_record *record, const pinba_stats_reco
 			tag = temp_tags[tag_name];
 
 			if (!tag) {
-				tag = (pinba_tag *)pinba_map_get(D->tag.name_index, word_ptr->str);
-				if (UNLIKELY(!tag)) {
-					/* doesn't exist, create */
-					int dummy;
-
-					pthread_rwlock_unlock(&D->words_lock);
-					pthread_rwlock_wrlock(&D->words_lock);
-
-					/* race condition check */
-					tag = (pinba_tag *)pinba_map_get(D->tag.name_index, word_ptr->str);
-					if (LIKELY(!tag)) {
-						size_t tag_id;
-
-						tag_id = pinba_lmap_count(D->tag.table);
-
-						tag = (pinba_tag *)malloc(sizeof(pinba_tag));
-						if (!tag) {
-							pthread_rwlock_unlock(&D->words_lock);
-							pthread_rwlock_rdlock(&D->words_lock);
-							pinba_warning("failed to allocate tag");
-							continue;
-						}
-
-						tag->id = tag_id;
-						tag->name_len = word_ptr->len;
-						memcpy_static(tag->name, word_ptr->str, tag->name_len, dummy);
-
-						/* add the tag to the table */
-						D->tag.table = pinba_lmap_add(D->tag.table, tag_id, tag);
-
-						/* add the tag to the index */
-						D->tag.name_index = pinba_map_add(D->tag.name_index, word_ptr->str, tag);
-					}
-					pthread_rwlock_unlock(&D->words_lock);
-					pthread_rwlock_rdlock(&D->words_lock);
+				tag = pinba_tag_lookup_or_create_locked(word_ptr->str, word_ptr->len);
+				if (!tag) {
+					continue;
 				}
+				temp_tags[tag_name] = tag;
 			}
 
 			timer->tag_ids[timer->tag_num] = tag->id;
@@ -941,7 +977,7 @@ static void data_job_func(void *data) /* {{{ */
 			if (!request || request_to_record(request, record_ex) < 0) {
 				//	d->invalid_packets++;
 			} else {
-				record_ex->record.time = d->now;
+				timeval_to_pinba_timeval(d->now, record_ex->record.time);
 				tmp_pool->in++;
 			}
 		} while (current_sub_request < sub_request_num);
@@ -978,6 +1014,7 @@ static void request_copy_job_func(void *job_data) /* {{{ */
 		tags_alloc_cnt = record->data.tags_alloc_cnt;
 
 		memcpy(record, temp_record, sizeof(pinba_stats_record));
+		record->active = 1;
 
 		record->counter = D->request_pool_counter + d->start + i;
 		record->data.tag_names = tag_names;
@@ -1026,45 +1063,30 @@ static void request_copy_job_func(void *job_data) /* {{{ */
 }
 /* }}} */
 
-static void free_data_func(void *job_data) /* {{{ */
-{
-	struct data_job_data *d = (struct data_job_data *)job_data;
-	pinba_pool *temp_request_pool = &D->per_thread_request_pool[!D->pool_num][d->thread_num];
-	pinba_stats_record_ex *temp_record_ex;
-	unsigned int i;
-
-	for (i = 0; i < temp_request_pool->in; i++) {
-		temp_record_ex = REQ_POOL_EX(temp_request_pool) + i;
-
-		if (temp_record_ex->request && temp_record_ex->can_free) {
-			pinba__request__free_unpacked(temp_record_ex->request, NULL);
-			temp_record_ex->words_cnt = 0;
-			temp_record_ex->request = NULL;
-			temp_record_ex->can_free = 0;
-		}
-	}
-	temp_request_pool->in = 0;
-}
-/* }}} */
-
-void *pinba_data_main(void *arg) /* {{{ */
+void *pinba_data_main(void *) /* {{{ */
 {
 	struct timeval launch, tv1;
-	struct data_job_data *job_data_arr;
+	struct data_job_data *job_data_arr = NULL;
 	pinba_pool *request_pool = &D->request_pool;
-	thread_pool_barrier_t *barrier1, *barrier2, *barrier3, *barrier4, *barrier5, *barrier6, *barrier7;
+	thread_pool_barrier_t *barrier1 = NULL, *barrier2 = NULL, *barrier3 = NULL;
+	thread_pool_barrier_t *barrier4 = NULL, *barrier5 = NULL, *barrier6 = NULL, *barrier7 = NULL;
 	struct reports_job_data *rep_job_data_arr = NULL;
 	struct reports_job_data *tag_rep_job_data_arr = NULL;
 	struct reports_job_data *rtag_rep_job_data_arr = NULL;
-	unsigned int base_reports_alloc = 0, rtag_reports_alloc = 0;
+	unsigned int base_reports_alloc = 0, rtag_reports_alloc = 0, tag_reports_alloc = 0;
+	int barriers_initialized = 0;
 
-	barrier1 = (thread_pool_barrier_t *)malloc(sizeof(*barrier1));
-	barrier2 = (thread_pool_barrier_t *)malloc(sizeof(*barrier2));
-	barrier3 = (thread_pool_barrier_t *)malloc(sizeof(*barrier3));
-	barrier4 = (thread_pool_barrier_t *)malloc(sizeof(*barrier4));
-	barrier5 = (thread_pool_barrier_t *)malloc(sizeof(*barrier5));
-	barrier6 = (thread_pool_barrier_t *)malloc(sizeof(*barrier6));
-	barrier7 = (thread_pool_barrier_t *)malloc(sizeof(*barrier7));
+	barrier1 = (thread_pool_barrier_t *)pinba_malloc_or_log(sizeof(*barrier1), "data barrier1");
+	barrier2 = (thread_pool_barrier_t *)pinba_malloc_or_log(sizeof(*barrier2), "data barrier2");
+	barrier3 = (thread_pool_barrier_t *)pinba_malloc_or_log(sizeof(*barrier3), "data barrier3");
+	barrier4 = (thread_pool_barrier_t *)pinba_malloc_or_log(sizeof(*barrier4), "data barrier4");
+	barrier5 = (thread_pool_barrier_t *)pinba_malloc_or_log(sizeof(*barrier5), "data barrier5");
+	barrier6 = (thread_pool_barrier_t *)pinba_malloc_or_log(sizeof(*barrier6), "data barrier6");
+	barrier7 = (thread_pool_barrier_t *)pinba_malloc_or_log(sizeof(*barrier7), "data barrier7");
+	if (UNLIKELY(!barrier1 || !barrier2 || !barrier3 || !barrier4 || !barrier5 || !barrier6 || !barrier7)) {
+		goto cleanup;
+	}
+
 	th_pool_barrier_init(barrier1);
 	th_pool_barrier_init(barrier2);
 	th_pool_barrier_init(barrier3);
@@ -1072,21 +1094,27 @@ void *pinba_data_main(void *arg) /* {{{ */
 	th_pool_barrier_init(barrier5);
 	th_pool_barrier_init(barrier6);
 	th_pool_barrier_init(barrier7);
+	barriers_initialized = 1;
 
 	pinba_debug("starting up data harvester thread");
 
-	/* yes, it's a minor memleak. once per process start. */
-	job_data_arr = (struct data_job_data *)malloc(sizeof(struct data_job_data) * D->thread_pool->size);
-	tag_rep_job_data_arr = (struct reports_job_data *)malloc(sizeof(struct reports_job_data) * D->thread_pool->size);
+	job_data_arr = (struct data_job_data *)pinba_malloc_or_log(
+		sizeof(struct data_job_data) * D->thread_pool->size,
+		"data worker job buffer"
+	);
+	if (UNLIKELY(!job_data_arr)) {
+		goto cleanup;
+	}
 
 	gettimeofday(&launch, NULL);
 	for (;;) {
 		size_t stats_records, records_to_copy, timers_added, free_slots, records_created;
-		size_t accounted, job_size, invalid_packets = 0, lost_tmp_records = 0, rtags_found;
+		size_t accounted, invalid_packets = 0, lost_tmp_records = 0, rtags_found;
 		size_t i;
+		pinba_pool *pool_tmp;
 
 		if (D->in_shutdown) {
-			return NULL;
+			break;
 		}
 
 		/* since we now support multi-request packets, we cannot assume that
@@ -1097,10 +1125,12 @@ void *pinba_data_main(void *arg) /* {{{ */
 
 		/* swap the pools and free the lock */
 		pthread_rwlock_wrlock(&D->per_thread_pools_lock);
-		D->current_read_pool = D->per_thread_request_pool[D->pool_num];
-		D->current_write_pool = D->per_thread_request_pool[!D->pool_num];
-		D->pool_num = !D->pool_num;
+		pool_tmp = D->current_write_pool;
+		D->current_write_pool = D->current_read_pool;
+		D->current_read_pool = pool_tmp;
 		pthread_rwlock_unlock(&D->per_thread_pools_lock);
+		pinba_log_udp_metrics_periodically();
+		pinba_log_report_metrics_periodically();
 
 		records_to_copy = 0;
 		for (i = 0; i < D->thread_pool->size; i++) {
@@ -1188,12 +1218,6 @@ void *pinba_data_main(void *arg) /* {{{ */
 
 		D->request_pool_counter += records_created;
 
-		if (records_created < (D->thread_pool->size * PINBA_THREAD_POOL_THRESHOLD_AMOUNT)) {
-			job_size = records_created;
-		} else {
-			job_size = records_created/D->thread_pool->size;
-		}
-
 		/* update base reports - one report per thread */
 		pthread_rwlock_rdlock(&D->base_reports_lock);
 
@@ -1210,8 +1234,17 @@ void *pinba_data_main(void *arg) /* {{{ */
 		}
 
 		if (base_reports_alloc < D->base_reports_arr.size) {
-			base_reports_alloc = D->base_reports_arr.size * 2;
-			rep_job_data_arr = (struct reports_job_data *)realloc(rep_job_data_arr, sizeof(struct reports_job_data) * base_reports_alloc);
+			if (UNLIKELY(pinba_ensure_reports_job_capacity(
+				&rep_job_data_arr,
+				&base_reports_alloc,
+				D->base_reports_arr.size,
+				"base report job buffer"
+			) != P_SUCCESS)) {
+				pinba_error(P_WARNING, "out of memory while extending base report job buffer");
+				pthread_rwlock_unlock(&D->base_reports_lock);
+				pthread_rwlock_unlock(&D->collector_lock);
+				goto sleep;
+			}
 		}
 
 		memset(rep_job_data_arr, 0, sizeof(struct reports_job_data) * base_reports_alloc);
@@ -1244,8 +1277,17 @@ void *pinba_data_main(void *arg) /* {{{ */
 			}
 
 			if (rtag_reports_alloc < D->rtag_reports_arr.size) {
-				rtag_reports_alloc = D->rtag_reports_arr.size * 2;
-				rtag_rep_job_data_arr = (struct reports_job_data *)realloc(rtag_rep_job_data_arr, sizeof(struct reports_job_data) * rtag_reports_alloc);
+				if (UNLIKELY(pinba_ensure_reports_job_capacity(
+					&rtag_rep_job_data_arr,
+					&rtag_reports_alloc,
+					D->rtag_reports_arr.size,
+					"rtag report job buffer"
+				) != P_SUCCESS)) {
+					pinba_error(P_WARNING, "out of memory while extending rtag report job buffer");
+					pthread_rwlock_unlock(&D->rtag_reports_lock);
+					pthread_rwlock_unlock(&D->collector_lock);
+					goto sleep;
+				}
 			}
 
 			memset(rtag_rep_job_data_arr, 0, sizeof(struct reports_job_data) * rtag_reports_alloc);
@@ -1282,20 +1324,6 @@ void *pinba_data_main(void *arg) /* {{{ */
 				timers_added += job_data_arr[i].timers_cnt;
 			}
 
-			pthread_rwlock_rdlock(&D->tag_reports_lock);
-
-			for (i = 0; i < D->tag_reports_arr.size; i++) {
-				pinba_std_report *report = (pinba_std_report *)D->tag_reports_arr.data[i];
-
-				pthread_rwlock_wrlock(&report->lock);
-				if (report->start.tv_sec == 0) {
-					pinba_stats_record *record = REQ_POOL(request_pool) + request_pool->in;
-					report->start = record->time;
-					report->request_pool_start_id = record->counter;
-				}
-				pthread_rwlock_unlock(&report->lock);
-			}
-
 			records_to_copy = stats_records;
 			for (i = 0; i < D->thread_pool->size; i++) {
 				pinba_pool *temp_request_pool = D->current_read_pool + i;
@@ -1313,29 +1341,52 @@ void *pinba_data_main(void *arg) /* {{{ */
 				th_pool_dispatch(D->thread_pool, barrier3, merge_timers_func, &(job_data_arr[i]));
 			}
 			th_pool_barrier_wait(barrier3);
+			pthread_rwlock_unlock(&D->timer_lock);
+
+			pthread_rwlock_rdlock(&D->timer_lock);
+			pthread_rwlock_rdlock(&D->tag_reports_lock);
+
+			for (i = 0; i < D->tag_reports_arr.size; i++) {
+				pinba_std_report *report = (pinba_std_report *)D->tag_reports_arr.data[i];
+
+				pthread_rwlock_wrlock(&report->lock);
+				if (report->start.tv_sec == 0) {
+					pinba_stats_record *record = REQ_POOL(request_pool) + request_pool->in;
+					report->start = record->time;
+					report->request_pool_start_id = record->counter;
+				}
+				pthread_rwlock_unlock(&report->lock);
+			}
 
 			for (i = 0; i < D->thread_pool->size; i++) {
 				D->timertags_cnt += job_data_arr[i].timertag_cnt;
 			}
 
-			/* update tag reports - all threads share the reports */
-			accounted = 0;
+			if (tag_reports_alloc < D->tag_reports_arr.size) {
+				if (UNLIKELY(pinba_ensure_reports_job_capacity(
+					&tag_rep_job_data_arr,
+					&tag_reports_alloc,
+					D->tag_reports_arr.size,
+					"tag report job buffer"
+				) != P_SUCCESS)) {
+					pinba_error(P_WARNING, "out of memory while extending tag report job buffer");
+					pthread_rwlock_unlock(&D->tag_reports_lock);
+					pthread_rwlock_unlock(&D->timer_lock);
+					pthread_rwlock_unlock(&D->collector_lock);
+					goto sleep;
+				}
+			}
+
+			memset(tag_rep_job_data_arr, 0, sizeof(struct reports_job_data) * tag_reports_alloc);
+
 			th_pool_barrier_start(barrier5);
-			for (i= 0; i < D->thread_pool->size; i++) {
-				if (i == D->thread_pool->size - 1) {
-					job_size = stats_records - accounted;
-				}
-
-				tag_rep_job_data_arr[i].prefix = request_pool->in + accounted;
-				tag_rep_job_data_arr[i].count = job_size;
+			for (i = 0; i < D->tag_reports_arr.size; i++) {
+				tag_rep_job_data_arr[i].prefix = request_pool->in;
+				tag_rep_job_data_arr[i].count = records_created;
+				tag_rep_job_data_arr[i].report = D->tag_reports_arr.data[i];
 				tag_rep_job_data_arr[i].add = 1;
-				accounted += job_size;
 
-				th_pool_dispatch(D->thread_pool, barrier5, update_tag_reports_func, &(tag_rep_job_data_arr[i]));
-
-				if (accounted == stats_records) {
-					break;
-				}
+				th_pool_dispatch(D->thread_pool, barrier5, update_reports_func, &(tag_rep_job_data_arr[i]));
 			}
 			th_pool_barrier_wait(barrier5);
 
@@ -1348,11 +1399,11 @@ void *pinba_data_main(void *arg) /* {{{ */
 		} else {
 			request_pool->in += records_created;
 		}
-
 		pthread_rwlock_unlock(&D->collector_lock);
 
 		for (i = 0; i < D->thread_pool->size; i++) {
 			pinba_pool *temp_request_pool = D->current_read_pool + i;
+
 			temp_request_pool->in = 0;
 			temp_request_pool->out = 0;
 		}
@@ -1398,12 +1449,35 @@ sleep:
 			timeradd(&launch, &tv1, &launch);
 		}
 	}
-	/* not reachable */
+cleanup:
+	free(rep_job_data_arr);
+	free(tag_rep_job_data_arr);
+	free(rtag_rep_job_data_arr);
+	free(job_data_arr);
+
+	if (barriers_initialized) {
+		th_pool_barrier_destroy(barrier1);
+		th_pool_barrier_destroy(barrier2);
+		th_pool_barrier_destroy(barrier3);
+		th_pool_barrier_destroy(barrier4);
+		th_pool_barrier_destroy(barrier5);
+		th_pool_barrier_destroy(barrier6);
+		th_pool_barrier_destroy(barrier7);
+	}
+	free(barrier1);
+	free(barrier2);
+	free(barrier3);
+	free(barrier4);
+	free(barrier5);
+	free(barrier6);
+	free(barrier7);
+
 	return NULL;
 }
 /* }}} */
 
 time_t last_error_time;
+char last_file_line[PINBA_ERR_BUFFER];
 char last_errormsg[PINBA_ERR_BUFFER];
 
 pthread_mutex_t error_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -1411,67 +1485,104 @@ pthread_mutex_t error_mutex = PTHREAD_MUTEX_INITIALIZER;
 char *pinba_error_ex(int return_error, int type, const char *file, int line, const char *format, ...) /* {{{ */
 {
 	va_list args;
+	va_list args_copy;
 	const char *type_name;
 	char *tmp;
-	char tmp_format[PINBA_ERR_BUFFER/2];
+	char message_body[PINBA_ERR_BUFFER];
 	char errormsg[PINBA_ERR_BUFFER];
 
-	if ((D->settings.log_level & type) == 0) {
+	if (D && (D->settings.log_level & type) == 0) {
 		return NULL;
 	}
 
+	// Map legacy log types to modern log levels
+	pinba::LogLevel modern_level = pinba::LogLevel::INFO;
 	switch (type) {
 		case P_DEBUG_DUMP:
-			type_name = "debug dump";
-			break;
 		case P_DEBUG:
 			type_name = "debug";
+			modern_level = pinba::LogLevel::DEBUG;
 			break;
 		case P_NOTICE:
 			type_name = "notice";
+			modern_level = pinba::LogLevel::NOTICE;
 			break;
 		case P_WARNING:
 			type_name = "warning";
+			modern_level = pinba::LogLevel::WARNING;
 			break;
 		case P_ERROR:
 			type_name = "error";
+			modern_level = pinba::LogLevel::ERROR;
+			// Update error metrics
+			if (D) {
+				pinba::MetricsRegistry::instance().counter("errors_total").increment();
+			}
 			break;
 		default:
 			type_name = "unknown error";
+			modern_level = pinba::LogLevel::WARNING;
 			break;
 	}
 
-	snprintf(tmp_format, PINBA_ERR_BUFFER/2, "[PINBA] %s: %s:%d %s", type_name, file, line, format);
-
 	va_start(args, format);
-	vsnprintf(errormsg, PINBA_ERR_BUFFER, tmp_format, args);
+	va_copy(args_copy, args);
+	vsnprintf(message_body, sizeof(message_body), format, args_copy);
+	va_end(args_copy);
 	va_end(args);
+	snprintf(errormsg, sizeof(errormsg), "[PINBA] %s: %s:%d %s", type_name, file, line, message_body);
 
 	if (!return_error) {
-		time_t t;
-		struct tm *tmp;
-		char timebuf[256] = {0};
+		// Use modern async logger if available, fallback to legacy
+		if (D) {
+			// Check for duplicate suppression (legacy behavior)
+			time_t t = time(NULL);
+			char file_line[PINBA_ERR_BUFFER] = "\0";
+			snprintf(file_line, sizeof(file_line), "%s:%d", file, line);
 
-		pthread_mutex_lock(&error_mutex);
-		t = time(NULL);
-		if ((t - last_error_time) < 1 && strcmp(last_errormsg, errormsg) == 0) {
-			/* don't flood the logs */
+			pthread_mutex_lock(&error_mutex);
+			if ((t - last_error_time) < 1 && strcmp(last_file_line, file_line) == 0) {
+				/* don't flood the logs */
+				pthread_mutex_unlock(&error_mutex);
+				return NULL;
+			}
+			last_error_time = t;
+			snprintf(last_file_line, sizeof(last_file_line), "%s:%d", file, line);
+			snprintf(last_errormsg, sizeof(last_errormsg), "%s", errormsg);
 			pthread_mutex_unlock(&error_mutex);
-			return NULL;
-		}
-		last_error_time = t;
-		strncpy(last_errormsg, errormsg, PINBA_ERR_BUFFER);
 
-		tmp = localtime(&t);
-
-		if (tmp) {
-			strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M:%S", tmp);
-			fprintf(stderr, "[%s] %s\n", timebuf, errormsg);
+			// Use modern logger
+			pinba::Logger::instance().log(modern_level, file, line, nullptr, errormsg);
 		} else {
-			fprintf(stderr, "%s\n", errormsg);
+			// Fallback to legacy synchronous logging
+			time_t t;
+			struct tm *tmp;
+			char timebuf[256] = {0};
+			char file_line[PINBA_ERR_BUFFER] = "\0";
+
+			pthread_mutex_lock(&error_mutex);
+			t = time(NULL);
+			snprintf(file_line, sizeof(file_line), "%s:%d", file, line);
+
+			if ((t - last_error_time) < 1 && strcmp(last_file_line, file_line) == 0) {
+				pthread_mutex_unlock(&error_mutex);
+				return NULL;
+			}
+			last_error_time = t;
+			snprintf(last_file_line, sizeof(last_file_line), "%s:%d", file, line);
+			snprintf(last_errormsg, sizeof(last_errormsg), "%s", errormsg);
+
+			tmp = localtime(&t);
+
+			if (tmp) {
+				strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M:%S", tmp);
+				fprintf(stderr, "[%s] %s\n", timebuf, errormsg);
+			} else {
+				fprintf(stderr, "%s\n", errormsg);
+			}
+			fflush(stderr);
+			pthread_mutex_unlock(&error_mutex);
 		}
-		fflush(stderr);
-		pthread_mutex_unlock(&error_mutex);
 		return NULL;
 	}
 	tmp = strdup(errormsg);
@@ -1491,104 +1602,207 @@ char *pinba_error_ex(int return_error, int type, const char *file, int line, con
 
 void pinba_eat_udp(pinba_socket *sock, size_t thread_num) /* {{{ */
 {
-	int i;
-	struct mmsghdr *msgs;
-	struct iovec *iovecs;
-	char *bufs;
-
-	msgs = (struct mmsghdr *)calloc(PINBA_VLEN, sizeof(struct mmsghdr));
-	iovecs = (struct iovec *)calloc(PINBA_VLEN, sizeof(struct iovec));
-	bufs = (char *)calloc(PINBA_VLEN, PINBA_UDP_BUFFER_SIZE);
-
-	if (!msgs || !iovecs || !bufs) {
-		pinba_error(P_ERROR, "out of memory");
+	if (!sock) {
 		return;
 	}
 
-	for (i = 0; i < PINBA_VLEN; i++) {
+	struct mmsghdr *msgs = (struct mmsghdr *)calloc(PINBA_VLEN, sizeof(struct mmsghdr));
+	struct iovec *iovecs = (struct iovec *)calloc(PINBA_VLEN, sizeof(struct iovec));
+	char *bufs = (char *)calloc(PINBA_VLEN, PINBA_UDP_BUFFER_SIZE);
+
+	if (!msgs || !iovecs || !bufs) {
+		pinba_error(P_ERROR, "out of memory in pinba_eat_udp");
+		free(msgs);
+		free(iovecs);
+		free(bufs);
+		return;
+	}
+
+	for (int i = 0; i < PINBA_VLEN; i++) {
 		iovecs[i].iov_base = bufs + PINBA_UDP_BUFFER_SIZE * i;
 		iovecs[i].iov_len = PINBA_UDP_BUFFER_SIZE;
 		msgs[i].msg_hdr.msg_iov = &iovecs[i];
 		msgs[i].msg_hdr.msg_iovlen = 1;
 	}
 
+	const int epoll_fd = epoll_create1(EPOLL_CLOEXEC);
+	if (epoll_fd == -1) {
+		pinba_error(P_ERROR, "epoll_create1() failed: %s (%d)", strerror(errno), errno);
+		free(msgs);
+		free(iovecs);
+		free(bufs);
+		return;
+	}
+
+	struct epoll_event ev = {};
+	ev.events = EPOLLIN | EPOLLET;
+	ev.data.fd = sock->listen_sock;
+
+	if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, sock->listen_sock, &ev) == -1) {
+		pinba_error(P_ERROR, "epoll_ctl() failed: %s (%d)", strerror(errno), errno);
+		close(epoll_fd);
+		free(msgs);
+		free(iovecs);
+		free(bufs);
+		return;
+	}
+
+	std::vector<epoll_event> events(PINBA_VLEN);
+	const int recv_flags = PINBA_RECVMMSG_FLAGS | MSG_DONTWAIT;
+
 	for (;;) {
-		int num;
-
-		num = recvmmsg(sock->listen_sock, msgs, PINBA_VLEN, PINBA_RECVMMSG_FLAGS, NULL);
-
-		if (num > 0) {
-			pinba_pool *req_pool;
-
-			pthread_rwlock_rdlock(&D->per_thread_pools_lock);
-			req_pool = D->current_write_pool + thread_num;
-
-			for (i = 0; i < num; i++) {
-				if (msgs[i].msg_len > 0) {
-					Pinba__Request *request;
-					int ret;
-
-					request = pinba__request__unpack(NULL, msgs[i].msg_len, (const unsigned char *)bufs + PINBA_UDP_BUFFER_SIZE * i);
-					if (UNLIKELY(request == NULL)) {
-						//d->invalid_packets++;
-						continue;
-					}
-
-					ret = pinba_pool_push(req_pool, 0, request);
-					if (ret != P_SUCCESS) {
-						pinba__request__free_unpacked(request, NULL); /* XXX */
-						break; /* XXX */
-					}
-				}
-			}
-
-			pthread_rwlock_unlock(&D->per_thread_pools_lock);
-		} else if (num < 0) {
+		int ready = epoll_wait(epoll_fd, events.data(), static_cast<int>(events.size()), -1);
+		if (ready == -1) {
 			if (errno == EINTR) {
 				continue;
 			}
-			pinba_error(P_WARNING, "recvmmsg() failed: %s (%d)", strerror(errno), errno);
-		} else {
-			pinba_error(P_WARNING, "recvmmsg() returned 0");
+			pinba_error(P_WARNING, "epoll_wait() failed: %s (%d)", strerror(errno), errno);
+			continue;
+		}
+
+		for (int e = 0; e < ready; ++e) {
+			if (!(events[e].events & (EPOLLIN | EPOLLERR | EPOLLHUP))) {
+				continue;
+			}
+
+			for (;;) {
+				const int num = recvmmsg(sock->listen_sock, msgs, PINBA_VLEN, recv_flags, NULL);
+
+				if (num > 0) {
+					pinba_pool *req_pool;
+
+					pthread_rwlock_rdlock(&D->per_thread_pools_lock);
+					req_pool = D->current_write_pool + thread_num;
+
+					for (int i = 0; i < num; i++) {
+						if (msgs[i].msg_len <= 0) {
+							continue;
+						}
+
+						auto *request = pinba__request__unpack(nullptr,
+							msgs[i].msg_len,
+							reinterpret_cast<const unsigned char *>(bufs + PINBA_UDP_BUFFER_SIZE * i));
+
+						if (UNLIKELY(request == NULL)) {
+							pinba_udp_record_decode_error();
+							continue;
+						}
+
+						if (pinba_pool_push(req_pool, 0, request) != P_SUCCESS) {
+							pinba__request__free_unpacked(request, NULL);
+							pinba_udp_record_drop(1);
+							break;
+						}
+
+						pinba_udp_record_receive(1);
+					}
+
+					pthread_rwlock_unlock(&D->per_thread_pools_lock);
+					pinba_log_udp_metrics_periodically();
+				} else if (num == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+					break;
+				} else if (num == -1 && errno == EINTR) {
+					continue;
+				} else if (num == -1) {
+					pinba_error(P_WARNING, "recvmmsg() failed: %s (%d)", strerror(errno), errno);
+					break;
+				} else {
+					pinba_error(P_WARNING, "recvmmsg() returned 0");
+					break;
+				}
+			}
 		}
 	}
+
+	close(epoll_fd);
+	free(msgs);
+	free(iovecs);
+	free(bufs);
 }
 /* }}} */
 #else
 void pinba_eat_udp(pinba_socket *sock, size_t thread_num) /* {{{ */
 {
+	if (!sock) {
+		return;
+	}
+
+	const int epoll_fd = epoll_create1(EPOLL_CLOEXEC);
+	if (epoll_fd == -1) {
+		pinba_error(P_ERROR, "epoll_create1() failed: %s (%d)", strerror(errno), errno);
+		return;
+	}
+
+	struct epoll_event ev = {};
+	ev.events = EPOLLIN | EPOLLET;
+	ev.data.fd = sock->listen_sock;
+
+	if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, sock->listen_sock, &ev) == -1) {
+		pinba_error(P_ERROR, "epoll_ctl() failed: %s (%d)", strerror(errno), errno);
+		close(epoll_fd);
+		return;
+	}
+
+	std::vector<epoll_event> events(PINBA_VLEN);
+
 	for (;;) {
-		int ret;
-		unsigned char buf[PINBA_UDP_BUFFER_SIZE];
-
-		ret = recv(sock->listen_sock, buf, PINBA_UDP_BUFFER_SIZE, 0);
-
-		if (ret > 0) {
-			pinba_pool *req_pool;
-			Pinba__Request *request;
-
-			pthread_rwlock_rdlock(&D->per_thread_pools_lock);
-			req_pool = D->current_write_pool + thread_num;
-
-			request = pinba__request__unpack(NULL, ret, (const unsigned char *)buf);
-			if (LIKELY(request != NULL)) {
-				int ret;
-
-				ret = pinba_pool_push(req_pool, 0, request);
-				if (ret != P_SUCCESS) {
-					pinba__request__free_unpacked(request, NULL); /* XXX */
-				}
-			} else {
-				//d->invalid_packets++;
-			}
-			pthread_rwlock_unlock(&D->per_thread_pools_lock);
-		} else if (ret < 0) {
+		int ready = epoll_wait(epoll_fd, events.data(), static_cast<int>(events.size()), -1);
+		if (ready == -1) {
 			if (errno == EINTR) {
 				continue;
 			}
-			pinba_error(P_WARNING, "recv() failed: %s (%d)", strerror(errno), errno);
-		} else {
-			pinba_error(P_WARNING, "recv() returned 0");
+			pinba_error(P_WARNING, "epoll_wait() failed: %s (%d)", strerror(errno), errno);
+			continue;
+		}
+
+		for (int e = 0; e < ready; ++e) {
+			if (!(events[e].events & (EPOLLIN | EPOLLERR | EPOLLHUP))) {
+				continue;
+			}
+
+			for (;;) {
+				unsigned char buf[PINBA_UDP_BUFFER_SIZE];
+				const int ret = recv(sock->listen_sock, buf, sizeof(buf), MSG_DONTWAIT);
+
+				if (ret > 0) {
+					Pinba__Request *request;
+					pinba_pool *req_pool;
+
+					pthread_rwlock_rdlock(&D->per_thread_pools_lock);
+					req_pool = D->current_write_pool + thread_num;
+
+					request = pinba__request__unpack(NULL, ret, buf);
+					if (LIKELY(request != NULL)) {
+						if (pinba_pool_push(req_pool, 0, request) != P_SUCCESS) {
+							pinba__request__free_unpacked(request, NULL);
+							pinba_udp_record_drop(1);
+						} else {
+							pinba_udp_record_receive(1);
+						}
+					} else {
+						pinba_udp_record_decode_error();
+					}
+
+					pthread_rwlock_unlock(&D->per_thread_pools_lock);
+					pinba_log_udp_metrics_periodically();
+					continue;
+				}
+
+				if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+					break;
+				}
+
+				if (ret == -1 && errno == EINTR) {
+					continue;
+				}
+
+				if (ret == -1) {
+					pinba_error(P_WARNING, "recv() failed: %s (%d)", strerror(errno), errno);
+				} else {
+					pinba_error(P_WARNING, "recv() returned 0");
+				}
+				break;
+			}
 		}
 	}
 }
@@ -1610,6 +1824,18 @@ void pinba_socket_free(pinba_socket *socket) /* {{{ */
 }
 /* }}} */
 
+static bool pinba_set_socket_nonblocking(int fd)
+{
+	int flags = fcntl(fd, F_GETFL, 0);
+	if (flags == -1) {
+		return false;
+	}
+	if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+		return false;
+	}
+	return true;
+}
+
 pinba_socket *pinba_socket_open(char *ip, int listen_port) /* {{{ */
 {
 	struct sockaddr_in addr;
@@ -1628,6 +1854,7 @@ pinba_socket *pinba_socket_open(char *ip, int listen_port) /* {{{ */
 
 	s = (pinba_socket *)calloc(1, sizeof(pinba_socket));
 	if (!s) {
+		close(sfd);
 		return NULL;
 	}
 	s->listen_sock = sfd;
@@ -1652,6 +1879,10 @@ pinba_socket *pinba_socket_open(char *ip, int listen_port) /* {{{ */
 		pinba_socket_free(s);
 		pinba_error(P_ERROR, "bind() failed: %s (%d)", strerror(errno), errno);
 		return NULL;
+	}
+
+	if (!pinba_set_socket_nonblocking(s->listen_sock)) {
+		pinba_error(P_WARNING, "failed to set UDP socket to non-blocking mode: %s (%d)", strerror(errno), errno);
 	}
 
 	return s;

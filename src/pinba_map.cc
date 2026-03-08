@@ -1,7 +1,10 @@
-#include <sparsehash/src/sparsehash/dense_hash_map>
-//#include <unordered_map>
+//#include <sparsehash/src/sparsehash/dense_hash_map>
+#include <unordered_map>
+#include <cstdio>
 #include <cstring>
+#include <cstdlib>
 #include "xxhash.h"
+#include "pinba_limits.h"
 
 struct eqstr {
 	bool operator()(const char *s1, const char *s2) const {
@@ -17,16 +20,15 @@ struct xxhash {
 	}
 };
 
-typedef  google::dense_hash_map<const char*, const void*, xxhash, eqstr> dense_hash_t;
-//typedef  std::unordered_map<const char*, const void*, xxhash, eqstr> dense_hash_t;
+//typedef  google::dense_hash_map<const char*, const void*, xxhash, eqstr> dense_hash_t;
+typedef  std::unordered_map<const char*, const void*, xxhash, eqstr> dense_hash_t;
 
 class pinba_map {
 	public:
 		dense_hash_t hash_map;
 		~pinba_map() {};
 		pinba_map() {
-			hash_map.set_empty_key(NULL);
-			hash_map.set_deleted_key("");
+			// std::unordered_map doesn't need set_empty_key/set_deleted_key
 		}
 		int data_add(const char *index, const void *report);
 		int data_delete(const char *index);
@@ -68,7 +70,7 @@ void *pinba_map::data_first(char *index_to_fill) /* {{{ */
 	if (it == hash_map.end()) {
 		return NULL;
 	}
-	strcpy(index_to_fill, it->first);
+	snprintf(index_to_fill, PINBA_TAG_VALUE_SIZE, "%s", it->first);
 	return (void*)it->second;
 }
 /* }}} */
@@ -80,13 +82,13 @@ void *pinba_map::data_next(char *index_to_fill) /* {{{ */
 	if (it == hash_map.end()) {
 		return NULL;
 	}
-	it++;
+	++it;
 
 	if (it == hash_map.end()) {
 		return NULL;
 	}
 
-	strcpy(index_to_fill, it->first);
+	snprintf(index_to_fill, PINBA_TAG_VALUE_SIZE, "%s", it->first);
 	return (void*)it->second;
 }
 /* }}} */
@@ -99,7 +101,7 @@ void pinba_map::clear()  /* {{{ */
 		char *key = (char *)it->first;
 
 		old_it = it;
-		it++;
+		++it;
 
 		hash_map.erase(old_it);
 		free(key);
@@ -216,4 +218,3 @@ size_t pinba_map_count(void *map_report) /* {{{ */
 	return map->size();
 }
 /* }}} */
-

@@ -33,6 +33,7 @@ typedef struct pinba_index_st { /* {{{ */
 		uint len;
 	} subindex;
 	size_t position;
+	size_t subposition;
 } pinba_index_st;
 /* }}} */
 
@@ -152,13 +153,13 @@ class ha_pinba: public handler
 		return (HA_NO_AUTO_INCREMENT|HA_BINLOG_ROW_CAPABLE|HA_NO_TRANSACTIONS|HA_STATS_RECORDS_IS_EXACT);
 	}
 
-	ulong index_flags(uint inx, uint part, bool all_parts) const
+	ulong index_flags(uint, uint, bool) const
 	{
 		return HA_READ_NEXT | HA_READ_PREV | HA_READ_ORDER | HA_ONLY_WHOLE_INDEX;
 	}
 
 
-	const char *index_type(uint inx)
+	const char *index_type(uint)
 	{
 		return ("HASH");
 	}
@@ -168,12 +169,9 @@ class ha_pinba: public handler
 	uint max_supported_key_parts()     const { return 1; }
 	uint max_supported_key_length()    const { return 256; }
 
-	/* disable query cache for Pinba engine */
-	uint8 table_cache_type() { return HA_CACHE_TBL_NOCACHE; }
-
 	/* methods */
 
-	int open(const char *name, int mode, uint test_if_locked);    //required
+	int open(const char *name, int mode, uint test_if_locked, const dd::Table *table_def);    //required
 	int close(void);                                              //required
 	int rnd_init(bool scan);                                      //required
 	int rnd_next(unsigned char *buf);                             //required
@@ -194,7 +192,7 @@ class ha_pinba: public handler
 	void position(const unsigned char *record);                   //required
 	int info(uint);                                               //required
 
-	int create(const char *name, TABLE *form, HA_CREATE_INFO *create_info); //required
+	int create(const char *name, TABLE *form, HA_CREATE_INFO *create_info, dd::Table *table_def); //required
 	int delete_all_rows();
 
 	THR_LOCK_DATA **store_lock(THD *thd, THR_LOCK_DATA **to, enum thr_lock_type lock_type);     //required

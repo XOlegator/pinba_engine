@@ -77,14 +77,17 @@ extern pinba_daemon *D;
 #define UNLIKELY(x)     x
 #endif
 
+#include <algorithm>
+#include <cstddef>
+
 void *pinba_data_main(void *arg);
 void *pinba_collector_main(void *arg);
 void *pinba_stats_main(void *arg);
-int pinba_collector_init(pinba_daemon_settings settings);
+int pinba_collector_init(const pinba_daemon_settings &settings);
 void pinba_collector_shutdown();
 int pinba_get_processors_number();
 
-int pinba_get_time_interval(pinba_std_report *report);
+int pinba_get_time_interval();
 int pinba_process_stats_packet(const unsigned char *buffer, int buffer_len);
 
 void pinba_eat_udp(pinba_socket *socket, size_t thread_num);
@@ -95,6 +98,14 @@ void pinba_tag_dtor(pinba_tag *tag);
 int pinba_tag_put(const unsigned char *name);
 pinba_tag *pinba_tag_get_by_name(char *name);
 pinba_tag *pinba_tag_get_by_id(size_t id);
+pinba_tag *pinba_tag_lookup_or_create_locked(const char *name, size_t len);
+
+typedef struct _pinba_tag_metrics_snapshot {
+	uint64_t tags_created;
+	uint64_t tags_reused;
+} pinba_tag_metrics_snapshot;
+
+pinba_tag_metrics_snapshot pinba_tag_metrics_get(void);
 
 #include "pinba_update_report_proto.h"
 
@@ -165,39 +176,102 @@ int pinba_delete_report_tables(char *index);
 #define TIMER_POOL(pool) ((pinba_timer_record *)((pool)->data))
 #define POOL_DATA(pool) ((void **)((pool)->data))
 
-#define memcpy_static(buf, str, str_len, result_len)	\
-do {										\
-	if (sizeof(buf) <= (unsigned int)str_len) { 	\
-		/* truncate the string */			\
-		memcpy(buf, str, sizeof(buf) - 1);	\
-		buf[sizeof(buf) - 1] = '\0';		\
-		result_len = sizeof(buf) - 1;       \
-	} else {								\
-		memcpy(buf, str, str_len);			\
-		buf[str_len] = '\0';				\
-		result_len = str_len;               \
-	}										\
-} while(0)
+static inline size_t pinba_copy_truncated(char *buf, size_t buf_size, const char *str, size_t str_len)
+{
+	if (!buf || buf_size == 0) {
+		return 0;
+	}
 
-#define memcat_static(buf, plus, str, str_len, result_len)	\
-do {										\
-	register unsigned int __n = sizeof(buf);			\
-											\
-	if ((unsigned int)(plus) >= __n) {		\
-		break;								\
-	}										\
-											\
-	if ((__n - (plus) - 1) < str_len) {		\
-		/* truncate the string */			\
-		memcpy(buf + (plus), str, __n - (plus)); \
-		buf[__n - 1] = '\0';				\
-		result_len = __n - 1;				\
-	} else {								\
-		memcpy(buf + (plus), str, str_len);	\
-		buf[(plus) + str_len] = '\0';		\
-		result_len = (plus) + str_len;		\
-	}										\
-} while(0)
+	const size_t copy_len = std::min(str_len, buf_size - 1);
+	if (copy_len > 0 && str) {
+		memcpy(buf, str, copy_len);
+	}
+	buf[copy_len] = '\0';
+	return copy_len;
+}
+
+static inline void *pinba_malloc_or_log(size_t size, const char *what)
+{
+	void *ptr = malloc(size);
+	if (UNLIKELY(!ptr)) {
+		pinba_error(P_WARNING, "out of memory allocating %s (%zu bytes)", what, size);
+	}
+	return ptr;
+}
+
+static inline void *pinba_calloc_or_log(size_t count, size_t size, const char *what)
+{
+	void *ptr = calloc(count, size);
+	if (UNLIKELY(!ptr)) {
+		pinba_error(P_WARNING, "out of memory allocating %s (%zu x %zu bytes)", what, count, size);
+	}
+	return ptr;
+}
+
+static inline void *pinba_realloc_or_log(void *ptr, size_t size, const char *what)
+{
+	void *new_ptr = realloc(ptr, size);
+	if (UNLIKELY(!new_ptr)) {
+		pinba_error(P_WARNING, "out of memory reallocating %s (%zu bytes)", what, size);
+	}
+	return new_ptr;
+}
+
+static inline void *pinba_realloc_array_or_log(void *ptr, size_t count, size_t elem_size, const char *what)
+{
+	return pinba_realloc_or_log(ptr, count * elem_size, what);
+}
+
+static inline int pinba_ensure_reports_job_capacity(
+	struct reports_job_data **buffer,
+	unsigned int *allocated,
+	size_t required,
+	const char *buffer_name)
+{
+	struct reports_job_data *new_buffer;
+	size_t new_allocated;
+
+	if (*allocated >= required) {
+		return P_SUCCESS;
+	}
+
+	new_allocated = required * 2;
+	new_buffer = (struct reports_job_data *)pinba_realloc_array_or_log(
+		*buffer, new_allocated, sizeof(struct reports_job_data), buffer_name);
+	if (UNLIKELY(!new_buffer)) {
+		return P_FAILURE;
+	}
+
+	*buffer = new_buffer;
+	*allocated = new_allocated;
+	return P_SUCCESS;
+}
+
+static inline size_t pinba_append_truncated(char *buf, size_t buf_size, size_t plus, const char *str, size_t str_len)
+{
+	if (!buf || buf_size == 0 || plus >= buf_size) {
+		return plus;
+	}
+
+	const size_t available = buf_size - plus;
+	if (available <= 1) {
+		buf[buf_size - 1] = '\0';
+		return buf_size - 1;
+	}
+
+	const size_t copy_len = std::min(str_len, available - 1);
+	if (copy_len > 0 && str) {
+		memcpy(buf + plus, str, copy_len);
+	}
+	buf[plus + copy_len] = '\0';
+	return plus + copy_len;
+}
+
+#define memcpy_static(buf, str, str_len, result_len) \
+	do { result_len = pinba_copy_truncated(buf, sizeof(buf), str, str_len); } while (0)
+
+#define memcat_static(buf, plus, str, str_len, result_len) \
+	do { result_len = pinba_append_truncated(buf, sizeof(buf), plus, str, str_len); } while (0)
 
 size_t pinba_pool_num_records(pinba_pool *p);
 int pinba_pool_init(pinba_pool *p, size_t size, size_t element_size, size_t limit_size, size_t grow_size, pool_dtor_func_t dtor, char *pool_name);
@@ -209,9 +283,35 @@ int pinba_pool_push(pinba_pool *p, size_t grow_size, void *data);
 
 #define timeval_to_float(tv) ((float)(tv).tv_sec + ((float)(tv).tv_usec / 1000000.0))
 
-static inline struct timeval float_to_timeval(double f) /* {{{ */
+#define timeval_to_pinba_timeval(tv, ptv) { ptv.tv_sec = tv.tv_sec; ptv.tv_usec = tv.tv_usec; }
+
+#define pinba_timercmp(a, b, CMP) \
+  (((a)->tv_sec == (b)->tv_sec) ? ((a)->tv_usec CMP (b)->tv_usec) : ((a)->tv_sec CMP (b)->tv_sec))
+
+# define pinba_timeradd(a, b, result)                 \
+  do {                                                \
+    (result)->tv_sec = (a)->tv_sec + (b)->tv_sec;     \
+    (result)->tv_usec = (a)->tv_usec + (b)->tv_usec;  \
+    if ((result)->tv_usec >= 1000000)                 \
+    {                                                 \
+      ++(result)->tv_sec;                             \
+      (result)->tv_usec -= 1000000;                   \
+    }                                                 \
+  } while (0)
+
+# define pinba_timersub(a, b, result)                 \
+  do {                                                \
+    (result)->tv_sec = (a)->tv_sec - (b)->tv_sec;     \
+    (result)->tv_usec = (a)->tv_usec - (b)->tv_usec;  \
+    if ((result)->tv_usec < 0) {                      \
+      --(result)->tv_sec;                             \
+      (result)->tv_usec += 1000000;                   \
+    }                                                 \
+  } while (0)
+
+static inline pinba_timeval float_to_timeval(double f) /* {{{ */
 {
-	struct timeval t;
+	pinba_timeval t;
 	double fraction, integral;
 
 	fraction = modf(f, &integral);
@@ -277,13 +377,12 @@ void pinba_timer_pool_dtor(void *pool);
 int timer_pool_add(int timers_cnt);
 
 void update_reports_func(void *job_data);
-void update_tag_reports_func(void *job_data);
 
 void pinba_get_rusage(struct rusage *data);
 void pinba_report_add_rusage(void *report, struct rusage *start_rusage);
 pinba_word *pinba_dictionary_word_get_or_insert_rdlock(char *str, int str_len);
 
-static inline void pinba_update_histogram(pinba_std_report *report, void **histogram_data, const struct timeval *time, const int add) /* {{{ */
+static inline void pinba_update_histogram(pinba_std_report *report, void **histogram_data, const pinba_timeval *time, const int add) /* {{{ */
 {
 	unsigned int slot_num;
 	float time_value = timeval_to_float(*time);
@@ -319,7 +418,7 @@ static inline void pinba_update_histogram(pinba_std_report *report, void **histo
 #define PINBA_UPDATE_HISTOGRAM_ADD_EX(report, data, value, cnt) pinba_update_histogram((pinba_std_report *)(report), &(data), &(value), (cnt));
 #define PINBA_UPDATE_HISTOGRAM_DEL_EX(report, data, value, cnt) pinba_update_histogram((pinba_std_report *)(report), &(data), &(value), -(cnt));
 
-#define PINBA_REPORT_DELETE_CHECK(report, record) if (timercmp(&(report)->std.start, &(record)->time, >) || (timercmp(&(report)->std.start, &(record)->time, ==) && (report)->std.request_pool_start_id > (record)->counter)) { return; }
+#define PINBA_REPORT_DELETE_CHECK(report, record) if (pinba_timercmp(&(report)->std.start, &(record)->time, >) || (pinba_timercmp(&(report)->std.start, &(record)->time, ==) && (report)->std.request_pool_start_id > (record)->counter)) { return; }
 
 struct pinba_version_info {
 	const char *vcs_date;

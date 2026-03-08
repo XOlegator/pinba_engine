@@ -12,6 +12,7 @@
 #include <pthread.h>
 #include <sys/time.h>
 #include <errno.h>
+#include <stdint.h>
 
 #include "pinba.h"
 #include "threadpool.h"
@@ -34,6 +35,7 @@ static inline queue_head_t *queue_create(int initial_cap) /* {{{ */
 	}
 
 	if (initial_cap == 0) {
+		free(theQueue);
 		return NULL;
 	}
 
@@ -252,7 +254,8 @@ static void *th_do_work(void *data) /* {{{ */
 
 		/* else execute all the jobs first */
 		queue_fetch_job(pool->job_queue, &barrier, &myjob, &myarg, &mycleaner, &mycleanarg);
-		if (myjob == (void *)-1) {
+		/* Use uintptr_t for safe comparison with sentinel value */
+		if ((uintptr_t)myjob == (uintptr_t)-1) {
 			break;
 		}
 		pthread_cond_signal(&pool->job_taken);
@@ -435,7 +438,6 @@ void th_pool_destroy(thread_pool_t *destroyme) /* {{{ */
 
 	free(pool);
 	pool = NULL;
-	destroyme = NULL;
 }
 /* }}} */
 
@@ -471,7 +473,6 @@ void th_pool_destroy_immediately(thread_pool_t *destroymenow) /* {{{ */
 	memset(pool, 0, sizeof(thread_pool_t));
 	free(pool);
 	pool = NULL;
-	destroymenow = NULL;
 }
 /* }}} */
 
@@ -524,4 +525,3 @@ void th_pool_barrier_end(thread_pool_barrier_t *b) /* {{{ */
 	th_pool_barrier_destroy(b);
 }
 /* }}} */
-

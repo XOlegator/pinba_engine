@@ -1,0 +1,37 @@
+/* src/config.h.in - configuration template used by CMake configure_file(). */
+
+/* debug is off */
+#undef DEBUG_OFF
+
+/* debug is on */
+#undef DEBUG_ON
+
+/* Whether pthread_setaffinity_np() is available */
+#undef HAVE_PTHREAD_SETAFFINITY_NP
+
+/* Define to 1 if you have the `recvmmsg' function. */
+#undef HAVE_RECVMMSG
+
+/* Define to 1 if you have the `strndup' function. */
+#undef HAVE_STRNDUP
+
+/* Define to 1 if you have the `sysconf' function. */
+#undef HAVE_SYSCONF
+
+/* custom build string */
+#undef PINBA_BUILD_STRING
+
+/* vcs branch */
+#undef VCS_BRANCH
+
+/* vcs date */
+#undef VCS_DATE
+
+/* vcs full hash */
+#undef VCS_FULL_HASH
+
+/* vcs short hash */
+#undef VCS_SHORT_HASH
+
+/* vcs wc modified */
+#undef VCS_WC_MODIFIED

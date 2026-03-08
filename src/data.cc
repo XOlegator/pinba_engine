@@ -18,11 +18,31 @@
 #include <string>
 using namespace std;
 
-static time_t last_warning = 0;
+static time_t last_warning __attribute__((unused)) = 0;
 
 
 #include "pinba_map.h"
 #include "pinba_update_report.h"
+
+static inline void pinba_append_key_delimiter(char *buf, size_t buf_size, int *index_len)
+{
+	if (!buf || !index_len || *index_len < 0) {
+		return;
+	}
+
+	const size_t pos = static_cast<size_t>(*index_len);
+	if (pos + 1 >= buf_size) {
+		if (buf_size > 0) {
+			buf[buf_size - 1] = '\0';
+			*index_len = static_cast<int>(buf_size - 1);
+		}
+		return;
+	}
+
+	buf[pos] = '|';
+	buf[pos + 1] = '\0';
+	*index_len += 1;
+}
 
 void pinba_update_tag_info_add(size_t request_id, void *rep, const pinba_stats_record *record) /* {{{ */
 {
@@ -68,10 +88,10 @@ void pinba_update_tag_info_add(size_t request_id, void *rep, const pinba_stats_r
 			report->std.results_cnt++;
 		} else {
 			data->hit_count += timer->hit_count;
-			timeradd(&data->timer_value, &timer->value, &data->timer_value);
+			pinba_timeradd(&data->timer_value, &timer->value, &data->timer_value);
 		}
-		timeradd(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
-		timeradd(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
+		pinba_timeradd(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
+		pinba_timeradd(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
 		PINBA_UPDATE_HISTOGRAM_ADD_EX(report, data->histogram_data, timer->value, timer->hit_count);
 
 		/* count tag values only once per request */
@@ -128,9 +148,9 @@ void pinba_update_tag_info_delete(size_t request_id, void *rep, const pinba_stat
 				free(data);
 			} else {
 				data->hit_count -= timer->hit_count;
-				timersub(&data->timer_value, &timer->value, &data->timer_value);
-				timersub(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
-				timersub(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
+				pinba_timersub(&data->timer_value, &timer->value, &data->timer_value);
+				pinba_timersub(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
+				pinba_timersub(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
 				PINBA_UPDATE_HISTOGRAM_DEL_EX(report, data->histogram_data, timer->value, timer->hit_count);
 			}
 		}
@@ -144,6 +164,7 @@ void pinba_update_tag2_info_add(size_t request_id, void *rep, const pinba_stats_
 	struct pinba_tag2_info_data *data;
 	pinba_timer_record *timer;
 	int i, j, tag1_pos, tag2_pos, dummy;
+	(void)i; (void)j; (void)tag1_pos; (void)tag2_pos; (void)dummy; /* Variables may be unused in some code paths */
 	pinba_word *word1, *word2;
 	int index_len;
 	char index_val[PINBA_TAG_VALUE_SIZE + 1 + PINBA_TAG_VALUE_SIZE];
@@ -197,10 +218,10 @@ void pinba_update_tag2_info_add(size_t request_id, void *rep, const pinba_stats_
 			report->std.results_cnt++;
 		} else {
 			data->hit_count += timer->hit_count;
-			timeradd(&data->timer_value, &timer->value, &data->timer_value);
+			pinba_timeradd(&data->timer_value, &timer->value, &data->timer_value);
 		}
-		timeradd(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
-		timeradd(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
+		pinba_timeradd(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
+		pinba_timeradd(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
 		PINBA_UPDATE_HISTOGRAM_ADD_EX(report, data->histogram_data, timer->value, timer->hit_count);
 
 		/* count tag values only once per request */
@@ -269,9 +290,9 @@ void pinba_update_tag2_info_delete(size_t request_id, void *rep, const pinba_sta
 				continue;
 			} else {
 				data->hit_count -= timer->hit_count;
-				timersub(&data->timer_value, &timer->value, &data->timer_value);
-				timersub(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
-				timersub(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
+				pinba_timersub(&data->timer_value, &timer->value, &data->timer_value);
+				pinba_timersub(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
+				pinba_timersub(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
 				PINBA_UPDATE_HISTOGRAM_DEL_EX(report, data->histogram_data, timer->value, timer->hit_count);
 			}
 		}
@@ -285,6 +306,7 @@ void pinba_update_tag_report_add(size_t request_id, void *rep, const pinba_stats
 	struct pinba_tag_report_data *data;
 	pinba_timer_record *timer;
 	int i, j, tag_found, dummy;
+	(void)i; (void)j; (void)tag_found; (void)dummy; /* Variables may be unused in some code paths */
 	pinba_word *word;
 	void *script_map = NULL;
 
@@ -333,10 +355,10 @@ void pinba_update_tag_report_add(size_t request_id, void *rep, const pinba_stats
 			report->std.results_cnt++;
 		} else {
 			data->hit_count += timer->hit_count;
-			timeradd(&data->timer_value, &timer->value, &data->timer_value);
+			pinba_timeradd(&data->timer_value, &timer->value, &data->timer_value);
 		}
-		timeradd(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
-		timeradd(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
+		pinba_timeradd(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
+		pinba_timeradd(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
 		PINBA_UPDATE_HISTOGRAM_ADD_EX(report, data->histogram_data, timer->value, timer->hit_count);
 
 		/* count tag values only once per request */
@@ -405,9 +427,9 @@ void pinba_update_tag_report_delete(size_t request_id, void *rep, const pinba_st
 				continue;
 			} else {
 				data->hit_count -= timer->hit_count;
-				timersub(&data->timer_value, &timer->value, &data->timer_value);
-				timersub(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
-				timersub(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
+				pinba_timersub(&data->timer_value, &timer->value, &data->timer_value);
+				pinba_timersub(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
+				pinba_timersub(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
 				PINBA_UPDATE_HISTOGRAM_DEL_EX(report, data->histogram_data, timer->value, timer->hit_count);
 			}
 		}
@@ -421,6 +443,7 @@ void pinba_update_tag2_report_add(size_t request_id, void *rep, const pinba_stat
 	struct pinba_tag2_report_data *data;
 	pinba_timer_record *timer;
 	int i, j, tag1_pos, tag2_pos, dummy;
+	(void)i; (void)j; (void)tag1_pos; (void)tag2_pos; (void)dummy; /* Variables may be unused in some code paths */
 	int index_len;
 	char index_val[PINBA_TAG_VALUE_SIZE + 1 + PINBA_TAG_VALUE_SIZE + 1];
 	pinba_word *word1, *word2;
@@ -483,10 +506,10 @@ void pinba_update_tag2_report_add(size_t request_id, void *rep, const pinba_stat
 			report->std.results_cnt++;
 		} else {
 			data->hit_count += timer->hit_count;
-			timeradd(&data->timer_value, &timer->value, &data->timer_value);
+			pinba_timeradd(&data->timer_value, &timer->value, &data->timer_value);
 		}
-		timeradd(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
-		timeradd(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
+		pinba_timeradd(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
+		pinba_timeradd(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
 		PINBA_UPDATE_HISTOGRAM_ADD_EX(report, data->histogram_data, timer->value, timer->hit_count);
 
 		/* count tag values only once per request */
@@ -563,9 +586,9 @@ void pinba_update_tag2_report_delete(size_t request_id, void *rep, const pinba_s
 				report->std.results_cnt--;
 			} else {
 				data->hit_count -= timer->hit_count;
-				timersub(&data->timer_value, &timer->value, &data->timer_value);
-				timersub(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
-				timersub(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
+				pinba_timersub(&data->timer_value, &timer->value, &data->timer_value);
+				pinba_timersub(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
+				pinba_timersub(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
 				PINBA_UPDATE_HISTOGRAM_DEL_EX(report, data->histogram_data, timer->value, timer->hit_count);
 			}
 		}
@@ -579,6 +602,7 @@ void pinba_update_tag_report2_add(size_t request_id, void *rep, const pinba_stat
 	struct pinba_tag_report2_data *data;
 	pinba_timer_record *timer;
 	int i, j, tag_found, index_len, dummy;
+	(void)i; (void)j; (void)tag_found; (void)index_len; (void)dummy; /* Variables may be unused in some code paths */
 	char index[PINBA_SCRIPT_NAME_SIZE + PINBA_HOSTNAME_SIZE + PINBA_SCRIPT_NAME_SIZE + 1 + PINBA_TAG_VALUE_SIZE];
 	pinba_word *word;
 	void *script_map = NULL;
@@ -629,6 +653,7 @@ void pinba_update_tag_report2_add(size_t request_id, void *rep, const pinba_stat
 			data->prev_del_request_id = -1;
 
 			memcpy_static(data->hostname, record->data.hostname, record->data.hostname_len, dummy);
+		(void)dummy; /* Suppress unused variable warning */
 			memcpy_static(data->server_name, record->data.server_name, record->data.server_name_len, dummy);
 			memcpy_static(data->script_name, record->data.script_name, record->data.script_name_len, dummy);
 			memcpy_static(data->tag_value, word->str, word->len, dummy);
@@ -638,10 +663,10 @@ void pinba_update_tag_report2_add(size_t request_id, void *rep, const pinba_stat
 		} else {
 
 			data->hit_count += timer->hit_count;
-			timeradd(&data->timer_value, &timer->value, &data->timer_value);
+			pinba_timeradd(&data->timer_value, &timer->value, &data->timer_value);
 		}
-		timeradd(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
-		timeradd(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
+		pinba_timeradd(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
+		pinba_timeradd(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
 		PINBA_UPDATE_HISTOGRAM_ADD_EX(report, data->histogram_data, timer->value, timer->hit_count);
 
 		/* count tag values only once per request */
@@ -715,9 +740,9 @@ void pinba_update_tag_report2_delete(size_t request_id, void *rep, const pinba_s
 				report->std.results_cnt--;
 			} else {
 				data->hit_count -= timer->hit_count;
-				timersub(&data->timer_value, &timer->value, &data->timer_value);
-				timersub(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
-				timersub(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
+				pinba_timersub(&data->timer_value, &timer->value, &data->timer_value);
+				pinba_timersub(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
+				pinba_timersub(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
 				PINBA_UPDATE_HISTOGRAM_DEL_EX(report, data->histogram_data, timer->value, timer->hit_count);
 			}
 		}
@@ -731,8 +756,9 @@ void pinba_update_tag2_report2_add(size_t request_id, void *rep, const pinba_sta
 	struct pinba_tag2_report2_data *data;
 	pinba_timer_record *timer;
 	int i, j, tag1_pos, tag2_pos, dummy;
+	(void)i; (void)j; (void)tag1_pos; (void)tag2_pos; (void)dummy; /* Variables may be unused in some code paths */
 	int index_len;
-	char index_val[PINBA_HOSTNAME_SIZE + 1 + PINBA_SERVER_NAME_SIZE + 1 + PINBA_SCRIPT_NAME_SIZE + 1 + PINBA_TAG_VALUE_SIZE + 1 + PINBA_TAG_VALUE_SIZE];
+	char index_val[PINBA_HOSTNAME_SIZE + 1 + PINBA_SERVER_NAME_SIZE + 1 + PINBA_SCRIPT_NAME_SIZE + 1 + PINBA_TAG_VALUE_SIZE + 1 + PINBA_TAG_VALUE_SIZE + 1]; /* +1 for safety */
 	pinba_word *word1, *word2;
 	void *script_map = NULL;
 
@@ -759,11 +785,11 @@ void pinba_update_tag2_report2_add(size_t request_id, void *rep, const pinba_sta
 		word2 = (pinba_word *)timer->tag_values[tag2_pos];
 
 		memcpy_static(index_val, record->data.hostname, (int)record->data.hostname_len, index_len);
-		index_val[index_len] = '|'; index_len++;
+		pinba_append_key_delimiter(index_val, sizeof(index_val), &index_len);
 		memcat_static(index_val, index_len, record->data.server_name, (int)record->data.server_name_len, index_len);
-		index_val[index_len] = '|'; index_len++;
+		pinba_append_key_delimiter(index_val, sizeof(index_val), &index_len);
 		memcat_static(index_val, index_len, word1->str, word1->len, index_len);
-		index_val[index_len] = '|'; index_len++;
+		pinba_append_key_delimiter(index_val, sizeof(index_val), &index_len);
 		memcat_static(index_val, index_len, word2->str, word2->len, index_len);
 
 		if (!script_map) {
@@ -789,6 +815,7 @@ void pinba_update_tag2_report2_add(size_t request_id, void *rep, const pinba_sta
 			data->prev_del_request_id = -1;
 
 			memcpy_static(data->hostname, record->data.hostname, record->data.hostname_len, dummy);
+		(void)dummy; /* Suppress unused variable warning */
 			memcpy_static(data->server_name, record->data.server_name, record->data.server_name_len, dummy);
 			memcpy_static(data->script_name, record->data.script_name, record->data.script_name_len, dummy);
 			memcpy_static(data->tag1_value, word1->str, word1->len, dummy);
@@ -798,10 +825,10 @@ void pinba_update_tag2_report2_add(size_t request_id, void *rep, const pinba_sta
 			report->std.results_cnt++;
 		} else {
 			data->hit_count += timer->hit_count;
-			timeradd(&data->timer_value, &timer->value, &data->timer_value);
+			pinba_timeradd(&data->timer_value, &timer->value, &data->timer_value);
 		}
-		timeradd(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
-		timeradd(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
+		pinba_timeradd(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
+		pinba_timeradd(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
 		PINBA_UPDATE_HISTOGRAM_ADD_EX(report, data->histogram_data, timer->value, timer->hit_count);
 
 		/* count tag values only once per request */
@@ -820,7 +847,7 @@ void pinba_update_tag2_report2_delete(size_t request_id, void *rep, const pinba_
 	pinba_timer_record *timer;
 	int i, j, tag1_pos, tag2_pos;
 	int index_len;
-	char index_val[PINBA_HOSTNAME_SIZE + PINBA_SERVER_NAME_SIZE + PINBA_SCRIPT_NAME_SIZE + 1 + PINBA_TAG_VALUE_SIZE + 1 + PINBA_TAG_VALUE_SIZE];
+	char index_val[PINBA_HOSTNAME_SIZE + PINBA_SERVER_NAME_SIZE + PINBA_SCRIPT_NAME_SIZE + 1 + PINBA_TAG_VALUE_SIZE + 1 + PINBA_TAG_VALUE_SIZE + 1]; /* +1 for safety */
 	pinba_word *word1, *word2;
 	void *script_map;
 
@@ -854,11 +881,11 @@ void pinba_update_tag2_report2_delete(size_t request_id, void *rep, const pinba_
 		word2 = (pinba_word *)timer->tag_values[tag2_pos];
 
 		memcpy_static(index_val, record->data.hostname, (int)record->data.hostname_len, index_len);
-		index_val[index_len] = '|'; index_len++;
+		pinba_append_key_delimiter(index_val, sizeof(index_val), &index_len);
 		memcat_static(index_val, index_len, record->data.server_name, (int)record->data.server_name_len, index_len);
-		index_val[index_len] = '|'; index_len++;
+		pinba_append_key_delimiter(index_val, sizeof(index_val), &index_len);
 		memcat_static(index_val, index_len, word1->str, word1->len, index_len);
-		index_val[index_len] = '|'; index_len++;
+		pinba_append_key_delimiter(index_val, sizeof(index_val), &index_len);
 		memcat_static(index_val, index_len, word2->str, word2->len, index_len);
 
 		data = (struct pinba_tag2_report2_data*)pinba_map_get(script_map, index_val);
@@ -883,9 +910,9 @@ void pinba_update_tag2_report2_delete(size_t request_id, void *rep, const pinba_
 				report->std.results_cnt--;
 			} else {
 				data->hit_count -= timer->hit_count;
-				timersub(&data->timer_value, &timer->value, &data->timer_value);
-				timersub(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
-				timersub(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
+				pinba_timersub(&data->timer_value, &timer->value, &data->timer_value);
+				pinba_timersub(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
+				pinba_timersub(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
 				PINBA_UPDATE_HISTOGRAM_DEL_EX(report, data->histogram_data, timer->value, timer->hit_count);
 			}
 		}
@@ -975,10 +1002,10 @@ jump_ahead:
 			report->std.results_cnt++;
 		} else {
 			data->hit_count += timer->hit_count;
-			timeradd(&data->timer_value, &timer->value, &data->timer_value);
+			pinba_timeradd(&data->timer_value, &timer->value, &data->timer_value);
 		}
-		timeradd(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
-		timeradd(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
+		pinba_timeradd(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
+		pinba_timeradd(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
 		PINBA_UPDATE_HISTOGRAM_ADD_EX(report, data->histogram_data, timer->value, timer->hit_count);
 
 		/* count tag values only once per request */
@@ -1064,9 +1091,9 @@ jump_ahead:
 				continue;
 			} else {
 				data->hit_count -= timer->hit_count;
-				timersub(&data->timer_value, &timer->value, &data->timer_value);
-				timersub(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
-				timersub(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
+				pinba_timersub(&data->timer_value, &timer->value, &data->timer_value);
+				pinba_timersub(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
+				pinba_timersub(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
 				PINBA_UPDATE_HISTOGRAM_DEL_EX(report, data->histogram_data, timer->value, timer->hit_count);
 			}
 		}
@@ -1080,6 +1107,7 @@ void pinba_update_tagN_report_add(size_t request_id, void *rep, const pinba_stat
 	struct pinba_tagN_report_data *data;
 	pinba_timer_record *timer;
 	int i, j, k, found_tags_cnt, dummy, h;
+	(void)i; (void)j; (void)k; (void)found_tags_cnt; (void)h; (void)dummy; /* Variables may be unused in some code paths */
 	int index_len;
 	pinba_word *word;
 	void *script_map = NULL;
@@ -1162,10 +1190,10 @@ jump_ahead:
 			report->std.results_cnt++;
 		} else {
 			data->hit_count += timer->hit_count;
-			timeradd(&data->timer_value, &timer->value, &data->timer_value);
+			pinba_timeradd(&data->timer_value, &timer->value, &data->timer_value);
 		}
-		timeradd(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
-		timeradd(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
+		pinba_timeradd(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
+		pinba_timeradd(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
 		PINBA_UPDATE_HISTOGRAM_ADD_EX(report, data->histogram_data, timer->value, timer->hit_count);
 
 		/* count tag values only once per request */
@@ -1258,9 +1286,9 @@ jump_ahead:
 				continue;
 			} else {
 				data->hit_count -= timer->hit_count;
-				timersub(&data->timer_value, &timer->value, &data->timer_value);
-				timersub(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
-				timersub(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
+				pinba_timersub(&data->timer_value, &timer->value, &data->timer_value);
+				pinba_timersub(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
+				pinba_timersub(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
 				PINBA_UPDATE_HISTOGRAM_DEL_EX(report, data->histogram_data, timer->value, timer->hit_count);
 			}
 		}
@@ -1274,6 +1302,7 @@ void pinba_update_tagN_report2_add(size_t request_id, void *rep, const pinba_sta
 	struct pinba_tagN_report2_data *data;
 	pinba_timer_record *timer;
 	int i, j, k, found_tags_cnt, dummy, h;
+	(void)i; (void)j; (void)k; (void)found_tags_cnt; (void)h; (void)dummy; /* Variables may be unused in some code paths */
 	int index_len;
 	pinba_word *word;
 	void *script_map = NULL;
@@ -1353,6 +1382,7 @@ jump_ahead:
 			data->prev_del_request_id = -1;
 
 			memcpy_static(data->hostname, record->data.hostname, record->data.hostname_len, dummy);
+		(void)dummy; /* Suppress unused variable warning */
 			memcpy_static(data->server_name, record->data.server_name, record->data.server_name_len, dummy);
 			memcpy_static(data->script_name, record->data.script_name, record->data.script_name_len, dummy);
 			for (k = 0; k < report->tags_cnt; k++) {
@@ -1364,10 +1394,10 @@ jump_ahead:
 			report->std.results_cnt++;
 		} else {
 			data->hit_count += timer->hit_count;
-			timeradd(&data->timer_value, &timer->value, &data->timer_value);
+			pinba_timeradd(&data->timer_value, &timer->value, &data->timer_value);
 		}
-		timeradd(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
-		timeradd(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
+		pinba_timeradd(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
+		pinba_timeradd(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
 		PINBA_UPDATE_HISTOGRAM_ADD_EX(report, data->histogram_data, timer->value, timer->hit_count);
 
 		/* count tag values only once per request */
@@ -1466,9 +1496,9 @@ jump_ahead:
 				continue;
 			} else {
 				data->hit_count -= timer->hit_count;
-				timersub(&data->timer_value, &timer->value, &data->timer_value);
-				timersub(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
-				timersub(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
+				pinba_timersub(&data->timer_value, &timer->value, &data->timer_value);
+				pinba_timersub(&data->ru_utime_value, &timer->ru_utime, &data->ru_utime_value);
+				pinba_timersub(&data->ru_stime_value, &timer->ru_stime, &data->ru_stime_value);
 				PINBA_UPDATE_HISTOGRAM_DEL_EX(report, data->histogram_data, timer->value, timer->hit_count);
 			}
 		}
@@ -1479,6 +1509,7 @@ jump_ahead:
 
 void pinba_update_rtag_info_add(size_t request_id, void *rep, const pinba_stats_record *record) /* {{{ */
 {
+	(void)request_id; /* Suppress unused parameter warning */
 	pinba_rtag_report *report = (pinba_rtag_report *)rep;
 	struct pinba_rtag_info_data *data;
 	unsigned int i, tag_found = 0;
@@ -1506,16 +1537,16 @@ void pinba_update_rtag_info_add(size_t request_id, void *rep, const pinba_stats_
 		report->std.results_cnt++;
 	}
 
-	timeradd(&report->time_total, &record->data.req_time, &report->time_total);
-	timeradd(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
-	timeradd(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
+	pinba_timeradd(&report->time_total, &record->data.req_time, &report->time_total);
+	pinba_timeradd(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
+	pinba_timeradd(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
 	report->kbytes_total += record->data.doc_size;
 	report->memory_footprint += record->data.memory_footprint;
 
 	data->req_count++;
-	timeradd(&data->req_time_total, &record->data.req_time, &data->req_time_total);
-	timeradd(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
-	timeradd(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
+	pinba_timeradd(&data->req_time_total, &record->data.req_time, &data->req_time_total);
+	pinba_timeradd(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
+	pinba_timeradd(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
 	data->kbytes_total += record->data.doc_size;
 	data->memory_footprint += record->data.memory_footprint;
 	PINBA_UPDATE_HISTOGRAM_ADD(report, data->histogram_data, record->data.req_time);
@@ -1524,6 +1555,7 @@ void pinba_update_rtag_info_add(size_t request_id, void *rep, const pinba_stats_
 
 void pinba_update_rtag_info_delete(size_t request_id, void *rep, const pinba_stats_record *record) /* {{{ */
 {
+	(void)request_id; /* Suppress unused parameter warning */
 	pinba_rtag_report *report = (pinba_rtag_report *)rep;
 	struct pinba_rtag_info_data *data;
 	unsigned int i, tag_found = 0;
@@ -1548,9 +1580,9 @@ void pinba_update_rtag_info_delete(size_t request_id, void *rep, const pinba_sta
 	if (UNLIKELY(!data)) {
 		return;
 	} else {
-		timersub(&report->time_total, &record->data.req_time, &report->time_total);
-		timersub(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
-		timersub(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
+		pinba_timersub(&report->time_total, &record->data.req_time, &report->time_total);
+		pinba_timersub(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
+		pinba_timersub(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
 		report->kbytes_total -= record->data.doc_size;
 		report->memory_footprint -= record->data.memory_footprint;
 
@@ -1563,9 +1595,9 @@ void pinba_update_rtag_info_delete(size_t request_id, void *rep, const pinba_sta
 			report->std.results_cnt--;
 			return;
 		} else {
-			timersub(&data->req_time_total, &record->data.req_time, &data->req_time_total);
-			timersub(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
-			timersub(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
+			pinba_timersub(&data->req_time_total, &record->data.req_time, &data->req_time_total);
+			pinba_timersub(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
+			pinba_timersub(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
 			data->kbytes_total -= record->data.doc_size;
 			data->memory_footprint -= record->data.memory_footprint;
 			PINBA_UPDATE_HISTOGRAM_DEL(report, data->histogram_data, record->data.req_time);
@@ -1576,6 +1608,7 @@ void pinba_update_rtag_info_delete(size_t request_id, void *rep, const pinba_sta
 
 void pinba_update_rtag2_info_add(size_t request_id, void *rep, const pinba_stats_record *record) /* {{{ */
 {
+	(void)request_id; /* Suppress unused parameter warning */
 	pinba_rtag_report *report = (pinba_rtag_report *)rep;
 	struct pinba_rtag2_info_data *data;
 	unsigned int i;
@@ -1608,7 +1641,7 @@ void pinba_update_rtag2_info_add(size_t request_id, void *rep, const pinba_stats
 
 	data = (struct pinba_rtag2_info_data*)pinba_map_get(report->results, index_val);
 	if (UNLIKELY(!data)) {
-		int dummy;
+		int dummy; /* Used in memcpy_static macro */
 
 		data = (struct pinba_rtag2_info_data *)calloc(1, sizeof(struct pinba_rtag2_info_data));
 		if (!data) {
@@ -1617,22 +1650,22 @@ void pinba_update_rtag2_info_add(size_t request_id, void *rep, const pinba_stats
 
 		memcpy_static(data->tag1_value, word1->str, word1->len, dummy);
 		memcpy_static(data->tag2_value, word2->str, word2->len, dummy);
-		(void)dummy;
+		(void)dummy; /* Suppress unused variable warning */
 
 		report->results = pinba_map_add(report->results, index_val, data);
 		report->std.results_cnt++;
 	}
 
-	timeradd(&report->time_total, &record->data.req_time, &report->time_total);
-	timeradd(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
-	timeradd(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
+	pinba_timeradd(&report->time_total, &record->data.req_time, &report->time_total);
+	pinba_timeradd(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
+	pinba_timeradd(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
 	report->kbytes_total += record->data.doc_size;
 	report->memory_footprint += record->data.memory_footprint;
 
 	data->req_count++;
-	timeradd(&data->req_time_total, &record->data.req_time, &data->req_time_total);
-	timeradd(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
-	timeradd(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
+	pinba_timeradd(&data->req_time_total, &record->data.req_time, &data->req_time_total);
+	pinba_timeradd(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
+	pinba_timeradd(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
 	data->kbytes_total += record->data.doc_size;
 	data->memory_footprint += record->data.memory_footprint;
 	PINBA_UPDATE_HISTOGRAM_ADD(report, data->histogram_data, record->data.req_time);
@@ -1641,6 +1674,7 @@ void pinba_update_rtag2_info_add(size_t request_id, void *rep, const pinba_stats
 
 void pinba_update_rtag2_info_delete(size_t request_id, void *rep, const pinba_stats_record *record) /* {{{ */
 {
+	(void)request_id; /* Suppress unused parameter warning */
 	pinba_rtag_report *report = (pinba_rtag_report *)rep;
 	struct pinba_rtag2_info_data *data;
 	unsigned int i;
@@ -1677,9 +1711,9 @@ void pinba_update_rtag2_info_delete(size_t request_id, void *rep, const pinba_st
 	if (UNLIKELY(!data)) {
 		return;
 	} else {
-		timersub(&report->time_total, &record->data.req_time, &report->time_total);
-		timersub(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
-		timersub(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
+		pinba_timersub(&report->time_total, &record->data.req_time, &report->time_total);
+		pinba_timersub(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
+		pinba_timersub(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
 		report->kbytes_total -= record->data.doc_size;
 		report->memory_footprint -= record->data.memory_footprint;
 
@@ -1692,9 +1726,9 @@ void pinba_update_rtag2_info_delete(size_t request_id, void *rep, const pinba_st
 			report->std.results_cnt--;
 			return;
 		} else {
-			timersub(&data->req_time_total, &record->data.req_time, &data->req_time_total);
-			timersub(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
-			timersub(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
+			pinba_timersub(&data->req_time_total, &record->data.req_time, &data->req_time_total);
+			pinba_timersub(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
+			pinba_timersub(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
 			data->kbytes_total -= record->data.doc_size;
 			data->memory_footprint -= record->data.memory_footprint;
 			PINBA_UPDATE_HISTOGRAM_DEL(report, data->histogram_data, record->data.req_time);
@@ -1705,6 +1739,7 @@ void pinba_update_rtag2_info_delete(size_t request_id, void *rep, const pinba_st
 
 void pinba_update_rtagN_info_add(size_t request_id, void *rep, const pinba_stats_record *record) /* {{{ */
 {
+	(void)request_id; /* Suppress unused parameter warning */
 	pinba_rtag_report *report = (pinba_rtag_report *)rep;
 	struct pinba_rtagN_info_data *data;
 	unsigned int i, j, found_tags_cnt = 0;
@@ -1768,16 +1803,16 @@ void pinba_update_rtagN_info_add(size_t request_id, void *rep, const pinba_stats
 		report->std.results_cnt++;
 	}
 
-	timeradd(&report->time_total, &record->data.req_time, &report->time_total);
-	timeradd(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
-	timeradd(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
+	pinba_timeradd(&report->time_total, &record->data.req_time, &report->time_total);
+	pinba_timeradd(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
+	pinba_timeradd(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
 	report->kbytes_total += record->data.doc_size;
 	report->memory_footprint += record->data.memory_footprint;
 
 	data->req_count++;
-	timeradd(&data->req_time_total, &record->data.req_time, &data->req_time_total);
-	timeradd(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
-	timeradd(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
+	pinba_timeradd(&data->req_time_total, &record->data.req_time, &data->req_time_total);
+	pinba_timeradd(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
+	pinba_timeradd(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
 	data->kbytes_total += record->data.doc_size;
 	data->memory_footprint += record->data.memory_footprint;
 	PINBA_UPDATE_HISTOGRAM_ADD(report, data->histogram_data, record->data.req_time);
@@ -1786,6 +1821,7 @@ void pinba_update_rtagN_info_add(size_t request_id, void *rep, const pinba_stats
 
 void pinba_update_rtagN_info_delete(size_t request_id, void *rep, const pinba_stats_record *record) /* {{{ */
 {
+	(void)request_id; /* Suppress unused parameter warning */
 	pinba_rtag_report *report = (pinba_rtag_report *)rep;
 	struct pinba_rtagN_info_data *data;
 	unsigned int i, j, found_tags_cnt = 0;
@@ -1834,9 +1870,9 @@ void pinba_update_rtagN_info_delete(size_t request_id, void *rep, const pinba_st
 	if (UNLIKELY(!data)) {
 		return;
 	} else {
-		timersub(&report->time_total, &record->data.req_time, &report->time_total);
-		timersub(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
-		timersub(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
+		pinba_timersub(&report->time_total, &record->data.req_time, &report->time_total);
+		pinba_timersub(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
+		pinba_timersub(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
 		report->kbytes_total -= record->data.doc_size;
 		report->memory_footprint -= record->data.memory_footprint;
 
@@ -1850,9 +1886,9 @@ void pinba_update_rtagN_info_delete(size_t request_id, void *rep, const pinba_st
 			report->std.results_cnt--;
 			return;
 		} else {
-			timersub(&data->req_time_total, &record->data.req_time, &data->req_time_total);
-			timersub(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
-			timersub(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
+			pinba_timersub(&data->req_time_total, &record->data.req_time, &data->req_time_total);
+			pinba_timersub(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
+			pinba_timersub(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
 			data->kbytes_total -= record->data.doc_size;
 			data->memory_footprint -= record->data.memory_footprint;
 			PINBA_UPDATE_HISTOGRAM_DEL(report, data->histogram_data, record->data.req_time);
@@ -1863,6 +1899,7 @@ void pinba_update_rtagN_info_delete(size_t request_id, void *rep, const pinba_st
 
 void pinba_update_rtag_report_add(size_t request_id, void *rep, const pinba_stats_record *record) /* {{{ */
 {
+	(void)request_id; /* Suppress unused parameter warning */
 	pinba_rtag_report *report = (pinba_rtag_report *)rep;
 	struct pinba_rtag_report_data *data;
 	unsigned int i, tag_found = 0;
@@ -1890,7 +1927,7 @@ void pinba_update_rtag_report_add(size_t request_id, void *rep, const pinba_stat
 
 	data = (struct pinba_rtag_report_data *)pinba_map_get(host_map, word->str);
 	if (UNLIKELY(!data)) {
-		int dummy;
+		int dummy; /* Used in memcpy_static macro */
 
 		data = (struct pinba_rtag_report_data *)calloc(1, sizeof(struct pinba_rtag_report_data));
 		if (!data) {
@@ -1898,22 +1935,24 @@ void pinba_update_rtag_report_add(size_t request_id, void *rep, const pinba_stat
 		}
 
 		memcpy_static(data->hostname, record->data.hostname, record->data.hostname_len, dummy);
+		(void)dummy; /* Suppress unused variable warning */
 		memcpy_static(data->tag_value, word->str, word->len, dummy);
+		(void)dummy; /* Suppress unused variable warning */
 
 		pinba_map_add(host_map, word->str, data);
 		report->std.results_cnt++;
 	}
 
-	timeradd(&report->time_total, &record->data.req_time, &report->time_total);
-	timeradd(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
-	timeradd(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
+	pinba_timeradd(&report->time_total, &record->data.req_time, &report->time_total);
+	pinba_timeradd(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
+	pinba_timeradd(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
 	report->kbytes_total += record->data.doc_size;
 	report->memory_footprint += record->data.memory_footprint;
 
 	data->req_count++;
-	timeradd(&data->req_time_total, &record->data.req_time, &data->req_time_total);
-	timeradd(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
-	timeradd(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
+	pinba_timeradd(&data->req_time_total, &record->data.req_time, &data->req_time_total);
+	pinba_timeradd(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
+	pinba_timeradd(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
 	data->kbytes_total += record->data.doc_size;
 	data->memory_footprint += record->data.memory_footprint;
 	PINBA_UPDATE_HISTOGRAM_ADD(report, data->histogram_data, record->data.req_time);
@@ -1922,6 +1961,7 @@ void pinba_update_rtag_report_add(size_t request_id, void *rep, const pinba_stat
 
 void pinba_update_rtag_report_delete(size_t request_id, void *rep, const pinba_stats_record *record) /* {{{ */
 {
+	(void)request_id; /* Suppress unused parameter warning */
 	pinba_rtag_report *report = (pinba_rtag_report *)rep;
 	struct pinba_rtag_report_data *data;
 	unsigned int i, tag_found = 0;
@@ -1952,9 +1992,9 @@ void pinba_update_rtag_report_delete(size_t request_id, void *rep, const pinba_s
 	if (UNLIKELY(!data)) {
 		return;
 	} else {
-		timersub(&report->time_total, &record->data.req_time, &report->time_total);
-		timersub(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
-		timersub(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
+		pinba_timersub(&report->time_total, &record->data.req_time, &report->time_total);
+		pinba_timersub(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
+		pinba_timersub(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
 		report->kbytes_total -= record->data.doc_size;
 		report->memory_footprint -= record->data.memory_footprint;
 
@@ -1969,9 +2009,9 @@ void pinba_update_rtag_report_delete(size_t request_id, void *rep, const pinba_s
 			}
 			report->std.results_cnt--;
 		} else {
-			timersub(&data->req_time_total, &record->data.req_time, &data->req_time_total);
-			timersub(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
-			timersub(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
+			pinba_timersub(&data->req_time_total, &record->data.req_time, &data->req_time_total);
+			pinba_timersub(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
+			pinba_timersub(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
 			data->kbytes_total -= record->data.doc_size;
 			data->memory_footprint -= record->data.memory_footprint;
 			PINBA_UPDATE_HISTOGRAM_DEL(report, data->histogram_data, record->data.req_time);
@@ -1982,6 +2022,7 @@ void pinba_update_rtag_report_delete(size_t request_id, void *rep, const pinba_s
 
 void pinba_update_rtag2_report_add(size_t request_id, void *rep, const pinba_stats_record *record) /* {{{ */
 {
+	(void)request_id; /* Suppress unused parameter warning */
 	pinba_rtag_report *report = (pinba_rtag_report *)rep;
 	struct pinba_rtag2_report_data *data;
 	int tag1_pos = -1, tag2_pos = -1, index_len;
@@ -2022,7 +2063,7 @@ void pinba_update_rtag2_report_add(size_t request_id, void *rep, const pinba_sta
 	data = (struct pinba_rtag2_report_data *)pinba_map_get(host_map, index_val);
 
 	if (UNLIKELY(!data)) {
-		int dummy;
+		int dummy; /* Used in memcpy_static macro */
 
 		data = (struct pinba_rtag2_report_data *)calloc(1, sizeof(struct pinba_rtag2_report_data));
 		if (!data) {
@@ -2030,23 +2071,25 @@ void pinba_update_rtag2_report_add(size_t request_id, void *rep, const pinba_sta
 		}
 
 		memcpy_static(data->hostname, record->data.hostname, record->data.hostname_len, dummy);
+		(void)dummy; /* Suppress unused variable warning */
 		memcpy_static(data->tag1_value, word1->str, word1->len, dummy);
 		memcpy_static(data->tag2_value, word2->str, word2->len, dummy);
+		(void)dummy; /* Suppress unused variable warning */
 
 		pinba_map_add(host_map, index_val, data);
 		report->std.results_cnt++;
 	}
 
-	timeradd(&report->time_total, &record->data.req_time, &report->time_total);
-	timeradd(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
-	timeradd(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
+	pinba_timeradd(&report->time_total, &record->data.req_time, &report->time_total);
+	pinba_timeradd(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
+	pinba_timeradd(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
 	report->kbytes_total += record->data.doc_size;
 	report->memory_footprint += record->data.memory_footprint;
 
 	data->req_count++;
-	timeradd(&data->req_time_total, &record->data.req_time, &data->req_time_total);
-	timeradd(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
-	timeradd(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
+	pinba_timeradd(&data->req_time_total, &record->data.req_time, &data->req_time_total);
+	pinba_timeradd(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
+	pinba_timeradd(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
 	data->kbytes_total += record->data.doc_size;
 	data->memory_footprint += record->data.memory_footprint;
 	PINBA_UPDATE_HISTOGRAM_ADD(report, data->histogram_data, record->data.req_time);
@@ -2055,6 +2098,7 @@ void pinba_update_rtag2_report_add(size_t request_id, void *rep, const pinba_sta
 
 void pinba_update_rtag2_report_delete(size_t request_id, void *rep, const pinba_stats_record *record) /* {{{ */
 {
+	(void)request_id; /* Suppress unused parameter warning */
 	pinba_rtag_report *report = (pinba_rtag_report *)rep;
 	struct pinba_rtag2_report_data *data;
 	int tag1_pos = -1, tag2_pos = -1, index_len;
@@ -2098,9 +2142,9 @@ void pinba_update_rtag2_report_delete(size_t request_id, void *rep, const pinba_
 		return;
 	} else {
 
-		timersub(&report->time_total, &record->data.req_time, &report->time_total);
-		timersub(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
-		timersub(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
+		pinba_timersub(&report->time_total, &record->data.req_time, &report->time_total);
+		pinba_timersub(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
+		pinba_timersub(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
 		report->kbytes_total -= record->data.doc_size;
 		report->memory_footprint -= record->data.memory_footprint;
 
@@ -2116,9 +2160,9 @@ void pinba_update_rtag2_report_delete(size_t request_id, void *rep, const pinba_
 			}
 			report->std.results_cnt--;
 		} else {
-			timersub(&data->req_time_total, &record->data.req_time, &data->req_time_total);
-			timersub(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
-			timersub(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
+			pinba_timersub(&data->req_time_total, &record->data.req_time, &data->req_time_total);
+			pinba_timersub(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
+			pinba_timersub(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
 			data->kbytes_total -= record->data.doc_size;
 			data->memory_footprint -= record->data.memory_footprint;
 			PINBA_UPDATE_HISTOGRAM_DEL(report, data->histogram_data, record->data.req_time);
@@ -2129,6 +2173,7 @@ void pinba_update_rtag2_report_delete(size_t request_id, void *rep, const pinba_
 
 void pinba_update_rtagN_report_add(size_t request_id, void *rep, const pinba_stats_record *record) /* {{{ */
 {
+	(void)request_id; /* Suppress unused parameter warning */
 	pinba_rtag_report *report = (pinba_rtag_report *)rep;
 	struct pinba_rtagN_report_data *data;
 	unsigned int i, j, found_tags_cnt = 0;
@@ -2180,7 +2225,7 @@ void pinba_update_rtagN_report_add(size_t request_id, void *rep, const pinba_sta
 
 	data = (struct pinba_rtagN_report_data *)pinba_map_get(host_map, report->index);
 	if (UNLIKELY(!data)) {
-		int dummy;
+		int dummy; /* Used in memcpy_static macro */
 
 		data = (struct pinba_rtagN_report_data *)calloc(1, sizeof(struct pinba_rtagN_report_data));
 		if (!data) {
@@ -2194,6 +2239,7 @@ void pinba_update_rtagN_report_add(size_t request_id, void *rep, const pinba_sta
 		}
 
 		memcpy_static(data->hostname, record->data.hostname, record->data.hostname_len, dummy);
+		(void)dummy; /* Suppress unused variable warning */
 
 		for (i = 0; i < report->tags_cnt; i++) {
 			word = report->values[i];
@@ -2204,16 +2250,16 @@ void pinba_update_rtagN_report_add(size_t request_id, void *rep, const pinba_sta
 		report->std.results_cnt++;
 	}
 
-	timeradd(&report->time_total, &record->data.req_time, &report->time_total);
-	timeradd(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
-	timeradd(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
+	pinba_timeradd(&report->time_total, &record->data.req_time, &report->time_total);
+	pinba_timeradd(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
+	pinba_timeradd(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
 	report->kbytes_total += record->data.doc_size;
 	report->memory_footprint += record->data.memory_footprint;
 
 	data->req_count++;
-	timeradd(&data->req_time_total, &record->data.req_time, &data->req_time_total);
-	timeradd(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
-	timeradd(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
+	pinba_timeradd(&data->req_time_total, &record->data.req_time, &data->req_time_total);
+	pinba_timeradd(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
+	pinba_timeradd(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
 	data->kbytes_total += record->data.doc_size;
 	data->memory_footprint += record->data.memory_footprint;
 	PINBA_UPDATE_HISTOGRAM_ADD(report, data->histogram_data, record->data.req_time);
@@ -2222,6 +2268,7 @@ void pinba_update_rtagN_report_add(size_t request_id, void *rep, const pinba_sta
 
 void pinba_update_rtagN_report_delete(size_t request_id, void *rep, const pinba_stats_record *record) /* {{{ */
 {
+	(void)request_id; /* Suppress unused parameter warning */
 	pinba_rtag_report *report = (pinba_rtag_report *)rep;
 	struct pinba_rtagN_report_data *data;
 	unsigned int i, j, found_tags_cnt = 0;
@@ -2276,9 +2323,9 @@ void pinba_update_rtagN_report_delete(size_t request_id, void *rep, const pinba_
 	if (UNLIKELY(!data)) {
 		return;
 	} else {
-		timersub(&report->time_total, &record->data.req_time, &report->time_total);
-		timersub(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
-		timersub(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
+		pinba_timersub(&report->time_total, &record->data.req_time, &report->time_total);
+		pinba_timersub(&report->ru_utime_total, &record->data.ru_utime, &report->ru_utime_total);
+		pinba_timersub(&report->ru_stime_total, &record->data.ru_stime, &report->ru_stime_total);
 		report->kbytes_total -= record->data.doc_size;
 		report->memory_footprint -= record->data.memory_footprint;
 
@@ -2295,9 +2342,9 @@ void pinba_update_rtagN_report_delete(size_t request_id, void *rep, const pinba_
 			}
 			report->std.results_cnt--;
 		} else {
-			timersub(&data->req_time_total, &record->data.req_time, &data->req_time_total);
-			timersub(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
-			timersub(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
+			pinba_timersub(&data->req_time_total, &record->data.req_time, &data->req_time_total);
+			pinba_timersub(&data->ru_utime_total, &record->data.ru_utime, &data->ru_utime_total);
+			pinba_timersub(&data->ru_stime_total, &record->data.ru_stime, &data->ru_stime_total);
 			data->kbytes_total -= record->data.doc_size;
 			data->memory_footprint -= record->data.memory_footprint;
 			PINBA_UPDATE_HISTOGRAM_DEL(report, data->histogram_data, record->data.req_time);
@@ -2319,7 +2366,7 @@ void pinba_update_add(pinba_array_t *array, size_t request_id, const pinba_stats
 
 		pthread_rwlock_wrlock(&report->lock);
 		report->add_func(request_id, report, record);
-		report->time_interval = pinba_get_time_interval(report);
+		report->time_interval = pinba_get_time_interval();
 		pthread_rwlock_unlock(&report->lock);
 	}
 }
@@ -2337,7 +2384,7 @@ void pinba_update_delete(pinba_array_t *array, size_t request_id, const pinba_st
 
 		pthread_rwlock_wrlock(&report->lock);
 		report->delete_func(request_id, report, record);
-		report->time_interval = pinba_get_time_interval(report);
+		report->time_interval = pinba_get_time_interval();
 		pthread_rwlock_unlock(&report->lock);
 	}
 }
@@ -2361,7 +2408,7 @@ void pinba_report_results_dtor(pinba_report *report) /* {{{ */
 void pinba_std_report_dtor(void *rprt) /* {{{ */
 {
 	pinba_std_report *std_report = (pinba_std_report *)rprt;
-	unsigned int i;
+	unsigned int i __attribute__((unused));
 
 	if (std_report->histogram_data) {
 		pinba_lmap_destroy(std_report->histogram_data);
@@ -2599,11 +2646,11 @@ void pinba_report_add_rusage(void *report, struct rusage *start_rusage) /* {{{ *
 
 	getrusage(RUSAGE_THREAD, &final_data);
 
-	timersub(&final_data.ru_utime, &start_rusage->ru_utime, &diff);
-	timeradd(&std->ru_utime, &diff, &std->ru_utime);
+	pinba_timersub(&final_data.ru_utime, &start_rusage->ru_utime, &diff);
+	pinba_timeradd(&std->ru_utime, &diff, &std->ru_utime);
 
-	timersub(&final_data.ru_stime, &start_rusage->ru_stime, &diff);
-	timeradd(&std->ru_stime, &diff, &std->ru_stime);
+	pinba_timersub(&final_data.ru_stime, &start_rusage->ru_stime, &diff);
+	pinba_timeradd(&std->ru_stime, &diff, &std->ru_stime);
 }
 /* }}} */
 

@@ -63,6 +63,20 @@ CREATE TABLE `info` (
 	  `req_time_median` float DEFAULT NULL
 ) ENGINE=PINBA DEFAULT CHARSET=latin1 COMMENT='info';
 
+DROP TABLE IF EXISTS active_reports;
+
+CREATE TABLE `active_reports` (
+	  `id` varchar(256) DEFAULT NULL,
+	  `name` varchar(256) DEFAULT NULL,
+	  `kind` varchar(32) DEFAULT NULL,
+	  `type` varchar(64) DEFAULT NULL,
+	  `results_cnt` int(11) DEFAULT NULL,
+	  `ru_utime_per_packet` float DEFAULT NULL,
+	  `ru_stime_per_packet` float DEFAULT NULL,
+	  `use_cnt` int(11) DEFAULT NULL,
+	  `flags` varchar(255) DEFAULT NULL
+) ENGINE=PINBA DEFAULT CHARSET=latin1 COMMENT='active_reports';
+
 DROP TABLE IF EXISTS report_by_script_name;
 
 CREATE TABLE `report_by_script_name` (

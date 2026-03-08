@@ -1,0 +1,58 @@
+exclude: |
+  (?x)^(
+    build/|
+    autom4te\.cache/|
+    sparsehash/|
+    \.idea/
+  )
+default_install_hook_types: [pre-commit, pre-push]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: check-merge-conflict
+      - id: check-toml
+
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.14.0
+    hooks:
+      - id: hadolint
+        name: Hadolint
+        description: "Validate Dockerfile syntax and best practices"
+
+  - repo: local
+    hooks:
+      - id: clang-format
+        name: clang-format (C/C++)
+        language: system
+        entry: clang-format --dry-run --Werror
+        files: ^(tests|benchmarks)/.*\.(cc|cpp|cxx|h|hh|hpp|hxx)$
+
+      - id: cppcheck
+        name: cppcheck (C/C++)
+        language: system
+        entry: /bin/bash -lc './scripts/require_compile_commands.sh && cppcheck --project=build/compile_commands.json --std=c++17 --enable=warning,performance,portability --error-exitcode=1 --quiet --suppress=preprocessorErrorDirective:build/* --suppress=preprocessorErrorDirective:*/mysql/*'
+        files: ^src/.*\.(cc|cpp|cxx)$
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: cmakelint
+        name: cmakelint
+        language: system
+        entry: cmake-lint
+        files: (^|/)CMakeLists\.txt$|\.cmake$
+        exclude: (^|/)\.gitignore\.cmake$|\.cmake\.in$
+
+      - id: clang-tidy
+        name: clang-tidy (C/C++)
+        language: system
+        entry: ./scripts/run_clang_tidy.sh
+        files: ^src/.*\.(cc|cpp|cxx)$
+        pass_filenames: false
+        stages: [pre-push]
