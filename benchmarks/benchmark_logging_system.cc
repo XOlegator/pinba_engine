@@ -64,5 +64,3 @@ static void BM_StructuredLogging(benchmark::State &state) {
   Logger::instance().flush();
 }
 BENCHMARK(BM_StructuredLogging);
-
-BENCHMARK_MAIN();

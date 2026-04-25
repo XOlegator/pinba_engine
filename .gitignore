@@ -1,66 +1,63 @@
-_configs.sed
-Makefile
-Makefile.in
-config.guess
-config.sub
-acconfig.h
-aclocal.m4
-autom4te.cache
-config.nice
-config.cache
-config.log
-config.status
-configure
-conftest
-conftest.c
-generated_lists
-meta_cc
-meta_ccld
-mkinstalldirs
-missing
-install-sh
-libtool
-shlibtool
+# Local editor and agent files
+.codex
+.idea/
+.vscode/
+*.code-workspace
+*.swp
+*.swo
+*~
+
+# Python/tooling environments
+.venv/
+.pre-commit-cache/
+
+# CMake build trees and generated files
+build/
+build-*/
+cmake-build-*/
+out/
+_deps/
+CMakeUserPresets.json
+compile_commands.json
+
+# Build outputs
+*.a
+*.so
+*.o
 *.lo
 *.la
-libs
-.deps
-.libs
-_libs
-include
-confdefs.h
+*.d
+
+# Test, coverage, and benchmark outputs
+Testing/
+test_results/
+benchmark_results/
 *.gcda
 *.gcno
-cscope.out
-ltmain.sh
-depcomp
-config.h
-config.h.in
-stamp-h1
+*.profraw
+*.profdata
+*.xml
+*.json
+!CMakePresets.json
+!.release-please-manifest.json
+!release-please-config.json
+
+# Logs and temporary files
 *.log
-*.tar.gz
+*.tmp
+*.temp
 
-# Local IDE/editor files
-.idea/
-*.code-workspace
+# Generated local configuration
+config.h
+src/config.h
 
-# CMake and local build trees
-build/
-cmake-build-*/
+# OS files
+.DS_Store
+Thumbs.db
 
-# Autotools-generated helper dirs/files
-autom4te.cache/
-m4/
-compile
-configure~
-.pre-commit-cache/
-test-driver
-.venv/
-
-# Generated artifacts in bundled sparsehash tree
-sparsehash/compile
-sparsehash/configure~
-sparsehash/test-driver
+# Bundled sparsehash generated artifacts
+sparsehash/src/sparsehash/internal/sparseconfig.h
+sparsehash/src/*.o
 sparsehash/hashtable_test
 sparsehash/libc_allocator_with_realloc_test
 sparsehash/simple_compat_test
@@ -69,8 +66,3 @@ sparsehash/sparsetable_unittest
 sparsehash/template_util_unittest
 sparsehash/time_hash_map
 sparsehash/type_traits_unittest
-sparsehash/libsparsehash.pc
-sparsehash/src/.dirstamp
-sparsehash/src/config.h.in~
-sparsehash/src/sparsehash/internal/sparseconfig.h
-sparsehash/src/*.o

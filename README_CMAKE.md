@@ -1,50 +1,57 @@
-# Pinba Engine - CMake Build System
+# Pinba Engine CMake Build
 
-## Overview
-
-This document describes the CMake-based build system for Pinba Engine, targeting MySQL 8.0+ and modern C++ standards.
+The active build system is CMake. The project targets MySQL 8.0+ and C++23.
 
 ## Requirements
 
-- CMake 3.16+
-- GCC 9+ or Clang 10+ (C++17)
-- MySQL 8.0+ development packages
-- Protocol Buffers 3.0+
+- CMake 3.24+.
+- GCC 13+ or a Clang version with practical C++23 support.
+- MySQL 8.0 client development files.
+- MySQL 8.0 server source headers containing `sql/handler.h`.
+- Protocol Buffers 3.x.
 
 ## Build
 
 ```bash
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j"$(nproc)"
-sudo make install
+cmake --preset release
+cmake --build --preset release
 ```
 
-## Common build options
+Equivalent command without presets:
 
 ```bash
-# Debug build
-cmake .. -DCMAKE_BUILD_TYPE=Debug -DPINBA_DEBUG=ON
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j"$(nproc)"
+```
 
-# Static build
-cmake .. -DPINBA_STATIC_BUILD=ON
+## Options
 
-# Build tests
-cmake .. -DPINBA_WITH_TESTS=ON
+```bash
+# Debug build with Pinba debug logging
+cmake -S . -B build-debug -DCMAKE_BUILD_TYPE=Debug -DPINBA_DEBUG=ON
 
-# Build benchmarks
-cmake .. -DPINBA_WITH_BENCHMARKS=ON
+# Unit tests, enabled by default
+cmake -S . -B build -DPINBA_WITH_TESTS=ON
+
+# Benchmarks
+cmake -S . -B build -DPINBA_WITH_BENCHMARKS=ON
+
+# Download pinned MySQL 8.0 source archive if local server headers are missing
+cmake -S . -B build -DPINBA_DOWNLOAD_MYSQL_SOURCE=ON
 ```
 
 ## Tests
 
 ```bash
-cmake .. -DPINBA_WITH_TESTS=ON
-make -j"$(nproc)"
-ctest --output-on-failure
+cmake --build build -j"$(nproc)"
+ctest --test-dir build --output-on-failure
 ```
 
-## Migration note
+## Static Analysis
 
-Legacy autotools files were kept only for historical context in older branches.
-The active development path for this fork is CMake.
+```bash
+./scripts/run_clang_tidy.sh
+pre-commit run --all-files
+```
+
+CMake generates `build/compile_commands.json` by default.

@@ -106,5 +106,3 @@ static void BM_MetricRegistryAccess(benchmark::State &state) {
   }
 }
 BENCHMARK(BM_MetricRegistryAccess);
-
-BENCHMARK_MAIN();

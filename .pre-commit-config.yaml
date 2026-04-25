@@ -37,7 +37,7 @@ repos:
       - id: cppcheck
         name: cppcheck (C/C++)
         language: system
-        entry: /bin/bash -lc './scripts/require_compile_commands.sh && cppcheck --project=build/compile_commands.json --std=c++17 --enable=warning,performance,portability --error-exitcode=1 --quiet --suppress=preprocessorErrorDirective:build/* --suppress=preprocessorErrorDirective:*/mysql/*'
+        entry: /bin/bash -lc './scripts/require_compile_commands.sh && cppcheck --project=build/compile_commands.json --std=c++23 --enable=warning,performance,portability --error-exitcode=1 --quiet --suppress=preprocessorErrorDirective:build/* --suppress=preprocessorErrorDirective:*/mysql/*'
         files: ^src/.*\.(cc|cpp|cxx)$
         pass_filenames: false
         stages: [pre-push]
@@ -45,7 +45,7 @@ repos:
       - id: cmakelint
         name: cmakelint
         language: system
-        entry: cmake-lint
+        entry: cmake-lint --linelength=120
         files: (^|/)CMakeLists\.txt$|\.cmake$
         exclude: (^|/)\.gitignore\.cmake$|\.cmake\.in$
 

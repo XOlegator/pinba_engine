@@ -1,59 +1,83 @@
 # Build Guide: Pinba Engine for MySQL 8.0
 
-## Quick Start
+## Requirements
+
+- Linux with MySQL 8.0 client development files and server source headers.
+- CMake 3.24+.
+- GCC 13+ or a Clang version with practical C++23 support.
+- Protocol Buffers 3.x.
+
+On Ubuntu 24.04:
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y \
-  build-essential cmake git \
+  build-essential cmake git pkg-config \
   libprotobuf-dev protobuf-compiler \
-  libmysqlclient-dev mysql-source-8.0 pkg-config
-
-mkdir -p build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j"$(nproc)"
+  libmysqlclient-dev mysql-source-8.0
 ```
 
-The resulting plugin should be `ha_pinba.so` in the build directory.
+## Build
 
-## Requirements
-
-- Linux (Ubuntu 20.04+, Debian 11+, CentOS/RHEL 8+)
-- MySQL 8.0+
-- GCC 9+ or Clang 10+
-- CMake 3.16+
-- Protocol Buffers 3.0+
-
-## Installing the plugin
+Prefer CMake presets:
 
 ```bash
-sudo cp ha_pinba.so /usr/lib/mysql/plugin/
+cmake --preset release
+cmake --build --preset release
+```
+
+Or use explicit commands:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j"$(nproc)"
+```
+
+The resulting plugin is `build/ha_pinba.so`.
+
+## MySQL Server Headers
+
+A plugin build requires MySQL server headers such as `sql/handler.h`, not only client headers.
+
+Use one of these sources:
+
+- distro package such as `mysql-source-8.0`;
+- an extracted MySQL 8.0 source archive;
+- the pinned CMake download path via `-DPINBA_DOWNLOAD_MYSQL_SOURCE=ON`.
+
+Explicit source tree:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPINBA_MYSQL_SOURCE_DIR=/path/to/mysql-8.0
+```
+
+Opt-in download:
+
+```bash
+cmake --preset release-download-mysql-source
+```
+
+## Checks
+
+```bash
+cmake --build build -j"$(nproc)"
+./build/pinba_test
+ctest --test-dir build --output-on-failure
+```
+
+## Installing the Plugin
+
+```bash
+sudo cp build/ha_pinba.so /usr/lib/mysql/plugin/
 sudo chmod 644 /usr/lib/mysql/plugin/ha_pinba.so
 sudo chown mysql:mysql /usr/lib/mysql/plugin/ha_pinba.so
-
 mysql -u root -p -e "INSTALL PLUGIN pinba SONAME 'ha_pinba.so';"
 ```
 
-## Notes about MySQL headers
-
-A production-ready build requires MySQL **server** headers (`sql/handler.h` and related files).
-
-Recommended source:
-- package `mysql-source-8.0`
-- or a manually extracted MySQL 8.0 source tree
-
-You can pass the path explicitly:
+## Clean Rebuild
 
 ```bash
-cmake .. -DCMAKE_BUILD_TYPE=Release -DPINBA_MYSQL_SOURCE_DIR=/path/to/mysql-8.0
-```
-
-## Clean rebuild
-
-```bash
-rm -rf build cmake-build-*
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j"$(nproc)"
+rm -rf build build-* cmake-build-*
+cmake --preset release
+cmake --build --preset release
 ```

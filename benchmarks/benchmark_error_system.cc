@@ -56,10 +56,8 @@ static void BM_ExceptionThrowCatch(benchmark::State &state) {
     try {
       throw PinbaException(PinbaErrorCode::INVALID_PACKET, "Test");
     } catch (const PinbaException &e) {
-      benchmark::DoNotOptimize(e);
+      benchmark::DoNotOptimize(e.what());
     }
   }
 }
 BENCHMARK(BM_ExceptionThrowCatch);
-
-BENCHMARK_MAIN();

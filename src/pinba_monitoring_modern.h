@@ -248,6 +248,13 @@ public:
         return result;
     }
 
+    void clear() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        counters_.clear();
+        gauges_.clear();
+        histograms_.clear();
+    }
+
 private:
     std::unordered_map<std::string, std::unique_ptr<CounterMetric>> counters_;
     std::unordered_map<std::string, std::unique_ptr<GaugeMetric>> gauges_;
@@ -285,23 +292,14 @@ public:
     
     HealthStatus overall_status() const {
         std::lock_guard<std::mutex> lock(mutex_);
-        HealthStatus worst = HealthStatus::HEALTHY;
-        
-        for (const auto& [name, check] : checks_) {
-            HealthStatus status = check->check();
-            if (status > worst) {
-                worst = status;
-            }
-        }
-        
-        return worst;
+        return overall_status_unlocked();
     }
     
     std::string status_json() const {
         std::lock_guard<std::mutex> lock(mutex_);
         std::string result = "{\"status\":\"";
         
-        HealthStatus overall = overall_status();
+        HealthStatus overall = overall_status_unlocked();
         switch (overall) {
             case HealthStatus::HEALTHY:
                 result += "healthy";
@@ -341,7 +339,25 @@ public:
         return result;
     }
 
+    void clear() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        checks_.clear();
+    }
+
 private:
+    HealthStatus overall_status_unlocked() const {
+        HealthStatus worst = HealthStatus::HEALTHY;
+
+        for (const auto& [name, check] : checks_) {
+            HealthStatus status = check->check();
+            if (status > worst) {
+                worst = status;
+            }
+        }
+
+        return worst;
+    }
+
     std::unordered_map<std::string, std::unique_ptr<HealthCheck>> checks_;
     mutable std::mutex mutex_;
 };

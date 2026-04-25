@@ -1,4 +1,3 @@
-#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 // Test includes
@@ -59,7 +58,7 @@ TEST_F(PinbaEngineTest, TimeOperations) {
 TEST_F(PinbaEngineTest, HashPerformance) {
   // Test hash function performance
   const char *test_string = "test_string_for_hashing";
-  size_t len = strlen(test_string);
+  EXPECT_GT(strlen(test_string), 0);
 
   // This would test XXHash performance
   // uint64_t hash = XXH64(test_string, len, 0);
@@ -83,9 +82,4 @@ TEST_F(PinbaEngineTest, ErrorHandling) {
 TEST_F(PinbaEngineTest, ThreadSafety) {
   // Test thread safety
   EXPECT_TRUE(true);
-}
-
-int main(int argc, char **argv) {
-  ::testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

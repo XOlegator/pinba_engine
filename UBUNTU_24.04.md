@@ -1,10 +1,8 @@
 # Ubuntu 24.04 Build Guide
 
-## Verified environment
+This guide targets Ubuntu/Kubuntu 24.04 with MySQL 8.0 and CMake.
 
-This guide targets Ubuntu/Kubuntu 24.04 with MySQL 8.0 and CMake-based build.
-
-## 1. Install dependencies
+## 1. Install Dependencies
 
 ```bash
 sudo apt-get update
@@ -19,31 +17,29 @@ sudo apt-get install -y \
 
 ```bash
 cd /path/to/pinba_engine
-rm -rf build
-mkdir build && cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release
-make -j"$(nproc)"
+cmake --preset release
+cmake --build --preset release
 ```
 
-## 3. Install plugin
+## 3. Install Plugin
 
 ```bash
-sudo cp ha_pinba.so /usr/lib/mysql/plugin/
+sudo cp build/ha_pinba.so /usr/lib/mysql/plugin/
 sudo chmod 644 /usr/lib/mysql/plugin/ha_pinba.so
 sudo chown mysql:mysql /usr/lib/mysql/plugin/ha_pinba.so
 ```
 
-## 4. Enable plugin
+## 4. Enable Plugin
 
 ```bash
 mysql -u root -p -e "INSTALL PLUGIN pinba SONAME 'ha_pinba.so';"
 ```
 
-## 5. Initialize schema
+## 5. Initialize Schema
 
 ```bash
 mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS pinba;"
-mysql -u root -p pinba < ../default_tables.sql
+mysql -u root -p pinba < default_tables.sql
 ```
 
 ## Validation

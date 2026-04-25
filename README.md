@@ -17,8 +17,9 @@ The primary goal is to migrate and evolve Pinba Engine for modern MySQL versions
 Key directions:
 
 - compatibility with modern MySQL server headers and plugin APIs;
+- C++23-based CMake development workflow;
 - modernization of build/release workflows;
-- gradual cleanup of legacy code and obsolete tooling;
+- cleanup of legacy code and obsolete tooling;
 - preserving core Pinba behavior where possible.
 
 ## How this fork differs from the original
@@ -35,6 +36,18 @@ Compared to the original upstream, this fork focuses on:
 This fork uses a semi-automated GitHub release flow with automatic `CHANGELOG.md` updates.
 
 - Release guide: `docs/releasing.md`
+
+## Build and test
+
+Use CMake presets for normal development:
+
+```bash
+cmake --preset release
+cmake --build --preset release
+ctest --test-dir build --output-on-failure
+```
+
+See `BUILD.md` for dependency details, including MySQL 8.0 server source headers.
 
 ## Project status
 

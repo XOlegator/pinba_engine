@@ -35,11 +35,11 @@ static void test_compat_buffers() {
     }
 }
 
-// Simple test to verify C++17 compilation
+// Simple test to verify the configured modern C++ standard
 int main() {
     std::cout << "Pinba Engine Modern C++ Test" << std::endl;
     
-    // Test C++17 features
+    // Test modern C++ features
     auto start_time = std::chrono::steady_clock::now();
 
     test_compat_buffers();
@@ -78,7 +78,7 @@ int main() {
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
     
     std::cout << "Test completed in " << duration.count() << " microseconds" << std::endl;
-    std::cout << "All C++17 features working correctly!" << std::endl;
+    std::cout << "Modern C++ features working correctly!" << std::endl;
     
     return 0;
 }

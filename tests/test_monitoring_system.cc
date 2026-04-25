@@ -12,9 +12,15 @@ using namespace pinba;
 
 class MonitoringSystemTest : public ::testing::Test {
 protected:
-  void SetUp() override {}
+  void SetUp() override {
+    MetricsRegistry::instance().clear();
+    HealthRegistry::instance().clear();
+  }
 
-  void TearDown() override {}
+  void TearDown() override {
+    MetricsRegistry::instance().clear();
+    HealthRegistry::instance().clear();
+  }
 };
 
 // Test Counter metric

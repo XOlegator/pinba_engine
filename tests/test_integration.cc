@@ -19,11 +19,15 @@ protected:
     // Initialize logging
     Logger::instance().initialize("", LogLevel::INFO);
 
-    // Reset metrics
-    MetricsRegistry::instance().counter("test_errors").reset();
+    MetricsRegistry::instance().clear();
+    HealthRegistry::instance().clear();
   }
 
-  void TearDown() override { Logger::instance().shutdown(); }
+  void TearDown() override {
+    Logger::instance().shutdown();
+    MetricsRegistry::instance().clear();
+    HealthRegistry::instance().clear();
+  }
 };
 
 // Test error handling with logging
