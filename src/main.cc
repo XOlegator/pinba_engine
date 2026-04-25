@@ -167,7 +167,7 @@ int pinba_get_processors_number(void) /* {{{ */
 int pinba_collector_init(const pinba_daemon_settings &settings) /* {{{ */
 {
 	size_t i;
-	int cpu_cnt, cpu_num;
+	int cpu_cnt;
 	pthread_rwlockattr_t attr;
 
 	if (settings.port < 0 || settings.port >= 65536) {
@@ -230,7 +230,7 @@ int pinba_collector_init(const pinba_daemon_settings &settings) /* {{{ */
 	D->thread_pool = th_pool_create(cpu_cnt);
 
 #ifdef PINBA_ENGINE_HAVE_PTHREAD_SETAFFINITY_NP
-	cpu_num = 0;
+	int cpu_num = 0;
 	for (i = 0; i < D->thread_pool->size; i++, cpu_num = (cpu_num == (cpu_cnt-1)) ? 0 : cpu_num + 1) {
 		pinba_cpu_set_t mask;
 
@@ -1485,7 +1485,6 @@ pthread_mutex_t error_mutex = PTHREAD_MUTEX_INITIALIZER;
 char *pinba_error_ex(int return_error, int type, const char *file, int line, const char *format, ...) /* {{{ */
 {
 	va_list args;
-	va_list args_copy;
 	const char *type_name;
 	char *tmp;
 	char message_body[PINBA_ERR_BUFFER];
@@ -1526,11 +1525,15 @@ char *pinba_error_ex(int return_error, int type, const char *file, int line, con
 	}
 
 	va_start(args, format);
-	va_copy(args_copy, args);
-	vsnprintf(message_body, sizeof(message_body), format, args_copy);
-	va_end(args_copy);
+	vsnprintf(message_body, sizeof(message_body), format, args);
 	va_end(args);
-	snprintf(errormsg, sizeof(errormsg), "[PINBA] %s: %s:%d %s", type_name, file, line, message_body);
+	int prefix_len = snprintf(errormsg, sizeof(errormsg), "[PINBA] %s: %s:%d ", type_name, file, line);
+	if (prefix_len < 0) {
+		errormsg[0] = '\0';
+	} else if ((size_t)prefix_len < sizeof(errormsg)) {
+		const size_t message_max_len = sizeof(errormsg) - (size_t)prefix_len - 1;
+		snprintf(errormsg + prefix_len, sizeof(errormsg) - (size_t)prefix_len, "%.*s", (int)message_max_len, message_body);
+	}
 
 	if (!return_error) {
 		// Use modern async logger if available, fallback to legacy
