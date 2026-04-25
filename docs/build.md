@@ -102,18 +102,37 @@ CMake generates `build/compile_commands.json` by default. The pre-push hooks als
 
 ## Install Plugin Locally
 
+Use the MySQL-reported plugin directory instead of hard-coding a distro path:
+
 ```bash
-sudo cp build/ha_pinba.so /usr/lib/mysql/plugin/
-sudo chmod 644 /usr/lib/mysql/plugin/ha_pinba.so
-sudo chown mysql:mysql /usr/lib/mysql/plugin/ha_pinba.so
+MYSQL_PLUGIN_DIR=$(mysql --user=root --password --batch --skip-column-names --raw --execute="SELECT @@global.plugin_dir;")
+printf 'MySQL plugin dir: %s\n' "$MYSQL_PLUGIN_DIR"
+test -n "$MYSQL_PLUGIN_DIR"
+sudo cp build/ha_pinba.so "$MYSQL_PLUGIN_DIR/"
+sudo chmod 644 "$MYSQL_PLUGIN_DIR/ha_pinba.so"
+sudo chown mysql:mysql "$MYSQL_PLUGIN_DIR/ha_pinba.so"
 mysql -u root -p -e "INSTALL PLUGIN pinba SONAME 'ha_pinba.so';"
 ```
 
-If the plugin directory differs:
+If `INSTALL PLUGIN` returns `ERROR 1125 (HY000): Function 'pinba' already exists`, the plugin is already registered in MySQL. For a rebuild/reinstall, unload it first, replace the shared object, and install it again:
 
 ```bash
-MYSQL_PLUGIN_DIR=$(mysql -u root -p -e "SHOW VARIABLES LIKE 'plugin_dir';" 2>/dev/null | grep plugin_dir | awk '{print $2}')
+mysql -u root -p -e "UNINSTALL PLUGIN pinba;"
+MYSQL_PLUGIN_DIR=$(mysql --user=root --password --batch --skip-column-names --raw --execute="SELECT @@global.plugin_dir;")
+printf 'MySQL plugin dir: %s\n' "$MYSQL_PLUGIN_DIR"
+test -n "$MYSQL_PLUGIN_DIR"
 sudo cp build/ha_pinba.so "$MYSQL_PLUGIN_DIR/"
+sudo chmod 644 "$MYSQL_PLUGIN_DIR/ha_pinba.so"
+sudo chown mysql:mysql "$MYSQL_PLUGIN_DIR/ha_pinba.so"
+mysql -u root -p -e "INSTALL PLUGIN pinba SONAME 'ha_pinba.so';"
+```
+
+If MySQL refuses to unload the plugin because it is in use, stop active sessions using Pinba tables and retry. If needed during local development, restart MySQL after `UNINSTALL PLUGIN` and before replacing `ha_pinba.so`.
+
+To check whether Pinba is already installed:
+
+```bash
+mysql --user=root --password --table --execute="SELECT PLUGIN_NAME, PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS WHERE PLUGIN_NAME = 'PINBA';"
 ```
 
 ## Initialize Schema
