@@ -9,7 +9,7 @@ This project uses a semi-automated release flow on GitHub:
 - `CHANGELOG.md` is updated automatically;
 - Git tag and GitHub Release are created automatically after release PR merge.
 
-This replaces the old manual `NEWS`-driven flow and is intended for active development in the fork.
+This replaces the old manual NEWS-driven flow, which is now archived in `docs/legacy-news.md`, and is intended for active development in the fork.
 
 ## What is automated
 
@@ -109,6 +109,5 @@ Do this once in your fork repository settings:
 
 ## Migration notes
 
-- Keep `NEWS` as historical archive if needed, but treat `CHANGELOG.md` as the source of truth for all new releases.
+- Keep `docs/legacy-news.md` as historical archive, but treat `CHANGELOG.md` as the source of truth for all new releases.
 - If release logic must be reset later, update `.release-please-manifest.json` to the desired baseline version.
-

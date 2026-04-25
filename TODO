@@ -1,8 +1,0 @@
-## MySQL 8.0 Engine Version
-
-* [x] Stabilize the MySQL 8.0 storage engine path and remove remaining compiler warnings in `ha_pinba.cc` and related runtime code
-* Audit all virtual tables supported by the engine and bring `default_tables.sql` in sync with the actual table parser and handler implementation
-* Validate report tables (`report_by_*`, `tag_report*`, `active_reports`) on real traffic and fix runtime/DDL mismatches
-* Replace obsolete mock-header assumptions in docs/build flow with the real MySQL 8.0 source-header workflow
-* Add repeatable smoke tests for plugin install, table creation, packet ingestion from PHP, and basic `SELECT` queries
-* Review memory ownership, thread-safety, and long-running stability of collector/report code under MySQL 8.0

@@ -26,5 +26,5 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 ## [1.2.0] - Legacy baseline
 
 - Historical baseline imported from old `RELEASE_1_2_0` line.
-- Previous release notes were maintained in `NEWS`.
+- Previous release notes were maintained in `docs/legacy-news.md`.
 - New releases are managed by GitHub Release Please and added here automatically.

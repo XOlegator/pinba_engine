@@ -1,12 +1,12 @@
-# Docker Guide: Pinba Engine
+# Docker Guide
 
-## Build the image
+## Build Image
 
 ```bash
 docker build -t pinba-engine:latest -f Dockerfile .
 ```
 
-## Run container
+## Run Container
 
 ```bash
 docker run -d \
@@ -18,7 +18,7 @@ docker run -d \
   pinba-engine:latest
 ```
 
-## Verify plugin installation
+## Verify Plugin
 
 ```bash
 docker exec -it pinba-mysql mysql -uroot -pyourpassword -e "SHOW PLUGINS;"
@@ -26,7 +26,7 @@ docker exec -it pinba-mysql mysql -uroot -pyourpassword -e "SHOW PLUGINS;"
 
 The output must include `pinba` with status `ACTIVE`.
 
-## Persistent data
+## Persistent Data
 
 ```bash
 docker volume create pinba-data
@@ -43,7 +43,6 @@ docker run -d \
 
 ## Troubleshooting
 
-- Check container logs: `docker logs pinba-mysql`
-- Check plugin directory in MySQL:
-  `SHOW VARIABLES LIKE 'plugin_dir';`
-- Check MySQL error log for plugin load failures.
+- Check container logs with `docker logs pinba-mysql`.
+- Check plugin directory in MySQL with `SHOW VARIABLES LIKE 'plugin_dir';`.
+- Check the MySQL error log for plugin load failures.

@@ -1,43 +1,24 @@
 # Pinba Engine (MySQL 8+ Fork)
 
+Pinba Engine is a MySQL storage engine used to collect and analyze PHP runtime statistics sent over UDP.
+
 This repository is an actively maintained fork of the original Pinba Engine project:
 
 - Original project: https://github.com/tony2001/pinba_engine
 
-## What this fork is
+## Project Goals
 
-Pinba Engine is a MySQL storage engine used to collect and analyze PHP runtime statistics sent over UDP.
+The primary goal is to keep Pinba Engine usable on modern systems, starting with MySQL 8.0+.
 
-The original project is effectively unmaintained, so this fork exists to continue practical development and keep the engine usable on modern systems.
-
-## Main goal of this fork
-
-The primary goal is to migrate and evolve Pinba Engine for modern MySQL versions, starting with **MySQL 8.0**.
-
-Key directions:
+Current direction:
 
 - compatibility with modern MySQL server headers and plugin APIs;
 - C++23-based CMake development workflow;
-- modernization of build/release workflows;
-- cleanup of legacy code and obsolete tooling;
+- reproducible build, test, and static-analysis tooling;
+- cleanup of obsolete legacy build files and documentation;
 - preserving core Pinba behavior where possible.
 
-## How this fork differs from the original
-
-Compared to the original upstream, this fork focuses on:
-
-- active maintenance and issue resolution;
-- modern CI/CD and semi-automated GitHub releases;
-- changelog-driven releases via `CHANGELOG.md`;
-- forward-looking compatibility work for MySQL 8.x.
-
-## Release process
-
-This fork uses a semi-automated GitHub release flow with automatic `CHANGELOG.md` updates.
-
-- Release guide: `docs/releasing.md`
-
-## Build and test
+## Build and Test
 
 Use CMake presets for normal development:
 
@@ -47,10 +28,20 @@ cmake --build --preset release
 ctest --test-dir build --output-on-failure
 ```
 
-See `BUILD.md` for dependency details, including MySQL 8.0 server source headers.
+The resulting plugin is `build/ha_pinba.so`.
 
-## Project status
+## Documentation
 
-This is an in-progress modernization fork.
+- Build, dependencies, tests, and local plugin install: `docs/build.md`
+- Docker usage: `docs/docker.md`
+- Release flow and commit-message rules: `docs/releasing.md`
+- Roadmap and open stabilization work: `docs/roadmap.md`
+- Historical release notes from the legacy project: `docs/legacy-news.md`
 
-Interfaces, internals, and build details may continue to evolve while MySQL 8+ support is being stabilized.
+## Release Process
+
+This fork uses a semi-automated GitHub release flow with automatic `CHANGELOG.md` updates. New release notes belong in `CHANGELOG.md`; the old release notes are kept in `docs/legacy-news.md` only as historical archive.
+
+## Project Status
+
+This is an in-progress modernization fork. Interfaces, internals, and build details may continue to evolve while MySQL 8+ support is being stabilized.

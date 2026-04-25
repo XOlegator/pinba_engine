@@ -1,3 +1,7 @@
+# Legacy Release Notes
+
+This file preserves the historical Pinba `NEWS` content. New release notes are maintained in `../CHANGELOG.md`.
+
 Pinba 1.2.0      09 Sep 2016
 ----------------------------
 - Added pinba_log_level configuration directive to configure log verbosity.
