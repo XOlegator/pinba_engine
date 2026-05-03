@@ -1,32 +1,35 @@
 # Build Pinba Engine in a stable and ABI-compatible environment
-
-FROM ubuntu:20.04 AS builder
+FROM ubuntu:24.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV CMAKE_BUILD_TYPE=Release
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential=* \
-    cmake=* \
-    git=* \
-    wget=* \
-    ca-certificates=* \
-    libprotobuf-dev=* \
-    protobuf-compiler=* \
-    libmysqlclient-dev=* \
-    mysql-client=* \
-    mysql-source-8.0=* \
-    rapidjson-dev=* \
-    pkg-config=* \
+    build-essential \
+    cmake \
+    git \
+    wget \
+    ca-certificates \
+    libprotobuf-dev \
+    protobuf-compiler \
+    libmysqlclient-dev \
+    mysql-source-8.0 \
+    mysql-client \
+    rapidjson-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 COPY . /build/pinba_engine
 
 WORKDIR /build/pinba_engine/build
-RUN cmake \
+RUN MYSQL_SOURCE_ARCHIVE="$(ls /usr/src/mysql/mysql-source-8.0.tar.* | head -n 1)" && \
+    cmake \
         -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
         -DCMAKE_INSTALL_PREFIX=/usr/local \
+        -DPINBA_WITH_TESTS=OFF \
+        -DPINBA_DOWNLOAD_MYSQL_SOURCE=OFF \
+        -DPINBA_MYSQL_SOURCE_ARCHIVE="${MYSQL_SOURCE_ARCHIVE}" \
         .. && \
     make -j"$(nproc)" && \
     make install

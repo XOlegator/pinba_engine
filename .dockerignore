@@ -3,6 +3,8 @@
 # Build output
 build/
 build-*/
+build-bench/
+cmake-build-debug/
 *.o
 *.so
 *.a
@@ -38,3 +40,5 @@ benchmarks/
 *.tmp
 *.bak
 *.log
+ai_develop.log
+.venv/
