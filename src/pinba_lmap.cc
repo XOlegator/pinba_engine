@@ -1,6 +1,7 @@
 //#include <sparsehash/src/sparsehash/sparse_hash_map>
 #include <unordered_map>
 #include <cstdint>
+#include <cstddef>
 
 typedef  std::unordered_map<uint64_t, const void*> sparse_hash_t;
 

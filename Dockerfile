@@ -8,6 +8,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ARG CMAKE_BUILD_TYPE=Release
 ARG CMAKE_VERSION=3.31.6
 
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential=12.9 \
     g++=4:12.2.0-3 \
@@ -18,6 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     protobuf-compiler=3.21.12-3 \
     rapidjson-dev=1.1.0+dfsg2-7.1 \
     pkg-config=1.8.1-1 \
+    # Keep this unpinned: strict pin may conflict with libssl3 from the base image.
+    libssl-dev \
     libmysqlclient-dev=8.0.46-1debian12 && \
     rm -rf /var/lib/apt/lists/*
 
@@ -44,9 +47,11 @@ RUN mkdir -p /usr/lib/mysql/plugin
 COPY --from=builder /usr/local/lib/mysql/plugin/ha_pinba.so /usr/lib/mysql/plugin/libpinba_engine.so
 COPY --from=builder /usr/lib/x86_64-linux-gnu/libprotobuf.so.* /usr/lib/x86_64-linux-gnu/
 COPY --from=builder /build/pinba_engine/default_tables.sql /usr/share/pinba_engine/default_tables.sql
+COPY docker/mysql/conf.d/zz-pinba.cnf /etc/mysql/conf.d/zz-pinba.cnf
 COPY docker-entrypoint-initdb.d/ /docker-entrypoint-initdb.d/
 
 RUN chmod 755 /usr/lib/mysql/plugin/libpinba_engine.so && \
-    chmod 644 /usr/share/pinba_engine/default_tables.sql
+    chmod 644 /usr/share/pinba_engine/default_tables.sql && \
+    chmod 644 /etc/mysql/conf.d/zz-pinba.cnf
 
 EXPOSE 3306 30002/udp
