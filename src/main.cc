@@ -48,11 +48,11 @@ static struct pinba_version_info version_info[] __attribute__((used)) = {
 #else
 
 static struct pinba_version_info version_info[] __attribute__((used)) = {
-	"VCS date: not available",
-	"VCS branch: not available",
-	"VCS full hash: not available",
-	"VCS short hash: not available",
-	"VCS WC modified: not available"
+	{"VCS date: not available"},
+	{"VCS branch: not available"},
+	{"VCS full hash: not available"},
+	{"VCS short hash: not available"},
+	{"VCS WC modified: not available"}
 };
 
 #endif
@@ -694,6 +694,7 @@ inline static int _add_timers(pinba_stats_record *record, const pinba_stats_reco
 			temp_tags_dynamic = (pinba_tag **)malloc(sizeof(void *) * request->n_dictionary);
 			if (!temp_tags_dynamic) {
 				pinba_warning("out of memory when allocating temp tags");
+				free(temp_words_dynamic);
 				return 0;
 			}
 			temp_tags = temp_tags_dynamic;
@@ -868,13 +869,13 @@ void merge_timers_func(void *job_data) /* {{{ */
 	Pinba__Request *request;
 	pinba_stats_record *record;
 	pinba_stats_record_ex *record_ex;
-	unsigned int timers_cnt, real_timers_cnt, dict_size, k, request_id;
+	unsigned int timers_cnt, real_timers_cnt, dict_size, request_id;
 
 	d->timers_cnt = 0;
 
 	request_id = 0;
 	pthread_rwlock_rdlock(&D->words_lock);
-	for (k = 0; request_id < d->end; k++) {
+	for (; request_id < d->end; ) {
 		record_ex = REQ_POOL_EX(tmp_pool) + request_id;
 		record = REQ_POOL(request_pool) + record_ex->request_id;
 		request = record_ex->request;
@@ -1145,8 +1146,7 @@ void *pinba_data_main(void *) /* {{{ */
 		memset(job_data_arr, 0, sizeof(struct data_job_data) * D->thread_pool->size);
 
 		th_pool_barrier_start(barrier1);
-		accounted = 0;
-		for (i = 0; i < D->thread_pool->size; i++) {
+			for (i = 0; i < D->thread_pool->size; i++) {
 			pinba_pool *request_pool = D->current_read_pool + i;
 			if (request_pool->in == 0) {
 				continue;
@@ -1484,7 +1484,7 @@ pthread_mutex_t error_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 char *pinba_error_ex(int return_error, int type, const char *file, int line, const char *format, ...) /* {{{ */
 {
-	va_list args;
+	va_list args{};
 	const char *type_name;
 	char *tmp;
 	char message_body[PINBA_ERR_BUFFER];

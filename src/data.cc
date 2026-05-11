@@ -981,10 +981,12 @@ jump_ahead:
 				continue;
 			}
 
-			data->tag_value = (char *)calloc(report->tags_cnt, PINBA_TAG_VALUE_SIZE);
-			if (UNLIKELY(!data->tag_value)) {
-				free(data);
-				continue;
+			if (report->tags_cnt > 0) {
+				data->tag_value = (char *)calloc(report->tags_cnt, PINBA_TAG_VALUE_SIZE);
+				if (UNLIKELY(!data->tag_value)) {
+					free(data);
+					continue;
+				}
 			}
 
 			data->req_count = 1;
@@ -1168,10 +1170,12 @@ jump_ahead:
 				continue;
 			}
 
-			data->tag_value = (char *)calloc(report->tags_cnt, PINBA_TAG_VALUE_SIZE);
-			if (UNLIKELY(!data->tag_value)) {
-				free(data);
-				continue;
+			if (report->tags_cnt > 0) {
+				data->tag_value = (char *)calloc(report->tags_cnt, PINBA_TAG_VALUE_SIZE);
+				if (UNLIKELY(!data->tag_value)) {
+					free(data);
+					continue;
+				}
 			}
 
 			data->req_count = 1;
@@ -1369,10 +1373,12 @@ jump_ahead:
 				continue;
 			}
 
-			data->tag_value = (char *)calloc(report->tags_cnt, PINBA_TAG_VALUE_SIZE);
-			if (UNLIKELY(!data->tag_value)) {
-				free(data);
-				continue;
+			if (report->tags_cnt > 0) {
+				data->tag_value = (char *)calloc(report->tags_cnt, PINBA_TAG_VALUE_SIZE);
+				if (UNLIKELY(!data->tag_value)) {
+					free(data);
+					continue;
+				}
 			}
 
 			data->req_count = 1;
@@ -1789,11 +1795,13 @@ void pinba_update_rtagN_info_add(size_t request_id, void *rep, const pinba_stats
 			return;
 		}
 
-		data->tag_value = (char *)calloc(report->tags_cnt, PINBA_TAG_VALUE_SIZE);
-		if (!data->tag_value) {
-			free(data);
-			return;
-		}
+			if (report->tags_cnt > 0) {
+				data->tag_value = (char *)calloc(report->tags_cnt, PINBA_TAG_VALUE_SIZE);
+				if (!data->tag_value) {
+					free(data);
+					return;
+				}
+			}
 
 		for (i = 0; i < report->tags_cnt; i++) {
 			word = report->values[i];
@@ -2232,11 +2240,13 @@ void pinba_update_rtagN_report_add(size_t request_id, void *rep, const pinba_sta
 			return;
 		}
 
-		data->tag_value = (char *)calloc(report->tags_cnt, PINBA_TAG_VALUE_SIZE);
-		if (!data->tag_value) {
-			free(data);
-			return;
-		}
+			if (report->tags_cnt > 0) {
+				data->tag_value = (char *)calloc(report->tags_cnt, PINBA_TAG_VALUE_SIZE);
+				if (!data->tag_value) {
+					free(data);
+					return;
+				}
+			}
 
 		memcpy_static(data->hostname, record->data.hostname, record->data.hostname_len, dummy);
 		(void)dummy; /* Suppress unused variable warning */

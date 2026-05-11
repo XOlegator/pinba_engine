@@ -107,28 +107,6 @@ int pinba_pool_grow(pinba_pool *p, size_t more) /* {{{ */
 }
 /* }}} */
 
-static inline int pinba_pool_shrink(pinba_pool *p, size_t less) /* {{{ */
-{
-	size_t old_size = p->size;
-	void **new_data;
-
-	if (old_size <= less) {
-		return P_FAILURE;
-	}
-
-	pinba_debug("shrinking pool (in: %ld, out: %ld, taken: %ld, empty: %ld) from %ld to %ld", p->in, p->out, pinba_pool_num_records(p), p->size - p->in, old_size, p->size - less);
-
-	new_data = (void **)pinba_realloc_array_or_log(p->data, old_size - less, p->element_size, p->name);
-	if (UNLIKELY(!new_data)) {
-		return P_FAILURE;
-	}
-	p->data = new_data;
-	p->size = old_size - less; /* -less elements */
-
-	return P_SUCCESS;
-}
-/* }}} */
-
 int pinba_pool_init(pinba_pool *p, size_t size, size_t element_size, size_t limit_size, size_t grow_size, pool_dtor_func_t dtor, char *pool_name) /* {{{ */
 {
 	memset(p, 0, sizeof(pinba_pool));
@@ -179,7 +157,6 @@ static inline void pinba_stats_record_dtor(int request_id, pinba_stats_record *r
 	pthread_rwlock_wrlock(&D->timer_lock);
 	if (record->timers_cnt > 0) {
 		pinba_timer_record *timer;
-		int tag_sum = 0;
 
 		pinba_update_delete(&D->tag_reports_arr, request_id, record);
 
@@ -190,7 +167,6 @@ static inline void pinba_stats_record_dtor(int request_id, pinba_stats_record *r
 				timer_pool->out = 0;
 			}
 
-			tag_sum += timer->tag_num;
 			D->timertags_cnt -= timer->tag_num;
 		}
 

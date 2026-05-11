@@ -7526,8 +7526,10 @@ inline int ha_pinba::histogram_fetch_row_by_key(unsigned char *, const char *, u
 	dbug_tmp_restore_column_map(table->write_set, old_map);
 
 	if (share->report_kind == PINBA_BASE_REPORT_KIND) {
-		pthread_rwlock_unlock(&report->std.lock);
-	} else {
+		if (report) {
+			pthread_rwlock_unlock(&report->std.lock);
+		}
+	} else if (tag_report) {
 		pthread_rwlock_unlock(&tag_report->std.lock);
 	}
 	DBUG_RETURN(0);
