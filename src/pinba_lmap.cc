@@ -47,7 +47,7 @@ void *pinba_lmap::data_first(uint64_t *first_index) /* {{{ */
 {
 	sparse_hash_t::iterator it = hash_map.begin();
 	if (it == hash_map.end()) {
-		return NULL;
+		return nullptr;
 	}
 	*first_index = it->first;
 	return (void*)it->second;
@@ -59,12 +59,12 @@ void *pinba_lmap::data_next(uint64_t *next_index) /* {{{ */
 
 	sparse_hash_t::iterator it = hash_map.find(*next_index);
 	if (it == hash_map.end()) {
-		return NULL;
+		return nullptr;
 	}
 	++it;
 
 	if (it == hash_map.end()) {
-		return NULL;
+		return nullptr;
 	}
 
 	*next_index = it->first;
@@ -76,7 +76,7 @@ void *pinba_lmap::data_get(uint64_t index) /* {{{ */
 {
 	sparse_hash_t::iterator it = hash_map.find(index);
 	if (it == hash_map.end()) {
-		return NULL;
+		return nullptr;
 	}
 	return (void*)it->second;
 }
@@ -91,7 +91,7 @@ size_t pinba_lmap::size() /* {{{ */
 void *pinba_lmap_first(void *map_report, uint64_t *index_to_fill) /* {{{ */
 {
 	if (!map_report) {
-		return NULL;
+		return nullptr;
 	}
 
 	pinba_lmap *map = static_cast<pinba_lmap*>(map_report);
@@ -102,7 +102,7 @@ void *pinba_lmap_first(void *map_report, uint64_t *index_to_fill) /* {{{ */
 void *pinba_lmap_next(void *map_report, uint64_t *index_to_fill) /* {{{ */
 {
 	if (!map_report) {
-		return NULL;
+		return nullptr;
 	}
 
 	pinba_lmap *map = static_cast<pinba_lmap*>(map_report);
@@ -114,7 +114,7 @@ void *pinba_lmap_next(void *map_report, uint64_t *index_to_fill) /* {{{ */
 void *pinba_lmap_get(void *map_report, uint64_t index) /* {{{ */
 {
 	if (!map_report) {
-		return NULL;
+		return nullptr;
 	}
 	pinba_lmap *map = static_cast<pinba_lmap*>(map_report);
 
@@ -125,7 +125,7 @@ void *pinba_lmap_get(void *map_report, uint64_t index) /* {{{ */
 void *pinba_lmap_add(void *map_report, uint64_t index, const void *data) /* {{{ */
 {
 	pinba_lmap *map;
-	if (map_report == NULL) {
+	if (map_report == nullptr) {
 		map = new pinba_lmap();
 	} else {
 		map = static_cast<pinba_lmap*>(map_report);
@@ -144,7 +144,7 @@ void *pinba_lmap_create() /* {{{ */
 
 int pinba_lmap_delete(void *map_report, uint64_t index) /* {{{ */
 {
-	if (map_report == NULL) {
+	if (map_report == nullptr) {
 		return -1;
 	}
 

@@ -14,10 +14,6 @@
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
-#ifdef USE_PRAGMA_IMPLEMENTATION
-#pragma implementation        // gcc: Class implementation
-#endif
-
 #include <sql/table.h>
 #include "pinba.h"
 
@@ -32,7 +28,7 @@
 #endif
 
 #define MYSQL_SERVER 1
-#include <include/mysql_version.h>
+#include <mysql/mysql_version.h>
 #include <sql/field.h>
 #include <sql/handler.h>
 #if __has_include(<violite.h>)
@@ -48,7 +44,7 @@
 #include "ha_pinba.h"
 #include "pinba_map.h"
 #include "pinba_lmap.h"
-#include <include/mysql/service_mysql_alloc.h>
+#include <mysql/service_mysql_alloc.h>
 
 #ifdef my_free
 #undef my_free
@@ -57,15 +53,6 @@
 
 static PSI_memory_key pinba_key_memory_share;
 #define pinba_free(a, b) my_free(a)
-
-#ifndef hash_init
-# define hash_get_key    my_hash_get_key
-# define hash_init       my_hash_init
-# define hash_free       my_hash_free
-# define hash_search     my_hash_search
-# define hash_delete     my_hash_delete
-#endif
-
 
 /* Global variables */
 static int port_var = 0;
