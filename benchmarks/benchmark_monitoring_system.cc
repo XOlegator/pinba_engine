@@ -1,4 +1,4 @@
-/* Copyright (c) 2025 Pinba Engine Team
+/* Copyright (c) 2025 Oleg Ekhlakov <subspam@mail.ru>
  *
  * Benchmarks for monitoring system
  */

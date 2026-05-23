@@ -1,0 +1,15 @@
+Pinba Engine — Authors
+======================
+
+Original project (2007–2013):
+  Antony Dovgal <tony@daylessday.org>
+  https://github.com/tony2001/pinba_engine
+
+Fork maintainer — MySQL 8.0/8.4 port (2025–present):
+  Oleg Ekhlakov <subspam@mail.ru>
+  https://github.com/XOlegator/pinba_engine
+
+Third-party components bundled in this repository:
+  xxHash          — Yann Collet <yann.collet.73@gmail.com>  (BSD 2-Clause)
+  protobuf-c      — Dave Benson and the protobuf-c authors  (BSD 3-Clause)
+  Google Sparsehash — Google Inc.                           (BSD 3-Clause)

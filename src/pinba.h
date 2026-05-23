@@ -1,4 +1,6 @@
 /* Copyright (c) 2007-2013 Antony Dovgal <tony@daylessday.org>
+ * Copyright (c) 2025 Oleg Ekhlakov <subspam@mail.ru>
+ *    Modified for MySQL 8.0/8.4 compatibility.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
