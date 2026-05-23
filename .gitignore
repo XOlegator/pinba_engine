@@ -42,6 +42,9 @@ benchmark_results/
 !.release-please-manifest.json
 !release-please-config.json
 
+# Personal/local documentation (not for public repo)
+docs/docker.personal.md
+
 # Logs and temporary files
 *.log
 *.tmp

@@ -40,14 +40,6 @@ Format: `{mysql-series}-v{pinba-version}`
 Tags like `8.0.46` conflate the MySQL version used at build time with the MySQL version the user runs.
 The plugin is compatible with all MySQL 8.0.x patch versions (ABI is stable within a minor series).
 
-## Tags to Remove (Legacy)
-
-| Tag | Reason to remove |
-|-----|-----------------|
-| `8.0-pinboard2` | Meaningless suffix |
-| `8.0.46-pinboard1` | Mixes MySQL patch + private suffix |
-| `8.4-lts-pinboard1` | Meaningless suffix |
-
 ## Build and Push Commands
 
 ```bash

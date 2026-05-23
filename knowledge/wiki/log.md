@@ -158,3 +158,49 @@ Both containers validated:
 - `SHOW TABLES;` → all 25 pinba tables present
 
 ---
+
+## 2026-05-23 — Ingest: Pinboard Architecture
+
+**Action:** Explored `/mnt/projects/sites/pinba/www-new/` and compiled architecture doc.
+
+**Raw document added:**
+- `raw/repos/pinboard-architecture.md` — Symfony 8 stack, aggregate command logic, Docker Compose services, env vars
+
+**Concept page created:**
+- `wiki/concepts/pinboard-architecture.md` — full aggregation pipeline, source vs report table distinction, docker compose, env config reference
+
+---
+
+## 2026-05-23 — Ingest: MySQL 8.0→8.4 Migration Guide
+
+**Action:** Researched official MySQL documentation on 8.0→8.4 plugin API changes.
+
+**Raw document added:**
+- `raw/docs/mysql-80-to-84-migration.md` — ABI incompatibility, deprecated handler methods, build requirements, OS runtime differences
+
+**Concept page created:**
+- `wiki/concepts/mysql-plugin-migration-80-to-84.md` — what changed, what stayed the same, porting checklist
+
+---
+
+## 2026-05-23 — Ingest: GitHub Actions Docker Workflow
+
+**Action:** Researched canonical GitHub Actions workflow for Docker Hub build+push.
+
+**Raw document added:**
+- `raw/docs/github-actions-docker-workflow.md` — canonical action versions, full workflow YAML, design rationale
+
+**Concept page created:**
+- `wiki/concepts/github-actions-docker.md` — project-specific workflow (two jobs for 8.0 and 8.4 LTS, correct tag names, GHA cache scopes)
+
+---
+
+## 2026-05-23 — LINT: docker-tag-strategy.md
+
+**Action:** Removed stale "Tags to Remove (Legacy)" table from `wiki/concepts/docker-tag-strategy.md`.
+
+**Reason:** The three old tags (`8.0-pinboard2`, `8.0.46-pinboard1`, `8.4-lts-pinboard1`) were already
+deleted from Docker Hub before anyone used them. Documenting removed tags serves no purpose and
+makes the page look like a work-in-progress changelog rather than authoritative reference.
+
+---

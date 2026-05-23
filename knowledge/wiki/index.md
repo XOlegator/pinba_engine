@@ -11,7 +11,7 @@ updated: 2026-05-23
 
 Master catalog. Maintained by LLM agents.
 
-## Concepts (8 articles)
+## Concepts (12 articles)
 
 | Article | Key Topic |
 |---------|-----------|
@@ -20,12 +20,15 @@ Master catalog. Maintained by LLM agents.
 | [[pinba-pool-model]] | Cyclic buffer memory model, overflow behaviour, monitoring |
 | [[mysql-plugin-abi]] | **Critical**: 8.0 vs 8.4 ABI incompatibility, implications |
 | [[mysql-plugin-install]] | INSTALL PLUGIN lifecycle, reinstall procedure |
+| [[mysql-plugin-migration-80-to-84]] | Porting checklist: ABI, build requirements, OS paths |
 | [[php-pinba-configuration]] | php.ini settings, deployment scenarios, silent failure |
 | [[cmake-build-system]] | Presets, MySQL headers sourcing, Ubuntu 24.04 deps |
 | [[docker-build-strategy]] | Multi-stage build, libprotobuf copy, filename gotchas |
 | [[docker-tag-strategy]] | Docker Hub naming rules, rolling vs pinned tags |
+| [[github-actions-docker]] | CI/CD workflow for Docker Hub build+push automation |
+| [[pinboard-architecture]] | Pinboard (Symfony 8) stack, aggregation logic, docker compose |
 
-## Sources (6 documents)
+## Sources (9 documents)
 
 | Source | Raw File |
 |--------|---------|
@@ -35,6 +38,9 @@ Master catalog. Maintained by LLM agents.
 | [[mysql-plugin-api]] (source) | `raw/docs/mysql-plugin-api-install.md` |
 | [[pinba-engine-sysvars-and-tables]] | `raw/docs/pinba-engine-mysql-sysvars.md` + `raw/docs/pinba-default-tables.md` |
 | [[fork-build-docker]] | `raw/docs/xolegator-fork-build-docker.md` |
+| [[pinboard-architecture]] (raw) | `raw/repos/pinboard-architecture.md` |
+| [[mysql-80-to-84-migration]] (raw) | `raw/docs/mysql-80-to-84-migration.md` |
+| [[github-actions-docker-workflow]] (raw) | `raw/docs/github-actions-docker-workflow.md` |
 
 ## Raw Documents
 
@@ -43,6 +49,7 @@ raw/repos/
   tony2001-pinba-engine-readme.md
   tony2001-pinba-engine-changelog.md
   php-pinba-extension.md
+  pinboard-architecture.md
 
 raw/docs/
   pinba-udp-protocol-proto.md
@@ -50,12 +57,12 @@ raw/docs/
   pinba-default-tables.md
   mysql-plugin-api-install.md
   xolegator-fork-build-docker.md
+  mysql-80-to-84-migration.md
+  github-actions-docker-workflow.md
 ```
 
 ## Knowledge Gaps (candidates for next ingest)
 
-- MySQL 8.0 → 8.4 specific API changes (what exactly broke, what changed)
-- Pinboard architecture (Symfony, aggregation logic, Doctrine queries)
-- Docker Compose full stack for production deployment
-- PHP site integration examples (real php.ini configuration)
-- GitHub Actions CI workflow for Docker build+push automation
+- PHP site integration examples (real php.ini configuration with real server names)
+- Production deployment: docker-compose with volumes, backups, log rotation
+- Pinboard UI: controller/route structure, what each page shows
