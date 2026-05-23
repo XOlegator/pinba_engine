@@ -13,6 +13,7 @@ The primary goal is to keep Pinba Engine usable on modern systems, starting with
 Current direction:
 
 - compatibility with modern MySQL server headers and plugin APIs;
+- dual build targets for MySQL 8.0 and MySQL 8.4 LTS;
 - C++23-based CMake development workflow;
 - reproducible build, test, and static-analysis tooling;
 - cleanup of obsolete legacy build files and documentation;

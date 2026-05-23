@@ -1,13 +1,15 @@
-# Docker Guide (MySQL 8 + Pinba Engine)
+# Docker Guide (MySQL 8.0 and 8.4 LTS + Pinba Engine)
 
-This guide explains how to build, validate, and publish a Docker image with Pinba Engine for MySQL 8.
+This guide explains how to build, validate, and publish Docker images with Pinba Engine for MySQL 8.0 and MySQL 8.4 LTS.
 
 ## 1. Build the image
 
-From the repository root:
+From the repository root.
+Use separate Dockerfiles to keep `8.0` and `8.4 LTS` pipelines isolated:
 
 ```bash
-docker build -t <registry-user>/pinba-engine:8.0 -f Dockerfile .
+docker build -t <registry-user>/pinba-engine:8.0 -f Dockerfile.mysql80 .
+docker build -t <registry-user>/pinba-engine:8.4-lts -f Dockerfile.mysql84 .
 ```
 
 Optional version-specific tag:
@@ -63,7 +65,8 @@ docker push <registry-user>/pinba-engine:8.0
 
 Recommended tags:
 
-- `<registry-user>/pinba-engine:8.0` as stable MySQL 8 channel.
+- `<registry-user>/pinba-engine:8.0` as MySQL 8.0 channel.
+- `<registry-user>/pinba-engine:8.4-lts` as MySQL 8.4 LTS channel.
 - `<registry-user>/pinba-engine:<mysql-version>` for exact pinning.
 
 ## 5. Troubleshooting

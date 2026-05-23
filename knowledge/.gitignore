@@ -1,0 +1,10 @@
+# Raw source documents — keep directory structure, ignore actual content
+raw/articles/*
+raw/repos/*
+raw/docs/*
+raw/assets/*
+!raw/**/.gitkeep
+
+# Ephemeral query outputs
+output/*
+!output/.gitkeep

@@ -48,11 +48,13 @@ static struct pinba_version_info version_info[] __attribute__((used)) = {
 #else
 
 static struct pinba_version_info version_info[] __attribute__((used)) = {
-	{"VCS date: not available"},
-	{"VCS branch: not available"},
-	{"VCS full hash: not available"},
-	{"VCS short hash: not available"},
-	{"VCS WC modified: not available"}
+	{
+		"VCS date: not available",
+		"VCS branch: not available",
+		"VCS full hash: not available",
+		"VCS short hash: not available",
+		"VCS WC modified: not available"
+	}
 };
 
 #endif

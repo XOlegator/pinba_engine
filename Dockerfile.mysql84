@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.7
 
-ARG MYSQL_IMAGE=mysql:8.0-bookworm@sha256:9382e4f6f7f013231049ab854de9d0810594d028f4237b67102acc7ade8e3a99
+ARG MYSQL_IMAGE=mysql:8.4.9
 ARG BUILDER_IMAGE=debian:bookworm
-ARG PINBA_MYSQL_SERIES=8.0
+ARG PINBA_MYSQL_SERIES=8.4
 
 FROM ${BUILDER_IMAGE} AS builder
 
@@ -44,16 +44,21 @@ RUN cmake -S . -B build \
 
 FROM ${MYSQL_IMAGE}
 
-RUN mkdir -p /usr/lib/mysql/plugin
+# MySQL 8.4 uses /usr/lib64/mysql/plugin/ (vs /usr/lib/mysql/plugin/ in MySQL 8.0)
+RUN mkdir -p /usr/lib64/mysql/plugin
 
-COPY --from=builder /usr/local/lib/mysql/plugin/ha_pinba.so /usr/lib/mysql/plugin/libpinba_engine.so
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libprotobuf.so.* /usr/lib/x86_64-linux-gnu/
+COPY --from=builder /usr/local/lib/mysql/plugin/ha_pinba.so /usr/lib64/mysql/plugin/libpinba_engine.so
+# MySQL 8.4 image is Oracle Linux 9 (RPM layout): libraries live in /usr/lib64/, not
+# the Debian /usr/lib/x86_64-linux-gnu/. Copy the builder's libprotobuf here so the
+# plugin can load. ldconfig registers the new library in the runtime cache.
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libprotobuf.so.* /usr/lib64/
 COPY --from=builder /build/pinba_engine/default_tables.sql /usr/share/pinba_engine/default_tables.sql
 COPY docker/mysql/conf.d/zz-pinba.cnf /etc/mysql/conf.d/zz-pinba.cnf
 COPY docker-entrypoint-initdb.d/ /docker-entrypoint-initdb.d/
 
-RUN chmod 755 /usr/lib/mysql/plugin/libpinba_engine.so && \
+RUN chmod 755 /usr/lib64/mysql/plugin/libpinba_engine.so && \
     chmod 644 /usr/share/pinba_engine/default_tables.sql && \
-    chmod 644 /etc/mysql/conf.d/zz-pinba.cnf
+    chmod 644 /etc/mysql/conf.d/zz-pinba.cnf && \
+    ldconfig
 
 EXPOSE 3306 30002/udp

@@ -52,12 +52,20 @@ public:
     }
     
     std::string to_prometheus(const std::string& name, const std::string& labels = "") const override {
-        std::string result = "# TYPE " + name + " counter\n";
+        std::string result;
+        result.reserve(64);
+        result += "# TYPE ";
+        result += name;
+        result += " counter\n";
         result += name;
         if (!labels.empty()) {
-            result += "{" + labels + "}";
+            result += '{';
+            result += labels;
+            result += '}';
         }
-        result += " " + std::to_string(get()) + "\n";
+        result += ' ';
+        result += std::to_string(get());
+        result += '\n';
         return result;
     }
     
@@ -91,12 +99,20 @@ public:
     }
     
     std::string to_prometheus(const std::string& name, const std::string& labels = "") const override {
-        std::string result = "# TYPE " + name + " gauge\n";
+        std::string result;
+        result.reserve(64);
+        result += "# TYPE ";
+        result += name;
+        result += " gauge\n";
         result += name;
         if (!labels.empty()) {
-            result += "{" + labels + "}";
+            result += '{';
+            result += labels;
+            result += '}';
         }
-        result += " " + std::to_string(get()) + "\n";
+        result += ' ';
+        result += std::to_string(get());
+        result += '\n';
         return result;
     }
     
@@ -134,42 +150,66 @@ public:
     }
     
     std::string to_prometheus(const std::string& name, const std::string& labels = "") const override {
-        std::string result = "# TYPE " + name + " histogram\n";
-        
+        std::string result;
+        result.reserve(256);
+        result += "# TYPE ";
+        result += name;
+        result += " histogram\n";
+
         std::lock_guard<std::mutex> lock(mutex_);
         std::int64_t total_count = count_.load(std::memory_order_relaxed);
         double total_sum = sum_;
-        
+
         // Bucket counts
         std::int64_t cumulative = 0;
         for (size_t i = 0; i < buckets_.size(); ++i) {
             cumulative += counts_[i];
-            result += name + "_bucket";
-            std::string bucket_labels = labels;
-            if (!bucket_labels.empty()) bucket_labels += ",";
-            bucket_labels += "le=\"" + std::to_string(buckets_[i]) + "\"";
-            result += "{" + bucket_labels + "} " + std::to_string(cumulative) + "\n";
+            result += name;
+            result += "_bucket{";
+            if (!labels.empty()) {
+                result += labels;
+                result += ',';
+            }
+            result += "le=\"";
+            result += std::to_string(buckets_[i]);
+            result += "\"} ";
+            result += std::to_string(cumulative);
+            result += '\n';
         }
         // +Inf bucket
-        result += name + "_bucket";
-        std::string inf_labels = labels;
-        if (!inf_labels.empty()) inf_labels += ",";
-        inf_labels += "le=\"+Inf\"";
-        result += "{" + inf_labels + "} " + std::to_string(total_count) + "\n";
-        
+        result += name;
+        result += "_bucket{";
+        if (!labels.empty()) {
+            result += labels;
+            result += ',';
+        }
+        result += "le=\"+Inf\"} ";
+        result += std::to_string(total_count);
+        result += '\n';
+
         // Sum and count
-        result += name + "_sum";
+        result += name;
+        result += "_sum";
         if (!labels.empty()) {
-            result += "{" + labels + "}";
+            result += '{';
+            result += labels;
+            result += '}';
         }
-        result += " " + std::to_string(total_sum) + "\n";
-        
-        result += name + "_count";
+        result += ' ';
+        result += std::to_string(total_sum);
+        result += '\n';
+
+        result += name;
+        result += "_count";
         if (!labels.empty()) {
-            result += "{" + labels + "}";
+            result += '{';
+            result += labels;
+            result += '}';
         }
-        result += " " + std::to_string(total_count) + "\n";
-        
+        result += ' ';
+        result += std::to_string(total_count);
+        result += '\n';
+
         return result;
     }
     

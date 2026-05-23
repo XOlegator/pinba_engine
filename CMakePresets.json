@@ -29,9 +29,19 @@
     },
     {
       "name": "release-download-mysql-source",
-      "displayName": "Release with downloaded MySQL source headers",
+      "displayName": "Release with downloaded MySQL 8.0 source headers",
       "inherits": "release",
       "cacheVariables": {
+        "PINBA_MYSQL_SERIES": "8.0",
+        "PINBA_DOWNLOAD_MYSQL_SOURCE": "ON"
+      }
+    },
+    {
+      "name": "release-download-mysql84-source",
+      "displayName": "Release with downloaded MySQL 8.4 LTS source headers",
+      "inherits": "release",
+      "cacheVariables": {
+        "PINBA_MYSQL_SERIES": "8.4",
         "PINBA_DOWNLOAD_MYSQL_SOURCE": "ON"
       }
     }

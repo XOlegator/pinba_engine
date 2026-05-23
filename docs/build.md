@@ -1,6 +1,10 @@
 # Build and Development Guide
 
 This project builds a MySQL 8.0+ storage engine plugin with CMake and C++23.
+Supported target series:
+
+- MySQL 8.0 (current stable compatibility line)
+- MySQL 8.4 LTS
 
 ## Requirements
 
@@ -10,8 +14,8 @@ Required tools and libraries:
 - CMake 3.24 or newer.
 - GCC 13+ or a Clang version with practical C++23 support.
 - Protocol Buffers 3.x (`protoc`, headers, and library).
-- MySQL 8.0 client development files (`mysql.h`, `libmysqlclient`).
-- MySQL 8.0 server source headers containing `sql/handler.h`.
+- MySQL 8.0 or 8.4 client development files (`mysql.h`, `libmysqlclient`).
+- MySQL 8.0 or 8.4 server source headers containing `sql/handler.h`.
 
 Ubuntu 24.04 example:
 
@@ -29,23 +33,35 @@ sudo apt-get install -y \
 A plugin build requires MySQL server headers, not only the client development package.
 Use one of these sources:
 
-- distro package such as `mysql-source-8.0`;
-- an extracted MySQL 8.0 source archive;
+- distro package such as `mysql-source-8.0` or `mysql-source-8.4`;
+- an extracted MySQL source archive;
 - the pinned CMake download path via `-DPINBA_DOWNLOAD_MYSQL_SOURCE=ON`.
 
 Explicit source tree:
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPINBA_MYSQL_SOURCE_DIR=/path/to/mysql-8.0
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPINBA_MYSQL_SOURCE_DIR=/path/to/mysql-8.4.9
 ```
 
 Opt-in source download:
 
 ```bash
 cmake --preset release-download-mysql-source
+# MySQL 8.4 LTS headers
+cmake --preset release-download-mysql84-source
 ```
 
-The MySQL source archive is large, so downloading it is intentionally opt-in. The pinned version, URL, and hash are defined in `CMakeLists.txt`.
+The MySQL source archive is large, so downloading it is intentionally opt-in. Pinned version, URL, and hash are defined in `CMakeLists.txt` per target series.
+
+## Select target MySQL series
+
+Default target series is `8.0`.
+Set `PINBA_MYSQL_SERIES` for LTS 8.4 builds:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPINBA_MYSQL_SERIES=8.4
+cmake --build build -j"$(nproc)"
+```
 
 ## Build
 

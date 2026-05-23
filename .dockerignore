@@ -42,3 +42,6 @@ benchmarks/
 *.log
 ai_develop.log
 .venv/
+
+# LLM knowledge base (not needed in build context)
+knowledge/

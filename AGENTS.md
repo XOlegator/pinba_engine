@@ -1,5 +1,24 @@
 # Agent Notes
 
+## LLM Knowledge Base
+
+A structured knowledge base lives in `knowledge/`. Read `knowledge/SCHEMA.md` first — it defines
+the entire workflow (ingest, query, lint) and directory conventions.
+
+**Before any non-trivial task:**
+1. Read `knowledge/SCHEMA.md` — conventions, frontmatter rules, what you may and may not touch.
+2. Read `knowledge/wiki/index.md` — catalog of all compiled knowledge.
+3. Read `knowledge/wiki/overview.md` — high-level synthesis.
+4. Read relevant `knowledge/wiki/concepts/*.md` pages.
+
+**Rules:**
+- `knowledge/raw/` is **read-only** — never create, edit, or delete files there.
+- `knowledge/wiki/` is **your domain** — you compile and maintain it from raw sources.
+- `knowledge/output/` is for ephemeral query results — write here freely, ask user whether to file back.
+- After any ingest or discovery, **update `knowledge/wiki/log.md`** and **`knowledge/wiki/index.md`**.
+- When you learn something non-obvious during a task (gotcha, ABI constraint, workaround),
+  consider adding it to a relevant `knowledge/wiki/concepts/*.md` page and log it.
+
 ## Project Context
 
 Pinba Engine is a MySQL 8+ storage engine plugin for collecting and querying PHP runtime statistics sent over UDP. The active development path is CMake-based and uses C++23 for project code.

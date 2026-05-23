@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-ARG MYSQL_IMAGE=mysql:8.0-bookworm@sha256:9382e4f6f7f013231049ab854de9d0810594d028f4237b67102acc7ade8e3a99
+ARG MYSQL_IMAGE=mysql:8.0.46-bookworm
 ARG BUILDER_IMAGE=debian:bookworm
 ARG PINBA_MYSQL_SERIES=8.0
 
