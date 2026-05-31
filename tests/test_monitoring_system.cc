@@ -3,15 +3,17 @@
  * Unit tests for modern monitoring system
  */
 
-#include "pinba_monitoring_modern.h"
 #include <gtest/gtest.h>
+
 #include <thread>
 #include <vector>
+
+#include "pinba_monitoring_modern.h"
 
 using namespace pinba;
 
 class MonitoringSystemTest : public ::testing::Test {
-protected:
+ protected:
   void SetUp() override {
     MetricsRegistry::instance().clear();
     HealthRegistry::instance().clear();
@@ -100,8 +102,7 @@ TEST_F(MonitoringSystemTest, GaugeThreadSafety) {
 // Test Histogram metric
 TEST_F(MonitoringSystemTest, HistogramMetric) {
   std::vector<double> buckets = {0.1, 0.5, 1.0, 5.0, 10.0};
-  auto &histogram =
-      MetricsRegistry::instance().histogram("test_histogram", buckets);
+  auto &histogram = MetricsRegistry::instance().histogram("test_histogram", buckets);
 
   histogram.observe(0.05);
   histogram.observe(0.3);
@@ -136,28 +137,26 @@ TEST_F(MonitoringSystemTest, PrometheusExport) {
 // Test Health checks
 TEST_F(MonitoringSystemTest, HealthCheck) {
   class TestHealthCheck : public HealthCheck {
-  public:
-    TestHealthCheck(HealthStatus status, const std::string &msg)
-        : status_(status), message_(msg) {}
+   public:
+    TestHealthCheck(HealthStatus status, const std::string &msg) : status_(status), message_(msg) {}
 
     HealthStatus check() const override { return status_; }
 
     std::string message() const override { return message_; }
 
-  private:
+   private:
     HealthStatus status_;
     std::string message_;
   };
 
   auto &registry = HealthRegistry::instance();
 
-  registry.register_check(
-      "test1", std::make_unique<TestHealthCheck>(HealthStatus::HEALTHY, "OK"));
-  registry.register_check("test2", std::make_unique<TestHealthCheck>(
-                                       HealthStatus::DEGRADED, "Degraded"));
+  registry.register_check("test1", std::make_unique<TestHealthCheck>(HealthStatus::HEALTHY, "OK"));
+  registry.register_check("test2",
+                          std::make_unique<TestHealthCheck>(HealthStatus::DEGRADED, "Degraded"));
 
   HealthStatus overall = registry.overall_status();
-  EXPECT_EQ(overall, HealthStatus::DEGRADED); // Worst case
+  EXPECT_EQ(overall, HealthStatus::DEGRADED);  // Worst case
 
   std::string json = registry.status_json();
   EXPECT_NE(json.find("degraded"), std::string::npos);
@@ -167,7 +166,7 @@ TEST_F(MonitoringSystemTest, HealthCheck) {
 
 TEST_F(MonitoringSystemTest, HealthCheckUnhealthy) {
   class UnhealthyCheck : public HealthCheck {
-  public:
+   public:
     HealthStatus check() const override { return HealthStatus::UNHEALTHY; }
 
     std::string message() const override { return "System failure"; }

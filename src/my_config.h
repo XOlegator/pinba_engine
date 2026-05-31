@@ -1,5 +1,5 @@
 /* Copyright (c) 2009, 2025, Oracle and/or its affiliates.
- 
+
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License, version 2.0,
  as published by the Free Software Foundation.
@@ -146,13 +146,13 @@
 #define HAVE_ENDIAN_CONVERSION_MACROS 1
 
 /* Type sizes */
-#define SIZEOF_VOIDP     8
-#define SIZEOF_CHARP     8
-#define SIZEOF_LONG      8
-#define SIZEOF_SHORT     2
-#define SIZEOF_INT       4
+#define SIZEOF_VOIDP 8
+#define SIZEOF_CHARP 8
+#define SIZEOF_LONG 8
+#define SIZEOF_SHORT 2
+#define SIZEOF_INT 4
 #define SIZEOF_LONG_LONG 8
-#define SIZEOF_TIME_T    8
+#define SIZEOF_TIME_T 8
 #define HAVE_ULONG 1
 #define HAVE_U_INT32_T 1
 #define HAVE_TM_GMTOFF 1
@@ -253,7 +253,6 @@
 #define EDITLINE_HAVE_COMPLETION_CHAR 1
 /* #undef EDITLINE_HAVE_COMPLETION_INT */
 
-
 /*
  * Libedit
  */
@@ -352,7 +351,6 @@
 #define DEFAULT_PARTIAL_REVOKES 0
 
 #define SO_EXT ".so"
-
 
 /* From libmysql/CMakeLists.txt */
 #define HAVE_UNIX_DNS_SRV 1
