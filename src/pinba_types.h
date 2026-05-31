@@ -15,6 +15,7 @@
 */
 
 #include "pinba_limits.h"
+#include "threadpool.h"
 
 #ifndef PINBA_TYPES_H
 #define PINBA_TYPES_H
