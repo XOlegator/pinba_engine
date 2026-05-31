@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.2](https://github.com/XOlegator/pinba_engine/compare/v2.1.1...v2.1.2) (2026-05-31)
+
+
+### Bug Fixes
+
+* **cmake:** guard install(pinba_test) with PINBA_WITH_TESTS ([#16](https://github.com/XOlegator/pinba_engine/issues/16)) ([804ac96](https://github.com/XOlegator/pinba_engine/commit/804ac96d6fce73299dc901520cdcee3f7fe54f2f))
+
 ## [2.1.1](https://github.com/XOlegator/pinba_engine/compare/v2.1.0...v2.1.1) (2026-05-31)
 
 
