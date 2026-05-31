@@ -27,6 +27,9 @@ compile_commands.json
 *.lo
 *.la
 *.d
+# *.d would normally match conf.d directories; keep docker/ tracked
+!docker/
+!docker/**
 
 # Test, coverage, and benchmark outputs
 Testing/
