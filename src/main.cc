@@ -188,7 +188,7 @@ int pinba_collector_init(const pinba_daemon_settings &settings) /* {{{ */
   pthread_rwlockattr_setkind_np(&attr, PTHREAD_RWLOCK_PREFER_READER_NP);
 #endif
 
-  pthread_mutex_init(&D->share_mutex, NULL);
+  pthread_mutex_init(&D->share_mutex, nullptr);
 
   pthread_rwlock_init(&D->collector_lock, &attr);
   pthread_rwlock_init(&D->timer_lock, &attr);
@@ -292,7 +292,7 @@ int pinba_collector_init(const pinba_daemon_settings &settings) /* {{{ */
   }
 
   for (i = 0; i < (size_t)cpu_cnt; i++) {
-    if (pthread_create(&collector_threads[i], NULL, pinba_collector_main, (void *)i)) {
+    if (pthread_create(&collector_threads[i], nullptr, pinba_collector_main, (void *)i)) {
       return P_FAILURE;
     }
 
@@ -307,11 +307,11 @@ int pinba_collector_init(const pinba_daemon_settings &settings) /* {{{ */
 #endif
   }
 
-  if (pthread_create(&data_thread, NULL, pinba_data_main, NULL)) {
+  if (pthread_create(&data_thread, nullptr, pinba_data_main, nullptr)) {
     return P_FAILURE;
   }
 
-  if (pthread_create(&stats_thread, NULL, pinba_stats_main, NULL)) {
+  if (pthread_create(&stats_thread, nullptr, pinba_stats_main, nullptr)) {
     pthread_cancel(data_thread);
     return P_FAILURE;
   }
@@ -354,11 +354,11 @@ void pinba_collector_shutdown(void) /* {{{ */
     pthread_detach(collector_threads[i]);
 #endif
     pthread_cancel(collector_threads[i]);
-    pthread_join(collector_threads[i], NULL);
+    pthread_join(collector_threads[i], nullptr);
   }
 
-  pthread_join(data_thread, NULL);
-  pthread_join(stats_thread, NULL);
+  pthread_join(data_thread, nullptr);
+  pthread_join(stats_thread, nullptr);
 
   pthread_rwlock_wrlock(&D->collector_lock);
   pthread_rwlock_wrlock(&D->data_lock);
@@ -412,20 +412,21 @@ void pinba_collector_shutdown(void) /* {{{ */
   pthread_mutex_destroy(&D->share_mutex);
 
   index[0] = '\0';
-  for (tag = (pinba_tag *)pinba_map_first(D->tag.name_index, index); tag != NULL;
+  for (tag = (pinba_tag *)pinba_map_first(D->tag.name_index, index); tag != nullptr;
        tag = (pinba_tag *)pinba_map_next(D->tag.name_index, index)) {
     free(tag);
   }
 
   index[0] = '\0';
-  for (word = (pinba_word *)pinba_map_first(D->dictionary, index); word != NULL;
+  for (word = (pinba_word *)pinba_map_first(D->dictionary, index); word != nullptr;
        word = (pinba_word *)pinba_map_next(D->dictionary, index)) {
     free(word->str);
     free(word);
   }
 
   index[0] = '\0';
-  for (tables = (pinba_report_tables *)pinba_map_first(D->reports_to_tables, index); tables != NULL;
+  for (tables = (pinba_report_tables *)pinba_map_first(D->reports_to_tables, index);
+       tables != nullptr;
        tables = (pinba_report_tables *)pinba_map_next(D->reports_to_tables, index)) {
     pinba_map_destroy(tables->tables);
     free(tables);
@@ -433,7 +434,7 @@ void pinba_collector_shutdown(void) /* {{{ */
   pinba_map_destroy(D->reports_to_tables);
 
   index[0] = '\0';
-  for (report_index = (char *)pinba_map_first(D->tables_to_reports, index); report_index != NULL;
+  for (report_index = (char *)pinba_map_first(D->tables_to_reports, index); report_index != nullptr;
        report_index = (char *)pinba_map_next(D->tables_to_reports, index)) {
     free(report_index);
   }
@@ -444,7 +445,7 @@ void pinba_collector_shutdown(void) /* {{{ */
   pinba_map_destroy(D->dictionary);
 
   free(D);
-  D = NULL;
+  D = nullptr;
 
   pinba_debug("collector shut down");
 }
@@ -459,7 +460,7 @@ void *pinba_collector_main(void *arg) /* {{{ */
   pinba_eat_udp(D->collector_socket, thread_num);
 
   /* unreachable */
-  return NULL;
+  return nullptr;
 }
 /* }}} */
 
@@ -479,7 +480,7 @@ struct data_job_data {
 pinba_word *pinba_dictionary_word_get_or_insert_rdlock(char *str, int str_len) /* {{{ */
 {
   pinba_word *word_ptr;
-  char *copy_str = NULL;
+  char *copy_str = nullptr;
 
   if (str_len >= PINBA_TAG_VALUE_SIZE) {
     copy_str = strndup(str, PINBA_TAG_VALUE_SIZE - 1);
@@ -587,7 +588,7 @@ static inline int request_to_record(Pinba__Request *request,
       str = request->dictionary + PINBA_DICTIONARY_ENTRY_SIZE * i;
       str_len = strlen(str);
 
-      record_ex->words[i] = NULL;
+      record_ex->words[i] = nullptr;
       record_ex->words_cnt++;
 
       record_ex->words[i] = pinba_dictionary_word_get_or_insert_rdlock(str, str_len);
@@ -599,7 +600,7 @@ static inline int request_to_record(Pinba__Request *request,
       record->data.tag_names = (pinba_word **)realloc(record->data.tag_names,
                                                       request->n_tag_name * sizeof(pinba_word *));
       if (!record->data.tag_names) {
-        pinba_error(P_WARNING, "internal error: realloc(.., %d) returned NULL",
+        pinba_error(P_WARNING, "internal error: realloc(.., %d) returned nullptr",
                     request->n_tag_name * sizeof(pinba_word *));
         record->data.tags_alloc_cnt = 0;
         return -1;
@@ -608,7 +609,7 @@ static inline int request_to_record(Pinba__Request *request,
       record->data.tag_values = (pinba_word **)realloc(record->data.tag_values,
                                                        request->n_tag_name * sizeof(pinba_word *));
       if (!record->data.tag_values) {
-        pinba_error(P_WARNING, "internal error: realloc(.., %d) returned NULL",
+        pinba_error(P_WARNING, "internal error: realloc(.., %d) returned nullptr",
                     request->n_tag_name * sizeof(pinba_word *));
         record->data.tags_alloc_cnt = 0;
         return -1;
@@ -708,10 +709,10 @@ inline static int _add_timers(pinba_stats_record *record, const pinba_stats_reco
   pinba_tag *tag;
   int dict_size, str_len;
   pinba_word *temp_words_static[PINBA_TEMP_DICTIONARY_SIZE] = {0};
-  pinba_word **temp_words_dynamic = NULL;
+  pinba_word **temp_words_dynamic = nullptr;
   pinba_word **temp_words;
   pinba_tag *temp_tags_static[PINBA_TEMP_DICTIONARY_SIZE] = {0};
-  pinba_tag **temp_tags_dynamic = NULL;
+  pinba_tag **temp_tags_dynamic = nullptr;
   pinba_tag **temp_tags;
   Pinba__Request *request = record_ex->request;
 
@@ -743,8 +744,8 @@ inline static int _add_timers(pinba_stats_record *record, const pinba_stats_reco
       str = request->dictionary + PINBA_DICTIONARY_ENTRY_SIZE * i;
       str_len = strlen(str);
 
-      temp_words[i] = NULL;
-      temp_tags[i] = NULL;
+      temp_words[i] = nullptr;
+      temp_tags[i] = nullptr;
 
       temp_tags[i] = (pinba_tag *)pinba_map_get(D->tag.name_index, str);
 
@@ -770,7 +771,7 @@ inline static int _add_timers(pinba_stats_record *record, const pinba_stats_reco
       if (!word) {
         continue;
       }
-      temp_tags[i] = NULL;
+      temp_tags[i] = nullptr;
 
       tag = (pinba_tag *)pinba_map_get(D->tag.name_index, word->str);
       if (UNLIKELY(!tag)) {
@@ -852,7 +853,7 @@ inline static int _add_timers(pinba_stats_record *record, const pinba_stats_reco
       tag_value = request->timer_tag_value[tt];
       tag_name = request->timer_tag_name[tt];
 
-      timer->tag_values[timer->tag_num] = NULL;
+      timer->tag_values[timer->tag_num] = nullptr;
 
       if (LIKELY(tag_value < dict_size && tag_name < dict_size && tag_value >= 0 &&
                  tag_name >= 0)) {
@@ -954,7 +955,7 @@ static void data_job_func(void *data) /* {{{ */
   pinba_stats_record_ex *record_ex;
   int sub_request_num;
   int current_sub_request;
-  Pinba__Request *parent_request = NULL;
+  Pinba__Request *parent_request = nullptr;
   struct data_job_data *d = (struct data_job_data *)data;
   pinba_pool *request_pool = D->current_read_pool + d->thread_num;
   pinba_pool *tmp_pool = D->per_thread_tmp_pool + d->thread_num;
@@ -978,16 +979,16 @@ static void data_job_func(void *data) /* {{{ */
 
       record_ex = REQ_POOL_EX(tmp_pool) + tmp_pool->in;
       if (record_ex->request && record_ex->can_free) {
-        pinba__request__free_unpacked(record_ex->request, NULL);
-        record_ex->request = NULL;
+        pinba__request__free_unpacked(record_ex->request, nullptr);
+        record_ex->request = nullptr;
         record_ex->can_free = 0;
       }
 
       if (sub_request_num == -1) {
         request = REQ_DATA_POOL(request_pool)[request_pool->out];
-        REQ_DATA_POOL(request_pool)[request_pool->out] = NULL;
+        REQ_DATA_POOL(request_pool)[request_pool->out] = nullptr;
         request_pool->out++;
-        if (UNLIKELY(request == NULL)) {
+        if (UNLIKELY(request == nullptr)) {
           // d->invalid_packets++;
           break;
         }
@@ -1070,7 +1071,7 @@ static void request_copy_job_func(void *job_data) /* {{{ */
       record->data.tag_names = (pinba_word **)realloc(
           record->data.tag_names, temp_record->data.tags_cnt * sizeof(pinba_word *));
       if (!record->data.tag_names) {
-        pinba_error(P_WARNING, "internal error: realloc(.., %d) returned NULL",
+        pinba_error(P_WARNING, "internal error: realloc(.., %d) returned nullptr",
                     temp_record->data.tags_cnt * sizeof(pinba_word *));
         record->data.tags_alloc_cnt = 0;
         continue;
@@ -1079,7 +1080,7 @@ static void request_copy_job_func(void *job_data) /* {{{ */
       record->data.tag_values = (pinba_word **)realloc(
           record->data.tag_values, temp_record->data.tags_cnt * sizeof(pinba_word *));
       if (!record->data.tag_values) {
-        pinba_error(P_WARNING, "internal error: realloc(.., %d) returned NULL",
+        pinba_error(P_WARNING, "internal error: realloc(.., %d) returned nullptr",
                     temp_record->data.tags_cnt * sizeof(pinba_word *));
         record->data.tags_alloc_cnt = 0;
         continue;
@@ -1117,13 +1118,14 @@ static void request_copy_job_func(void *job_data) /* {{{ */
 void *pinba_data_main(void *) /* {{{ */
 {
   struct timeval launch, tv1;
-  struct data_job_data *job_data_arr = NULL;
+  struct data_job_data *job_data_arr = nullptr;
   pinba_pool *request_pool = &D->request_pool;
-  thread_pool_barrier_t *barrier1 = NULL, *barrier2 = NULL, *barrier3 = NULL;
-  thread_pool_barrier_t *barrier4 = NULL, *barrier5 = NULL, *barrier6 = NULL, *barrier7 = NULL;
-  struct reports_job_data *rep_job_data_arr = NULL;
-  struct reports_job_data *tag_rep_job_data_arr = NULL;
-  struct reports_job_data *rtag_rep_job_data_arr = NULL;
+  thread_pool_barrier_t *barrier1 = nullptr, *barrier2 = nullptr, *barrier3 = nullptr;
+  thread_pool_barrier_t *barrier4 = nullptr, *barrier5 = nullptr, *barrier6 = nullptr,
+                        *barrier7 = nullptr;
+  struct reports_job_data *rep_job_data_arr = nullptr;
+  struct reports_job_data *tag_rep_job_data_arr = nullptr;
+  struct reports_job_data *rtag_rep_job_data_arr = nullptr;
   unsigned int base_reports_alloc = 0, rtag_reports_alloc = 0, tag_reports_alloc = 0;
   int barriers_initialized = 0;
 
@@ -1156,7 +1158,7 @@ void *pinba_data_main(void *) /* {{{ */
     goto cleanup;
   }
 
-  gettimeofday(&launch, NULL);
+  gettimeofday(&launch, nullptr);
   for (;;) {
     size_t stats_records, records_to_copy, timers_added, free_slots, records_created;
     size_t accounted, invalid_packets = 0, lost_tmp_records = 0, rtags_found;
@@ -1516,7 +1518,7 @@ cleanup:
   free(barrier6);
   free(barrier7);
 
-  return NULL;
+  return nullptr;
 }
 /* }}} */
 
@@ -1536,7 +1538,7 @@ char *pinba_error_ex(int return_error, int type, const char *file, int line, con
   char errormsg[PINBA_ERR_BUFFER];
 
   if (D && (D->settings.log_level & type) == 0) {
-    return NULL;
+    return nullptr;
   }
 
   // Map legacy log types to modern log levels
@@ -1570,7 +1572,8 @@ char *pinba_error_ex(int return_error, int type, const char *file, int line, con
   }
 
   va_start(args, format);
-  vsnprintf(message_body, sizeof(message_body), format, args);
+  vsnprintf(message_body, sizeof(message_body), format,
+            args);  // NOLINT(clang-analyzer-valist.Uninitialized)
   va_end(args);
   int prefix_len =
       snprintf(errormsg, sizeof(errormsg), "[PINBA] %s: %s:%d ", type_name, file, line);
@@ -1586,7 +1589,7 @@ char *pinba_error_ex(int return_error, int type, const char *file, int line, con
     // Use modern async logger if available, fallback to legacy
     if (D) {
       // Check for duplicate suppression (legacy behavior)
-      time_t t = time(NULL);
+      time_t t = time(nullptr);
       char file_line[PINBA_ERR_BUFFER] = "\0";
       snprintf(file_line, sizeof(file_line), "%s:%d", file, line);
 
@@ -1594,7 +1597,7 @@ char *pinba_error_ex(int return_error, int type, const char *file, int line, con
       if ((t - last_error_time) < 1 && strcmp(last_file_line, file_line) == 0) {
         /* don't flood the logs */
         pthread_mutex_unlock(&error_mutex);
-        return NULL;
+        return nullptr;
       }
       last_error_time = t;
       snprintf(last_file_line, sizeof(last_file_line), "%s:%d", file, line);
@@ -1611,12 +1614,12 @@ char *pinba_error_ex(int return_error, int type, const char *file, int line, con
       char file_line[PINBA_ERR_BUFFER] = "\0";
 
       pthread_mutex_lock(&error_mutex);
-      t = time(NULL);
+      t = time(nullptr);
       snprintf(file_line, sizeof(file_line), "%s:%d", file, line);
 
       if ((t - last_error_time) < 1 && strcmp(last_file_line, file_line) == 0) {
         pthread_mutex_unlock(&error_mutex);
-        return NULL;
+        return nullptr;
       }
       last_error_time = t;
       snprintf(last_file_line, sizeof(last_file_line), "%s:%d", file, line);
@@ -1633,7 +1636,7 @@ char *pinba_error_ex(int return_error, int type, const char *file, int line, con
       fflush(stderr);
       pthread_mutex_unlock(&error_mutex);
     }
-    return NULL;
+    return nullptr;
   }
   tmp = strdup(errormsg);
   return tmp;
@@ -1716,7 +1719,7 @@ void pinba_eat_udp(pinba_socket *sock, size_t thread_num) /* {{{ */
       }
 
       for (;;) {
-        const int num = recvmmsg(sock->listen_sock, msgs, PINBA_VLEN, recv_flags, NULL);
+        const int num = recvmmsg(sock->listen_sock, msgs, PINBA_VLEN, recv_flags, nullptr);
 
         if (num > 0) {
           pinba_pool *req_pool;
@@ -1733,13 +1736,13 @@ void pinba_eat_udp(pinba_socket *sock, size_t thread_num) /* {{{ */
                 nullptr, msgs[i].msg_len,
                 reinterpret_cast<const unsigned char *>(bufs + PINBA_UDP_BUFFER_SIZE * i));
 
-            if (UNLIKELY(request == NULL)) {
+            if (UNLIKELY(request == nullptr)) {
               pinba_udp_record_decode_error();
               continue;
             }
 
             if (pinba_pool_push(req_pool, 0, request) != P_SUCCESS) {
-              pinba__request__free_unpacked(request, NULL);
+              pinba__request__free_unpacked(request, nullptr);
               pinba_udp_record_drop(1);
               break;
             }
@@ -1821,10 +1824,10 @@ void pinba_eat_udp(pinba_socket *sock, size_t thread_num) /* {{{ */
           pthread_rwlock_rdlock(&D->per_thread_pools_lock);
           req_pool = D->current_write_pool + thread_num;
 
-          request = pinba__request__unpack(NULL, ret, buf);
-          if (LIKELY(request != NULL)) {
+          request = pinba__request__unpack(nullptr, ret, buf);
+          if (LIKELY(request != nullptr)) {
             if (pinba_pool_push(req_pool, 0, request) != P_SUCCESS) {
-              pinba__request__free_unpacked(request, NULL);
+              pinba__request__free_unpacked(request, nullptr);
               pinba_udp_record_drop(1);
             } else {
               pinba_udp_record_receive(1);
@@ -1893,18 +1896,18 @@ pinba_socket *pinba_socket_open(char *ip, int listen_port) /* {{{ */
 
   if ((sfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
     pinba_error(P_ERROR, "socket() failed: %s (%d)", strerror(errno), errno);
-    return NULL;
+    return nullptr;
   }
 
   if (setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
     close(sfd);
-    return NULL;
+    return nullptr;
   }
 
   s = (pinba_socket *)calloc(1, sizeof(pinba_socket));
   if (!s) {
     close(sfd);
-    return NULL;
+    return nullptr;
   }
   s->listen_sock = sfd;
 
@@ -1927,7 +1930,7 @@ pinba_socket *pinba_socket_open(char *ip, int listen_port) /* {{{ */
   if (bind(s->listen_sock, (struct sockaddr *)&addr, sizeof(addr))) {
     pinba_socket_free(s);
     pinba_error(P_ERROR, "bind() failed: %s (%d)", strerror(errno), errno);
-    return NULL;
+    return nullptr;
   }
 
   if (!pinba_set_socket_nonblocking(s->listen_sock)) {
@@ -1945,7 +1948,7 @@ char *pinba_strndup(const char *s, unsigned int length) /* {{{ */
   char *p;
 
   p = (char *)malloc(length + 1);
-  if (UNLIKELY(p == NULL)) {
+  if (UNLIKELY(p == nullptr)) {
     return p;
   }
   if (length) {

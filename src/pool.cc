@@ -141,7 +141,7 @@ void pinba_pool_destroy(pinba_pool *p) /* {{{ */
     }
 
     free(p->data);
-    p->data = NULL;
+    p->data = nullptr;
   }
 }
 /* }}} */
@@ -227,7 +227,7 @@ void pinba_per_thread_request_pool_dtor(void *pool) /* {{{ */
   for (i = 0; i < p->size; i++) {
     request = REQ_DATA_POOL(p)[i];
     if (request) {
-      pinba__request__free_unpacked(request, NULL);
+      pinba__request__free_unpacked(request, nullptr);
     }
   }
 }
@@ -243,8 +243,8 @@ void pinba_per_thread_tmp_pool_dtor(void *pool) /* {{{ */
     record_ex = REQ_POOL_EX(p) + i;
     pinba_stats_record_tags_dtor(&record_ex->record);
     if (record_ex->request && record_ex->can_free) {
-      pinba__request__free_unpacked(record_ex->request, NULL);
-      record_ex->request = NULL;
+      pinba__request__free_unpacked(record_ex->request, nullptr);
+      record_ex->request = nullptr;
       record_ex->can_free = 0;
     }
     if (record_ex->words) {
@@ -476,15 +476,16 @@ void *pinba_stats_main(void *arg) /* {{{ */
 {
   (void)arg; /* Suppress unused parameter warning */
   struct timeval launch;
-  struct packets_job_data *packets_job_data_arr = NULL;
-  struct reports_job_data *rep_job_data_arr = NULL;
-  struct reports_job_data *tag_rep_job_data_arr = NULL;
-  struct reports_job_data *rtag_rep_job_data_arr = NULL;
+  struct packets_job_data *packets_job_data_arr = nullptr;
+  struct reports_job_data *rep_job_data_arr = nullptr;
+  struct reports_job_data *tag_rep_job_data_arr = nullptr;
+  struct reports_job_data *rtag_rep_job_data_arr = nullptr;
   int prev_request_id, new_request_id;
   unsigned int base_reports_alloc = 0, rtag_reports_alloc = 0, tag_reports_alloc = 0;
   pinba_pool *request_pool = &D->request_pool;
   pinba_pool *timer_pool = &D->timer_pool;
-  thread_pool_barrier_t *barrier1 = NULL, *barrier2 = NULL, *barrier3 = NULL, *barrier4 = NULL;
+  thread_pool_barrier_t *barrier1 = nullptr, *barrier2 = nullptr, *barrier3 = nullptr,
+                        *barrier4 = nullptr;
   int barriers_initialized = 0;
 
   pinba_debug("starting up stats thread");
@@ -714,7 +715,7 @@ cleanup:
   free(barrier3);
   free(barrier4);
 
-  return NULL;
+  return nullptr;
 }
 /* }}} */
 
