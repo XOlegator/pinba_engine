@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: Build & test (MySQL ${{ matrix.mysql-series }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mysql-series: "8.0"
+            cmake-preset: release-download-mysql-source
+            mysql-version: "8.0.46"
+          - mysql-series: "8.4"
+            cmake-preset: release-download-mysql84-source
+            mysql-version: "8.4.9"
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake \
+            libprotobuf-dev protobuf-compiler \
+            libssl-dev pkg-config
+
+      - name: Cache MySQL source tarball and GoogleTest
+        uses: actions/cache@v5
+        with:
+          path: build/_deps
+          key: deps-mysql${{ matrix.mysql-version }}-gtest1.15.2
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.cmake-preset }}
+
+      - name: Build
+        run: cmake --build build --parallel $(nproc)
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure -j$(nproc)
