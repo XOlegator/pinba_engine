@@ -39,6 +39,7 @@ benchmark_results/
 *.gcno
 *.profraw
 *.profdata
+coverage-*.info
 *.xml
 *.json
 !CMakePresets.json

@@ -73,7 +73,7 @@ typedef struct _thread_pool_t {
   queue_head_t *job_queue;
 } thread_pool_t;
 
-// Creates a fixed-size thread pool. Returns NULL on failure.
+// Creates a fixed-size thread pool. Returns nullptr on failure.
 thread_pool_t *th_pool_create(int num_threads_in_pool);
 
 // Dispatches a job with an optional cleanup function.

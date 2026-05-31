@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 
 project(
   pinba_engine
-  VERSION 2.0.0
+  VERSION 2.0.2
   DESCRIPTION "Pinba Engine - MySQL Storage Engine for PHP Performance Statistics"
   LANGUAGES C CXX)
 
@@ -297,6 +297,12 @@ target_compile_definitions(
 if(PINBA_ENABLE_SANITIZERS)
   target_compile_options(pinba_project_options INTERFACE -fsanitize=address,undefined -fno-omit-frame-pointer)
   target_link_options(pinba_project_options INTERFACE -fsanitize=address,undefined)
+endif()
+
+option(PINBA_ENABLE_COVERAGE "Enable gcov coverage instrumentation" OFF)
+if(PINBA_ENABLE_COVERAGE)
+  target_compile_options(pinba_project_options INTERFACE --coverage -fno-inline -fprofile-update=atomic)
+  target_link_options(pinba_project_options INTERFACE --coverage)
 endif()
 
 add_library(pinba_includes INTERFACE)

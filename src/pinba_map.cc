@@ -80,7 +80,7 @@ void *pinba_map::data_first(char *index_to_fill) /* {{{ */
 {
   dense_hash_t::iterator it = hash_map.begin();
   if (it == hash_map.end()) {
-    return NULL;
+    return nullptr;
   }
   snprintf(index_to_fill, PINBA_TAG_VALUE_SIZE, "%s", it->first);
   return (void *)it->second;
@@ -91,12 +91,12 @@ void *pinba_map::data_next(char *index_to_fill) /* {{{ */
 {
   dense_hash_t::iterator it = hash_map.find(index_to_fill);
   if (it == hash_map.end()) {
-    return NULL;
+    return nullptr;
   }
   ++it;
 
   if (it == hash_map.end()) {
-    return NULL;
+    return nullptr;
   }
 
   snprintf(index_to_fill, PINBA_TAG_VALUE_SIZE, "%s", it->first);
@@ -124,7 +124,7 @@ void *pinba_map::data_get(const char *index) /* {{{ */
 {
   dense_hash_t::iterator it = hash_map.find(index);
   if (it == hash_map.end()) {
-    return NULL;
+    return nullptr;
   }
   return (void *)it->second;
 }
@@ -139,7 +139,7 @@ size_t pinba_map::size() /* {{{ */
 void *pinba_map_first(void *map_report, char *index_to_fill) /* {{{ */
 {
   if (!map_report) {
-    return NULL;
+    return nullptr;
   }
 
   pinba_map *map = static_cast<pinba_map *>(map_report);
@@ -150,7 +150,7 @@ void *pinba_map_first(void *map_report, char *index_to_fill) /* {{{ */
 void *pinba_map_next(void *map_report, char *index_to_fill) /* {{{ */
 {
   if (!map_report) {
-    return NULL;
+    return nullptr;
   }
 
   pinba_map *map = static_cast<pinba_map *>(map_report);
@@ -162,7 +162,7 @@ void *pinba_map_next(void *map_report, char *index_to_fill) /* {{{ */
 void *pinba_map_get(void *map_report, const char *index) /* {{{ */
 {
   if (!map_report) {
-    return NULL;
+    return nullptr;
   }
   pinba_map *map = static_cast<pinba_map *>(map_report);
 
@@ -173,7 +173,7 @@ void *pinba_map_get(void *map_report, const char *index) /* {{{ */
 void *pinba_map_add(void *map_report, const char *index, const void *data) /* {{{ */
 {
   pinba_map *map;
-  if (map_report == NULL) {
+  if (map_report == nullptr) {
     map = new pinba_map();
   } else {
     map = static_cast<pinba_map *>(map_report);

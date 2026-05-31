@@ -40,7 +40,7 @@ pinba_tag *pinba_tag_get_by_name(char *name) /* {{{ */
 
   tag = (pinba_tag *)pinba_map_get(D->tag.name_index, name);
   if (UNLIKELY(!name)) {
-    return NULL;
+    return nullptr;
   }
 
   return tag;
@@ -53,7 +53,7 @@ pinba_tag *pinba_tag_get_by_id(size_t id) /* {{{ */
 
   tag = (pinba_tag *)pinba_lmap_get(D->tag.table, id);
   if (UNLIKELY(!tag)) {
-    return NULL;
+    return nullptr;
   }
 
   return tag;
@@ -63,7 +63,7 @@ pinba_tag *pinba_tag_get_by_id(size_t id) /* {{{ */
 pinba_tag *pinba_tag_lookup_or_create_locked(const char *name, size_t len) /* {{{ */
 {
   if (!name) {
-    return NULL;
+    return nullptr;
   }
 
   pinba_tag *tag = (pinba_tag *)pinba_map_get(D->tag.name_index, (char *)name);

@@ -8,7 +8,7 @@ PINBA_REGENERATE_REPORT_FUNC_D() /* pinba_regenerate_report9(PINBA_SHARE *share)
   if (!report) {
     report = (pinba_report *)calloc(1, sizeof(pinba_report));
     if (!report) {
-      return NULL;
+      return nullptr;
     }
 
     pinba_parse_conditions(share, (pinba_std_report *)report);
@@ -26,7 +26,7 @@ PINBA_REGENERATE_REPORT_FUNC_D() /* pinba_regenerate_report9(PINBA_SHARE *share)
       pinba_map_delete(D->base_reports, share->index);
       pthread_rwlock_destroy(&report->std.lock);
       free(report);
-      return NULL;
+      return nullptr;
     }
 
     if (!pinba_update_report_tables((pinba_std_report *)report, share->index)) {
@@ -34,7 +34,7 @@ PINBA_REGENERATE_REPORT_FUNC_D() /* pinba_regenerate_report9(PINBA_SHARE *share)
       pinba_map_delete(D->base_reports, share->index);
       pthread_rwlock_destroy(&report->std.lock);
       free(report);
-      return NULL;
+      return nullptr;
     }
 
   } else {

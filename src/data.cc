@@ -319,7 +319,7 @@ void pinba_update_tag_report_add(size_t request_id, void *rep,
   (void)tag_found;
   (void)dummy; /* Variables may be unused in some code paths */
   pinba_word *word;
-  void *script_map = NULL;
+  void *script_map = nullptr;
 
   for (i = 0; i < record->timers_cnt; i++) {
     tag_found = 0;
@@ -430,7 +430,7 @@ void pinba_update_tag_report_delete(size_t request_id, void *rep,
         if (pinba_map_delete(script_map, word->str) < 0) {
           pinba_map_destroy(script_map);
           pinba_map_delete(report->results, record->data.script_name);
-          script_map = NULL;
+          script_map = nullptr;
         }
 
         pinba_lmap_destroy(data->histogram_data);
@@ -464,7 +464,7 @@ void pinba_update_tag2_report_add(size_t request_id, void *rep,
   int index_len;
   char index_val[PINBA_TAG_VALUE_SIZE + 1 + PINBA_TAG_VALUE_SIZE + 1];
   pinba_word *word1, *word2;
-  void *script_map = NULL;
+  void *script_map = nullptr;
 
   for (i = 0; i < record->timers_cnt; i++) {
     tag1_pos = -1;
@@ -601,7 +601,7 @@ void pinba_update_tag2_report_delete(size_t request_id, void *rep,
         if (pinba_map_delete(script_map, index_val) < 0) {
           pinba_map_destroy(script_map);
           pinba_map_delete(report->results, record->data.script_name);
-          script_map = NULL;
+          script_map = nullptr;
         }
         report->std.results_cnt--;
       } else {
@@ -631,7 +631,7 @@ void pinba_update_tag_report2_add(size_t request_id, void *rep,
   char index[PINBA_SCRIPT_NAME_SIZE + PINBA_HOSTNAME_SIZE + PINBA_SCRIPT_NAME_SIZE + 1 +
              PINBA_TAG_VALUE_SIZE];
   pinba_word *word;
-  void *script_map = NULL;
+  void *script_map = nullptr;
 
   for (i = 0; i < record->timers_cnt; i++) {
     tag_found = 0;
@@ -768,7 +768,7 @@ void pinba_update_tag_report2_delete(size_t request_id, void *rep,
         if (pinba_map_delete(script_map, index) < 0) {
           pinba_map_destroy(script_map);
           pinba_map_delete(report->results, record->data.script_name);
-          script_map = NULL;
+          script_map = nullptr;
         }
         report->std.results_cnt--;
       } else {
@@ -799,7 +799,7 @@ void pinba_update_tag2_report2_add(size_t request_id, void *rep,
   char index_val[PINBA_HOSTNAME_SIZE + 1 + PINBA_SERVER_NAME_SIZE + 1 + PINBA_SCRIPT_NAME_SIZE + 1 +
                  PINBA_TAG_VALUE_SIZE + 1 + PINBA_TAG_VALUE_SIZE + 1]; /* +1 for safety */
   pinba_word *word1, *word2;
-  void *script_map = NULL;
+  void *script_map = nullptr;
 
   for (i = 0; i < record->timers_cnt; i++) {
     tag1_pos = -1;
@@ -950,7 +950,7 @@ void pinba_update_tag2_report2_delete(size_t request_id, void *rep,
         if (pinba_map_delete(script_map, index_val) < 0) {
           pinba_map_destroy(script_map);
           pinba_map_delete(report->results, record->data.script_name);
-          script_map = NULL;
+          script_map = nullptr;
         }
         report->std.results_cnt--;
       } else {
@@ -1165,7 +1165,7 @@ void pinba_update_tagN_report_add(size_t request_id, void *rep,
   (void)dummy; /* Variables may be unused in some code paths */
   int index_len;
   pinba_word *word;
-  void *script_map = NULL;
+  void *script_map = nullptr;
 
   for (i = 0; i < record->timers_cnt; i++) {
     found_tags_cnt = 0;
@@ -1335,7 +1335,7 @@ void pinba_update_tagN_report_delete(size_t request_id, void *rep,
         if (pinba_map_delete(script_map, report->index) < 0) {
           pinba_map_destroy(script_map);
           pinba_map_delete(report->results, record->data.script_name);
-          script_map = NULL;
+          script_map = nullptr;
         }
         pinba_lmap_destroy(data->histogram_data);
         free(data->tag_value);
@@ -1369,7 +1369,7 @@ void pinba_update_tagN_report2_add(size_t request_id, void *rep,
   (void)dummy; /* Variables may be unused in some code paths */
   int index_len;
   pinba_word *word;
-  void *script_map = NULL;
+  void *script_map = nullptr;
 
   for (i = 0; i < record->timers_cnt; i++) {
     found_tags_cnt = 0;
@@ -1559,7 +1559,7 @@ void pinba_update_tagN_report2_delete(size_t request_id, void *rep,
         if (pinba_map_delete(script_map, report->index) < 0) {
           pinba_map_destroy(script_map);
           pinba_map_delete(report->results, record->data.script_name);
-          script_map = NULL;
+          script_map = nullptr;
         }
         pinba_lmap_destroy(data->histogram_data);
         free(data->tag_value);
@@ -2486,12 +2486,12 @@ void pinba_report_results_dtor(pinba_report *report) /* {{{ */
   char index[PINBA_MAX_LINE_LEN] = {0};
   void *data;
 
-  for (data = pinba_map_first(report->results, index); data != NULL;
+  for (data = pinba_map_first(report->results, index); data != nullptr;
        data = pinba_map_next(report->results, index)) {
     free(data);
   }
   pinba_map_destroy(report->results);
-  report->results = NULL;
+  report->results = nullptr;
   report->std.results_cnt = 0;
 }
 /* }}} */
@@ -2547,9 +2547,9 @@ void pinba_report_dtor(pinba_report *report, int lock_reports) /* {{{ */
     report->kbytes_total = 0;
   }
 
-  if (report->results != NULL) {
+  if (report->results != nullptr) {
     pinba_map_destroy(report->results);
-    report->results = NULL;
+    report->results = nullptr;
   }
 
   pinba_std_report_dtor(report);
@@ -2589,17 +2589,17 @@ void pinba_tag_report_dtor(pinba_tag_report *report, int lock_tag_reports) /* {{
   if ((report->std.flags & PINBA_REPORT_INDEXED) != 0) {
     void *index_map;
 
-    for (index_map = pinba_map_first(report->results, index); index_map != NULL;
+    for (index_map = pinba_map_first(report->results, index); index_map != nullptr;
          index_map = pinba_map_next(report->results, index)) {
       char index2[PINBA_MAX_LINE_LEN] = {0};
-      for (data = pinba_map_first(index_map, index2); data != NULL;
+      for (data = pinba_map_first(index_map, index2); data != nullptr;
            data = pinba_map_next(index_map, index2)) {
         free(data);
       }
       pinba_map_destroy(index_map);
     }
   } else {
-    for (data = pinba_map_first(report->results, index); data != NULL;
+    for (data = pinba_map_first(report->results, index); data != nullptr;
          data = pinba_map_next(report->results, index)) {
       free(data);
     }
@@ -2653,17 +2653,17 @@ void pinba_rtag_report_dtor(pinba_rtag_report *report, int lock) /* {{{ */
   if ((report->std.flags & PINBA_REPORT_INDEXED) != 0) {
     void *index_map;
 
-    for (index_map = pinba_map_first(report->results, index); index_map != NULL;
+    for (index_map = pinba_map_first(report->results, index); index_map != nullptr;
          index_map = pinba_map_next(report->results, index)) {
       char index2[PINBA_MAX_LINE_LEN] = {0};
-      for (data = pinba_map_first(index_map, index2); data != NULL;
+      for (data = pinba_map_first(index_map, index2); data != nullptr;
            data = pinba_map_next(index_map, index2)) {
         free(data);
       }
       pinba_map_destroy(index_map);
     }
   } else {
-    for (data = pinba_map_first(report->results, index); data != NULL;
+    for (data = pinba_map_first(report->results, index); data != nullptr;
          data = pinba_map_next(report->results, index)) {
       free(data);
     }
