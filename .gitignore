@@ -60,15 +60,3 @@ src/config.h
 # OS files
 .DS_Store
 Thumbs.db
-
-# Bundled sparsehash generated artifacts
-sparsehash/src/sparsehash/internal/sparseconfig.h
-sparsehash/src/*.o
-sparsehash/hashtable_test
-sparsehash/libc_allocator_with_realloc_test
-sparsehash/simple_compat_test
-sparsehash/simple_test
-sparsehash/sparsetable_unittest
-sparsehash/template_util_unittest
-sparsehash/time_hash_map
-sparsehash/type_traits_unittest
