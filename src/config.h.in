@@ -35,3 +35,6 @@
 
 /* vcs wc modified */
 #undef VCS_WC_MODIFIED
+
+/* Plugin version string, filled by CMake from project() VERSION */
+#define PINBA_ENGINE_VERSION "@PROJECT_VERSION@"
