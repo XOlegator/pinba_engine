@@ -11,6 +11,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  clang-format:
+    name: clang-format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install clang-format
+        run: sudo apt-get install -y --no-install-recommends clang-format
+
+      - name: Check formatting
+        run: |
+          find src tests -type f \( -name "*.cc" -o -name "*.h" -o -name "*.c" \) \
+            ! -name "xxhash.c" ! -name "xxhash.h" \
+            ! -name "protobuf-c.h" ! -name "protobuf-c-private.h" \
+            ! -name "pinba.pb-c.cc" ! -name "pinba.pb-c.h" \
+            | xargs clang-format --dry-run --Werror
+
   build-test:
     name: Build & test (MySQL ${{ matrix.mysql-series }})
     runs-on: ubuntu-latest
@@ -35,7 +52,8 @@ jobs:
             build-essential cmake \
             libprotobuf-dev protobuf-compiler \
             rapidjson-dev \
-            libssl-dev pkg-config
+            libssl-dev pkg-config \
+            cppcheck
 
       - name: Cache MySQL source tarball and GoogleTest
         uses: actions/cache@v5
@@ -51,3 +69,16 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build --output-on-failure -j$(nproc)
+
+      - name: cppcheck (C++23 static analysis)
+        if: matrix.mysql-series == '8.4'
+        run: |
+          cppcheck \
+            --project=build/compile_commands.json \
+            --std=c++23 \
+            --enable=warning,performance,portability \
+            --error-exitcode=1 \
+            --quiet \
+            --suppress=preprocessorErrorDirective \
+            --suppress=missingInclude \
+            --file-filter='*/src/*.cc'
