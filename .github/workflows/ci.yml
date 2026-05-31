@@ -185,7 +185,7 @@ jobs:
             --capture \
             --directory ${{ matrix.build-dir }} \
             --output-file ${{ matrix.artifact-name }}.info \
-            --ignore-errors source,mismatch
+            --ignore-errors source,mismatch,negative
           lcov \
             --remove ${{ matrix.artifact-name }}.info \
               '/usr/*' \

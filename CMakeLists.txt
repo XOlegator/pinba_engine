@@ -301,7 +301,7 @@ endif()
 
 option(PINBA_ENABLE_COVERAGE "Enable gcov coverage instrumentation" OFF)
 if(PINBA_ENABLE_COVERAGE)
-  target_compile_options(pinba_project_options INTERFACE --coverage -fno-inline)
+  target_compile_options(pinba_project_options INTERFACE --coverage -fno-inline -fprofile-update=atomic)
   target_link_options(pinba_project_options INTERFACE --coverage)
 endif()
 
