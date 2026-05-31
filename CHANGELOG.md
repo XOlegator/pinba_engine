@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2](https://github.com/XOlegator/pinba_engine/compare/v2.0.1...v2.0.2) (2026-05-31)
+
+
+### Bug Fixes
+
+* **build:** fix FetchContent/find_package conflict for GTest and benchmark ([900a434](https://github.com/XOlegator/pinba_engine/commit/900a434fb74c5b86ce3534555492c98fb010a3a9))
+* **ci:** add rapidjson-dev and fix gitignore blocking docker config ([8dab3f7](https://github.com/XOlegator/pinba_engine/commit/8dab3f79046f8545f13ea9dc2b0b6970e6ac9589))
+
 ## [2.0.1](https://github.com/XOlegator/pinba_engine/compare/v2.0.0...v2.0.1) (2026-05-31)
 
 
