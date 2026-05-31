@@ -201,9 +201,8 @@ static void th_do_work(thread_pool_t *pool) /* {{{ */
   std::unique_lock<std::mutex> lock(pool->mutex);
 
   for (;;) {
-    pool->job_posted.wait(lock, [pool] {
-      return pool->shutdown || queue_is_job_available(pool->job_queue);
-    });
+    pool->job_posted.wait(
+        lock, [pool] { return pool->shutdown || queue_is_job_available(pool->job_queue); });
 
     // Drain remaining jobs before honouring shutdown.
     if (pool->shutdown && !queue_is_job_available(pool->job_queue)) {
@@ -273,14 +272,11 @@ thread_pool_t *th_pool_create(int num_threads_in_pool) /* {{{ */
 
 void th_pool_dispatch_with_cleanup(thread_pool_t *from_me, thread_pool_barrier_t *barrier,
                                    dispatch_fn_t dispatch_to_here, void *arg,
-                                   dispatch_fn_t cleaner_func,
-                                   void *cleaner_arg) /* {{{ */
+                                   dispatch_fn_t cleaner_func, void *cleaner_arg) /* {{{ */
 {
   std::unique_lock<std::mutex> lock(from_me->mutex);
 
-  from_me->job_taken.wait(lock, [from_me] {
-    return queue_can_accept_order(from_me->job_queue);
-  });
+  from_me->job_taken.wait(lock, [from_me] { return queue_can_accept_order(from_me->job_queue); });
 
   queue_post_job(from_me->job_queue, barrier, dispatch_to_here, arg, cleaner_func, cleaner_arg);
   from_me->job_posted.notify_one();
