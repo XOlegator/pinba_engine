@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1](https://github.com/XOlegator/pinba_engine/compare/v2.0.0...v2.0.1) (2026-05-31)
+
+
+### Bug Fixes
+
+* avoid warning-prone error formatting ([a8f8c72](https://github.com/XOlegator/pinba_engine/commit/a8f8c724a644c4229495b3a9cee8eafc77a97633))
+* **docker:** fix plugin ABI, OL9 library paths, and mysql_version.h generation ([87e9fbc](https://github.com/XOlegator/pinba_engine/commit/87e9fbc3fc82bd86f6661b90d082857a41fcb097))
+* **docker:** stabilize MySQL 8 Pinba image build and runtime for pinboard integration ([3cd3fe8](https://github.com/XOlegator/pinba_engine/commit/3cd3fe830718873aa64b31e8230379fb591f28da))
+* **docker:** stabilize pinba_engine image build for MySQL 8 and update Docker guide ([f4a8025](https://github.com/XOlegator/pinba_engine/commit/f4a8025e3d0992e521f74ed91a9486eab29e276d))
+* **docker:** stabilize pinba_engine image build for MySQL 8 and update Docker guide ([fc3b285](https://github.com/XOlegator/pinba_engine/commit/fc3b285c1dfb513851cb469c0e2857c66755cf7c))
+
 ## [2.0.0](https://github.com/XOlegator/pinba_engine/compare/v1.3.0...v2.0.0) (2026-03-08)
 
 
