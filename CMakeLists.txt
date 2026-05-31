@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.24)
 
 project(
   pinba_engine
-  VERSION 2.0.2
+  VERSION 2.1.2
   DESCRIPTION "Pinba Engine - MySQL Storage Engine for PHP Performance Statistics"
   LANGUAGES C CXX)
 
