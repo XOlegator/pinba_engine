@@ -404,7 +404,7 @@ if(PINBA_WITH_BENCHMARKS)
     FetchContent_Declare(
       googlebenchmark
       URL https://github.com/google/benchmark/archive/refs/tags/v1.9.1.tar.gz
-      URL_HASH SHA256=fae7a564c9d7b05b620f00709c4bc0b5061f6ae4c4cc79072f36ec0cb521b24d
+      URL_HASH SHA256=32131c08ee31eeff2c8968d7e874f3cb648034377dfc32a4c377fa8796d84981
       DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
     set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
     FetchContent_MakeAvailable(googlebenchmark)
