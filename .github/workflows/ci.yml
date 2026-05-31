@@ -81,4 +81,5 @@ jobs:
             --quiet \
             --suppress=preprocessorErrorDirective \
             --suppress=missingInclude \
+            "--suppress=*:build/*" \
             --file-filter='*/src/*.cc'
