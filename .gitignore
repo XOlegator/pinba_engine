@@ -46,6 +46,9 @@ coverage-*.info
 !.release-please-manifest.json
 !release-please-config.json
 
+# Generated documentation
+docs/api/
+
 # Personal/local documentation (not for public repo)
 docs/docker.personal.md
 

@@ -1,0 +1,37 @@
+PROJECT_NAME           = "Pinba Engine"
+PROJECT_NUMBER         = @PROJECT_VERSION@
+PROJECT_BRIEF          = "MySQL Storage Engine for PHP Performance Statistics"
+
+OUTPUT_DIRECTORY       = docs/api
+CREATE_SUBDIRS         = NO
+OUTPUT_LANGUAGE        = English
+BRIEF_MEMBER_DESC      = YES
+REPEAT_BRIEF           = YES
+ALWAYS_DETAILED_SEC    = NO
+JAVADOC_AUTOBRIEF      = YES
+QT_AUTOBRIEF           = NO
+BUILTIN_STL_SUPPORT    = YES
+
+INPUT                  = src/ha_pinba.h src/pinba.h src/pinba_types.h \
+                         src/pinba_limits.h src/threadpool.h
+RECURSIVE              = NO
+EXCLUDE_PATTERNS       = */xxhash* */protobuf-c* */pinba.pb-c*
+FILE_PATTERNS          = *.h
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = NO
+
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+HTML_DYNAMIC_SECTIONS  = NO
+GENERATE_LATEX         = NO
+GENERATE_MAN           = NO
+GENERATE_XML           = NO
+
+WARN_IF_UNDOCUMENTED   = NO
+QUIET                  = YES
+
+SORT_MEMBER_DOCS       = NO
+SHOW_USED_FILES        = NO
+SHOW_FILES             = YES
+SHOW_NAMESPACES        = NO
