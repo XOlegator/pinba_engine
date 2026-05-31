@@ -82,6 +82,15 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "PINBA_ENABLE_COVERAGE": "ON"
       }
+    },
+    {
+      "name": "benchmark-download-mysql84-source",
+      "displayName": "Release with benchmarks and downloaded MySQL 8.4 source headers",
+      "inherits": "release-download-mysql84-source",
+      "binaryDir": "${sourceDir}/build-benchmark",
+      "cacheVariables": {
+        "PINBA_WITH_BENCHMARKS": "ON"
+      }
     }
   ],
   "buildPresets": [

@@ -197,8 +197,60 @@ jobs:
           lcov --summary ${{ matrix.artifact-name }}.info
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.artifact-name }}
           path: ${{ matrix.artifact-name }}.info
           retention-days: 30
+
+  benchmark:
+    name: Benchmark / MySQL 8.4
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake \
+            libprotobuf-dev protobuf-compiler \
+            rapidjson-dev \
+            libssl-dev pkg-config
+
+      - name: Cache MySQL source tarball and GoogleTest/Benchmark
+        uses: actions/cache@v5
+        with:
+          path: build-benchmark/_deps
+          key: deps-benchmark-mysql8.4.9-gbench1.9.1
+
+      - name: Configure
+        run: cmake --preset benchmark-download-mysql84-source
+
+      - name: Build
+        run: cmake --build build-benchmark --parallel $(nproc)
+
+      - name: Run benchmarks
+        run: |
+          for bin in build-benchmark/benchmarks/benchmark_*; do
+            echo "=== $(basename $bin) ==="
+            "$bin" --benchmark_min_time=0.1s --benchmark_format=console
+          done
+
+      - name: Save benchmark results
+        run: |
+          mkdir -p benchmark-results
+          for bin in build-benchmark/benchmarks/benchmark_*; do
+            name="$(basename $bin)"
+            "$bin" --benchmark_min_time=0.1s --benchmark_format=json \
+              > "benchmark-results/${name}.json" || true
+          done
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v5
+        with:
+          name: benchmark-results
+          path: benchmark-results/
+          retention-days: 90

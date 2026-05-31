@@ -9111,6 +9111,10 @@ static SYS_VAR *system_variables[] = {MYSQL_SYSVAR(port),
 
 struct st_mysql_storage_engine pinba_storage_engine = {MYSQL_HANDLERTON_INTERFACE_VERSION};
 
+static SHOW_VAR pinba_status_vars[] = {
+    {"Pinba_engine_version", (char *)PINBA_ENGINE_VERSION, SHOW_CHAR, SHOW_SCOPE_GLOBAL},
+    {NullS, NullS, SHOW_LONG, SHOW_SCOPE_GLOBAL}};
+
 mysql_declare_plugin(pinba) /* {{{ */
     {
         MYSQL_STORAGE_ENGINE_PLUGIN,
@@ -9123,7 +9127,7 @@ mysql_declare_plugin(pinba) /* {{{ */
         pinba_engine_check_uninstall, /* Plugin Check uninstall */
         pinba_engine_shutdown,        /* Plugin Deinit */
         0x0101,                       /* VERSION 1.1.0 */
-        nullptr,                      /* status variables                */
+        pinba_status_vars,            /* status variables                */
         system_variables,             /* system variables                */
         nullptr,                      /* config options                  */
         0                             /* flags                           */
