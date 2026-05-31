@@ -6,10 +6,18 @@ on:
   pull_request:
     branches: [master]
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   doxygen:
-    name: Build API docs
+    name: Build & deploy API docs
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - uses: actions/checkout@v5
@@ -28,9 +36,17 @@ jobs:
           sed "s/@PROJECT_VERSION@/${{ steps.version.outputs.version }}/g" Doxyfile \
             | doxygen -
 
-      - name: Upload docs artifact
-        uses: actions/upload-artifact@v5
+      - name: Setup Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/upload-pages-artifact@v3
         with:
-          name: api-docs
           path: docs/api/html/
-          retention-days: 30
+
+      - name: Deploy to GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        id: deployment
+        uses: actions/deploy-pages@v4
