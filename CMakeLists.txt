@@ -415,7 +415,9 @@ if(PINBA_WITH_BENCHMARKS)
 endif()
 
 install(TARGETS pinba_engine LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/mysql/plugin COMPONENT Runtime)
-install(TARGETS pinba_test RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+if(PINBA_WITH_TESTS)
+  install(TARGETS pinba_test RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
 install(FILES README.md default_tables.sql DESTINATION ${CMAKE_INSTALL_DATADIR}/pinba_engine)
 install(FILES default_tables.sql DESTINATION ${CMAKE_INSTALL_DATADIR}/pinba_engine RENAME pinba_tables.sql)
 
