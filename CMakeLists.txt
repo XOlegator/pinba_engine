@@ -299,6 +299,12 @@ if(PINBA_ENABLE_SANITIZERS)
   target_link_options(pinba_project_options INTERFACE -fsanitize=address,undefined)
 endif()
 
+option(PINBA_ENABLE_COVERAGE "Enable gcov coverage instrumentation" OFF)
+if(PINBA_ENABLE_COVERAGE)
+  target_compile_options(pinba_project_options INTERFACE --coverage -fno-inline)
+  target_link_options(pinba_project_options INTERFACE --coverage)
+endif()
+
 add_library(pinba_includes INTERFACE)
 # Project headers: regular includes (warnings from our code are visible)
 target_include_directories(

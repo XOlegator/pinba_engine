@@ -44,6 +44,44 @@
         "PINBA_MYSQL_SERIES": "8.4",
         "PINBA_DOWNLOAD_MYSQL_SOURCE": "ON"
       }
+    },
+    {
+      "name": "debug-download-mysql-source",
+      "displayName": "Debug+sanitizers with downloaded MySQL 8.0 source headers",
+      "inherits": "debug",
+      "cacheVariables": {
+        "PINBA_MYSQL_SERIES": "8.0",
+        "PINBA_DOWNLOAD_MYSQL_SOURCE": "ON"
+      }
+    },
+    {
+      "name": "debug-download-mysql84-source",
+      "displayName": "Debug+sanitizers with downloaded MySQL 8.4 source headers",
+      "inherits": "debug",
+      "cacheVariables": {
+        "PINBA_MYSQL_SERIES": "8.4",
+        "PINBA_DOWNLOAD_MYSQL_SOURCE": "ON"
+      }
+    },
+    {
+      "name": "coverage-download-mysql-source",
+      "displayName": "Coverage build with downloaded MySQL 8.0 source headers",
+      "inherits": "release-download-mysql-source",
+      "binaryDir": "${sourceDir}/build-coverage",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "PINBA_ENABLE_COVERAGE": "ON"
+      }
+    },
+    {
+      "name": "coverage-download-mysql84-source",
+      "displayName": "Coverage build with downloaded MySQL 8.4 source headers",
+      "inherits": "release-download-mysql84-source",
+      "binaryDir": "${sourceDir}/build-coverage84",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "PINBA_ENABLE_COVERAGE": "ON"
+      }
     }
   ],
   "buildPresets": [

@@ -53,7 +53,7 @@ jobs:
             libprotobuf-dev protobuf-compiler \
             rapidjson-dev \
             libssl-dev pkg-config \
-            cppcheck
+            cppcheck clang-tidy
 
       - name: Cache MySQL source tarball and GoogleTest
         uses: actions/cache@v5
@@ -83,3 +83,121 @@ jobs:
             --suppress=missingInclude \
             "--suppress=*:build/*" \
             --file-filter='*/src/*.cc'
+
+      - name: clang-tidy
+        run: |
+          jq -r '.[].file' build/compile_commands.json \
+            | grep -E "^${GITHUB_WORKSPACE}/src/.*\.cc$" \
+            | grep -vE "/(xxhash|protobuf-c|pinba\.pb-c)\." \
+            | sort -u \
+            | xargs clang-tidy --quiet -p build
+
+  sanitize:
+    name: Sanitize / MySQL ${{ matrix.mysql-series }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mysql-series: "8.0"
+            cmake-preset: debug-download-mysql-source
+            mysql-version: "8.0.46"
+          - mysql-series: "8.4"
+            cmake-preset: debug-download-mysql84-source
+            mysql-version: "8.4.9"
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake \
+            libprotobuf-dev protobuf-compiler \
+            rapidjson-dev \
+            libssl-dev pkg-config
+
+      - name: Cache MySQL source tarball and GoogleTest
+        uses: actions/cache@v5
+        with:
+          path: build-debug/_deps
+          key: deps-debug-mysql${{ matrix.mysql-version }}-gtest1.15.2
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.cmake-preset }}
+
+      - name: Build
+        run: cmake --build build-debug --parallel $(nproc)
+
+      - name: Test (ASan/UBSan)
+        run: ctest --test-dir build-debug --output-on-failure -j$(nproc)
+
+  coverage:
+    name: Coverage / MySQL ${{ matrix.mysql-series }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mysql-series: "8.0"
+            cmake-preset: coverage-download-mysql-source
+            mysql-version: "8.0.46"
+            build-dir: build-coverage
+            artifact-name: coverage-mysql80
+          - mysql-series: "8.4"
+            cmake-preset: coverage-download-mysql84-source
+            mysql-version: "8.4.9"
+            build-dir: build-coverage84
+            artifact-name: coverage-mysql84
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake \
+            libprotobuf-dev protobuf-compiler \
+            rapidjson-dev \
+            libssl-dev pkg-config \
+            lcov
+
+      - name: Cache MySQL source tarball and GoogleTest
+        uses: actions/cache@v5
+        with:
+          path: ${{ matrix.build-dir }}/_deps
+          key: deps-coverage-mysql${{ matrix.mysql-version }}-gtest1.15.2
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.cmake-preset }}
+
+      - name: Build
+        run: cmake --build ${{ matrix.build-dir }} --parallel $(nproc)
+
+      - name: Test
+        run: ctest --test-dir ${{ matrix.build-dir }} --output-on-failure -j$(nproc)
+
+      - name: Collect coverage
+        run: |
+          lcov \
+            --capture \
+            --directory ${{ matrix.build-dir }} \
+            --output-file ${{ matrix.artifact-name }}.info \
+            --ignore-errors source
+          lcov \
+            --remove ${{ matrix.artifact-name }}.info \
+              '/usr/*' \
+              '*/build*/_deps/*' \
+              '*/tests/*' \
+            --output-file ${{ matrix.artifact-name }}.info \
+            --ignore-errors unused
+          lcov --summary ${{ matrix.artifact-name }}.info
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: ${{ matrix.artifact-name }}.info
+          retention-days: 30
