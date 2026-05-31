@@ -355,12 +355,14 @@ target_link_libraries(
           Threads::Threads ${Protobuf_LIBRARIES})
 target_include_directories(pinba_engine PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
-add_executable(pinba_test tests/test_simple.cc)
-set_target_properties(pinba_test PROPERTIES OUTPUT_NAME "pinba_test")
-target_link_libraries(
-  pinba_test PRIVATE pinba_project_options pinba_includes ${M_LIBRARY}
-                     Threads::Threads ${Protobuf_LIBRARIES})
-target_include_directories(pinba_test PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+if(PINBA_WITH_TESTS)
+  add_executable(pinba_test tests/test_simple.cc)
+  set_target_properties(pinba_test PROPERTIES OUTPUT_NAME "pinba_test")
+  target_link_libraries(
+    pinba_test PRIVATE pinba_project_options pinba_includes ${M_LIBRARY}
+                       Threads::Threads ${Protobuf_LIBRARIES})
+  target_include_directories(pinba_test PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+endif()
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/src/config.h @ONLY)
 
