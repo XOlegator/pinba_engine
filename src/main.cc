@@ -235,7 +235,7 @@ int pinba_collector_init(const pinba_daemon_settings &settings) /* {{{ */
 
     CPU_ZERO(&mask);
     CPU_SET(cpu_num, &mask);
-    pthread_setaffinity_np(D->thread_pool->threads[i], sizeof(mask), &mask);
+    pthread_setaffinity_np(D->thread_pool->threads[i].native_handle(), sizeof(mask), &mask);
   }
 #endif
 

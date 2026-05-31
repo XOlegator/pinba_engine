@@ -14,7 +14,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-// #include <sparsehash/src/sparsehash/sparse_hash_map>
 #include <cstddef>
 #include <cstdint>
 #include <unordered_map>

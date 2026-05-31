@@ -304,8 +304,7 @@ add_library(pinba_includes INTERFACE)
 target_include_directories(
   pinba_includes
   INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/sparsehash/src)
+    ${CMAKE_CURRENT_SOURCE_DIR}/src)
 # Third-party headers: SYSTEM includes suppress warnings from external code.
 # On Debian/Ubuntu the MySQL client package may provide MariaDB-compat headers
 # that emit #warning directives — SYSTEM silences them without hiding our own code.
@@ -350,7 +349,7 @@ target_link_libraries(
           Threads::Threads ${Protobuf_LIBRARIES})
 target_include_directories(pinba_engine PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 
-add_executable(pinba_test src/pinba_simple_test.cc)
+add_executable(pinba_test tests/test_simple.cc)
 set_target_properties(pinba_test PROPERTIES OUTPUT_NAME "pinba_test")
 target_link_libraries(
   pinba_test PRIVATE pinba_project_options pinba_includes ${M_LIBRARY}
