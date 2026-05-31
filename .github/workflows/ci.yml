@@ -34,6 +34,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake \
             libprotobuf-dev protobuf-compiler \
+            rapidjson-dev \
             libssl-dev pkg-config
 
       - name: Cache MySQL source tarball and GoogleTest

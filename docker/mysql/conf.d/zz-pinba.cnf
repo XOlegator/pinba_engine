@@ -1,0 +1,4 @@
+[mysqld]
+# loose_ prefix is required: MySQL reads this file during --initialize before the
+# Pinba plugin is registered in mysql.plugin. Without loose_, MySQL aborts on startup.
+loose_pinba-temp-pool-size-limit=1000
