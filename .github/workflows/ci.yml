@@ -224,7 +224,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: build-benchmark/_deps
-          key: deps-benchmark-mysql8.4.9-gbench1.9.1
+          key: deps-benchmark-mysql8.4.9-gbench1.9.1-h32131c
 
       - name: Configure
         run: cmake --preset benchmark-download-mysql84-source
