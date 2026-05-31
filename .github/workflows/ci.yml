@@ -185,14 +185,15 @@ jobs:
             --capture \
             --directory ${{ matrix.build-dir }} \
             --output-file ${{ matrix.artifact-name }}.info \
-            --ignore-errors source,mismatch,negative
+            --ignore-errors source,mismatch,mismatch,negative,negative,gcov,gcov \
+            --rc geninfo_unexecuted_blocks=1
           lcov \
             --remove ${{ matrix.artifact-name }}.info \
               '/usr/*' \
               '*/build*/_deps/*' \
               '*/tests/*' \
             --output-file ${{ matrix.artifact-name }}.info \
-            --ignore-errors unused
+            --ignore-errors unused,unused
           lcov --summary ${{ matrix.artifact-name }}.info
 
       - name: Upload coverage report
