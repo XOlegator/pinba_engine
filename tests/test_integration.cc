@@ -3,18 +3,20 @@
  * Integration tests for Pinba Engine components
  */
 
+#include <gtest/gtest.h>
+
+#include <chrono>
+#include <thread>
+#include <vector>
+
 #include "pinba_error_modern.h"
 #include "pinba_logging_modern.h"
 #include "pinba_monitoring_modern.h"
-#include <chrono>
-#include <gtest/gtest.h>
-#include <thread>
-#include <vector>
 
 using namespace pinba;
 
 class IntegrationTest : public ::testing::Test {
-protected:
+ protected:
   void SetUp() override {
     // Initialize logging
     Logger::instance().initialize("", LogLevel::INFO);
@@ -49,8 +51,7 @@ TEST_F(IntegrationTest, ErrorHandlingWithLogging) {
 TEST_F(IntegrationTest, ResultTypeWithLogging) {
   auto operation = []() -> Result<int> {
     // Simulate operation that can fail
-    return Result<int>::error(PinbaErrorCode::MEMORY_ALLOCATION_FAILED,
-                              "Memory allocation failed");
+    return Result<int>::error(PinbaErrorCode::MEMORY_ALLOCATION_FAILED, "Memory allocation failed");
   };
 
   auto result = operation();
@@ -67,11 +68,9 @@ TEST_F(IntegrationTest, ResultTypeWithLogging) {
 
 // Test metrics with error handling
 TEST_F(IntegrationTest, MetricsWithErrorHandling) {
-  auto &packets_received =
-      MetricsRegistry::instance().counter("packets_received");
+  auto &packets_received = MetricsRegistry::instance().counter("packets_received");
   auto &packets_errors = MetricsRegistry::instance().counter("packets_errors");
-  auto &active_connections =
-      MetricsRegistry::instance().gauge("active_connections");
+  auto &active_connections = MetricsRegistry::instance().gauge("active_connections");
 
   // Simulate packet processing
   for (int i = 0; i < 10; ++i) {
@@ -97,7 +96,7 @@ TEST_F(IntegrationTest, MetricsWithErrorHandling) {
 // Test health checks with metrics
 TEST_F(IntegrationTest, HealthChecksWithMetrics) {
   class SystemHealthCheck : public HealthCheck {
-  public:
+   public:
     SystemHealthCheck() {
       auto &registry = MetricsRegistry::instance();
       errors_ = &registry.counter("system_errors");
@@ -119,7 +118,7 @@ TEST_F(IntegrationTest, HealthChecksWithMetrics) {
              ", warnings=" + std::to_string(warnings_->get());
     }
 
-  private:
+   private:
     CounterMetric *errors_;
     CounterMetric *warnings_;
   };
@@ -166,8 +165,7 @@ TEST_F(IntegrationTest, ConcurrentOperations) {
         gauge.set(i * operations_per_thread + j);
 
         if (j % 10 == 0) {
-          PINBA_LOG_DEBUG("Thread " + std::to_string(i) + " operation " +
-                          std::to_string(j));
+          PINBA_LOG_DEBUG("Thread " + std::to_string(i) + " operation " + std::to_string(j));
         }
       }
     });
@@ -188,8 +186,7 @@ TEST_F(IntegrationTest, ErrorRecovery) {
   auto operation = [&retries, &successes](int attempt) -> Result<int> {
     if (attempt < 3) {
       retries.increment();
-      return Result<int>::error(PinbaErrorCode::NETWORK_ERROR,
-                                "Network error, retrying...");
+      return Result<int>::error(PinbaErrorCode::NETWORK_ERROR, "Network error, retrying...");
     }
     successes.increment();
     return Result<int>::success(42);
@@ -201,8 +198,7 @@ TEST_F(IntegrationTest, ErrorRecovery) {
   do {
     result = operation(attempt++);
     if (result.is_error()) {
-      PINBA_LOG_WARNING("Operation failed, retrying: " +
-                        result.error_message());
+      PINBA_LOG_WARNING("Operation failed, retrying: " + result.error_message());
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   } while (result.is_error() && attempt < 5);

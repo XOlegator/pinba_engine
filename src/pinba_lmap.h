@@ -15,7 +15,7 @@
  */
 
 #ifndef HAVE_PINBA_LMAP_H
-# define HAVE_PINBA_LMAP_H
+#define HAVE_PINBA_LMAP_H
 
 void *pinba_lmap_first(void *map_report, uint64_t *index_to_fill);
 void *pinba_lmap_next(void *map_report, uint64_t *index_to_fill);

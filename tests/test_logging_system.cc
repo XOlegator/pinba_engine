@@ -3,19 +3,21 @@
  * Unit tests for modern logging system
  */
 
-#include "pinba_logging_modern.h"
+#include <gtest/gtest.h>
+#include <unistd.h>
+
 #include <chrono>
 #include <cstdio>
 #include <fstream>
-#include <gtest/gtest.h>
 #include <sstream>
 #include <thread>
-#include <unistd.h>
+
+#include "pinba_logging_modern.h"
 
 using namespace pinba;
 
 class LoggingSystemTest : public ::testing::Test {
-protected:
+ protected:
   void SetUp() override {
     test_log_file_ = "/tmp/pinba_test_log_" + std::to_string(getpid()) + ".log";
     // Clean up any existing log file
@@ -64,8 +66,7 @@ TEST_F(LoggingSystemTest, LoggerInitialization) {
         line.find("Debug message") != std::string::npos) {
       found_debug = true;
     }
-    if (line.find("INFO") != std::string::npos &&
-        line.find("Info message") != std::string::npos) {
+    if (line.find("INFO") != std::string::npos && line.find("Info message") != std::string::npos) {
       found_info = true;
     }
   }
@@ -101,8 +102,7 @@ TEST_F(LoggingSystemTest, StructuredLogging) {
   Logger::instance().flush();
 
   std::ifstream file(test_log_file_);
-  std::string content((std::istreambuf_iterator<char>(file)),
-                      std::istreambuf_iterator<char>());
+  std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
   EXPECT_NE(content.find("Packet received"), std::string::npos);
   EXPECT_NE(content.find("packet_size"), std::string::npos);
@@ -149,8 +149,7 @@ TEST_F(LoggingSystemTest, LoggerMacros) {
   Logger::instance().flush();
 
   std::ifstream file(test_log_file_);
-  std::string content((std::istreambuf_iterator<char>(file)),
-                      std::istreambuf_iterator<char>());
+  std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 
   EXPECT_NE(content.find("Debug message"), std::string::npos);
   EXPECT_NE(content.find("Info message"), std::string::npos);
@@ -171,5 +170,5 @@ TEST_F(LoggingSystemTest, LoggerShutdown) {
   // After shutdown, logging should still work (fallback mode)
   PINBA_LOG_INFO("After shutdown");
 
-  EXPECT_TRUE(true); // No crash
+  EXPECT_TRUE(true);  // No crash
 }

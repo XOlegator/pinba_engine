@@ -6,7 +6,7 @@
 #include "pinba_types.h"
 
 class PinbaEngineTest : public ::testing::Test {
-protected:
+ protected:
   void SetUp() override {
     // Initialize test environment
   }
@@ -45,8 +45,8 @@ TEST_F(PinbaEngineTest, MemoryLimits) {
 
 TEST_F(PinbaEngineTest, TimeOperations) {
   // Test time operations
-  pinba_timeval tv1 = {1, 500000}; // 1.5 seconds
-  pinba_timeval tv2 = {2, 250000}; // 2.25 seconds
+  pinba_timeval tv1 = {1, 500000};  // 1.5 seconds
+  pinba_timeval tv2 = {2, 250000};  // 2.25 seconds
   pinba_timeval result;
 
   pinba_timeradd(&tv1, &tv2, &result);

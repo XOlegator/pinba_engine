@@ -3,14 +3,16 @@
  * Unit tests for modern error handling system
  */
 
-#include "pinba_error_modern.h"
 #include <gtest/gtest.h>
+
 #include <system_error>
+
+#include "pinba_error_modern.h"
 
 using namespace pinba;
 
 class ErrorSystemTest : public ::testing::Test {
-protected:
+ protected:
   void SetUp() override {}
 
   void TearDown() override {}
@@ -46,22 +48,16 @@ TEST_F(ErrorSystemTest, PinbaExceptionCreation) {
 }
 
 TEST_F(ErrorSystemTest, PinbaExceptionThrow) {
-  EXPECT_THROW(
-      { throw PinbaException(PinbaErrorCode::INVALID_PACKET, "Test"); },
-      PinbaException);
+  EXPECT_THROW({ throw PinbaException(PinbaErrorCode::INVALID_PACKET, "Test"); }, PinbaException);
 
-  EXPECT_THROW(
-      { throw PinbaException(PinbaErrorCode::INVALID_PACKET, "Test"); },
-      std::exception);
+  EXPECT_THROW({ throw PinbaException(PinbaErrorCode::INVALID_PACKET, "Test"); }, std::exception);
 }
 
 TEST_F(ErrorSystemTest, PinbaSystemException) {
-  PinbaSystemException ex(PinbaErrorCode::NETWORK_ERROR,
-                          "Network operation failed", ENOENT);
+  PinbaSystemException ex(PinbaErrorCode::NETWORK_ERROR, "Network operation failed", ENOENT);
   EXPECT_EQ(ex.code(), PinbaErrorCode::NETWORK_ERROR);
   EXPECT_EQ(ex.system_error(), ENOENT);
-  EXPECT_NE(std::string(ex.what()).find("Network operation failed"),
-            std::string::npos);
+  EXPECT_NE(std::string(ex.what()).find("Network operation failed"), std::string::npos);
 }
 
 // Test Result type
@@ -73,8 +69,7 @@ TEST_F(ErrorSystemTest, ResultSuccess) {
 }
 
 TEST_F(ErrorSystemTest, ResultError) {
-  auto result =
-      Result<int>::error(PinbaErrorCode::INVALID_PACKET, "Invalid packet");
+  auto result = Result<int>::error(PinbaErrorCode::INVALID_PACKET, "Invalid packet");
   EXPECT_FALSE(result.is_success());
   EXPECT_TRUE(result.is_error());
   EXPECT_EQ(result.error_code(), PinbaErrorCode::INVALID_PACKET);
@@ -95,8 +90,7 @@ TEST_F(ErrorSystemTest, ResultVoidSuccess) {
 }
 
 TEST_F(ErrorSystemTest, ResultVoidError) {
-  auto result = Result<void>::error(PinbaErrorCode::MEMORY_ALLOCATION_FAILED,
-                                    "Out of memory");
+  auto result = Result<void>::error(PinbaErrorCode::MEMORY_ALLOCATION_FAILED, "Out of memory");
   EXPECT_FALSE(result.is_success());
   EXPECT_TRUE(result.is_error());
   EXPECT_EQ(result.error_code(), PinbaErrorCode::MEMORY_ALLOCATION_FAILED);

@@ -15,7 +15,7 @@
  */
 
 #ifndef HAVE_PINBA_MAP_H
-# define HAVE_PINBA_MAP_H
+#define HAVE_PINBA_MAP_H
 
 void *pinba_map_first(void *map_report, char *index_to_fill);
 void *pinba_map_next(void *map_report, char *index_to_fill);

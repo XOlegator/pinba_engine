@@ -32,7 +32,8 @@ repos:
         name: clang-format (C/C++)
         language: system
         entry: clang-format --dry-run --Werror
-        files: ^(tests|benchmarks)/.*\.(cc|cpp|cxx|h|hh|hpp|hxx)$
+        files: ^(src|tests|benchmarks)/.*\.(cc|cpp|cxx|h|hh|hpp|hxx)$
+        exclude: ^src/(xxhash\.(c|h)|protobuf-c(-private)?\.h|pinba\.pb-c\.(cc|h))$
 
       - id: cppcheck
         name: cppcheck (C/C++)
