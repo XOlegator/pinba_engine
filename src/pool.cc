@@ -506,7 +506,7 @@ void *pinba_stats_main(void *arg) /* {{{ */
   th_pool_barrier_init(barrier4);
   barriers_initialized = 1;
 
-  gettimeofday(&launch, 0);
+  gettimeofday(&launch, nullptr);
 
   for (;;) {
     struct timeval tv1, from;
@@ -686,13 +686,13 @@ void *pinba_stats_main(void *arg) /* {{{ */
       launch.tv_sec++;
     }
 
-    gettimeofday(&tv1, 0);
+    gettimeofday(&tv1, nullptr);
     timersub(&launch, &tv1, &tv1);
 
     if (LIKELY(tv1.tv_sec >= 0 && tv1.tv_usec >= 0)) {
       usleep(tv1.tv_sec * 1000000 + tv1.tv_usec);
     } else { /* we were locked too long: run right now, but re-schedule next launch */
-      gettimeofday(&launch, 0);
+      gettimeofday(&launch, nullptr);
       tv1.tv_sec = D->settings.stats_gathering_period / 1000000;
       tv1.tv_usec = D->settings.stats_gathering_period % 1000000;
       timeradd(&launch, &tv1, &launch);

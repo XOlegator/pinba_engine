@@ -708,10 +708,10 @@ inline static int _add_timers(pinba_stats_record *record, const pinba_stats_reco
   char *str;
   pinba_tag *tag;
   int dict_size, str_len;
-  pinba_word *temp_words_static[PINBA_TEMP_DICTIONARY_SIZE] = {0};
+  pinba_word *temp_words_static[PINBA_TEMP_DICTIONARY_SIZE] = {nullptr};
   pinba_word **temp_words_dynamic = nullptr;
   pinba_word **temp_words;
-  pinba_tag *temp_tags_static[PINBA_TEMP_DICTIONARY_SIZE] = {0};
+  pinba_tag *temp_tags_static[PINBA_TEMP_DICTIONARY_SIZE] = {nullptr};
   pinba_tag **temp_tags_dynamic = nullptr;
   pinba_tag **temp_tags;
   Pinba__Request *request = record_ex->request;
@@ -1483,13 +1483,13 @@ void *pinba_data_main(void *) /* {{{ */
       launch.tv_sec++;
     }
 
-    gettimeofday(&tv1, 0);
+    gettimeofday(&tv1, nullptr);
     timersub(&launch, &tv1, &tv1);
 
     if (LIKELY(tv1.tv_sec >= 0 && tv1.tv_usec >= 0)) {
       usleep(tv1.tv_sec * 1000000 + tv1.tv_usec);
     } else { /* we were locked too long: run right now, but re-schedule next launch */
-      gettimeofday(&launch, 0);
+      gettimeofday(&launch, nullptr);
       tv1.tv_sec = D->settings.stats_gathering_period / 1000000;
       tv1.tv_usec = D->settings.stats_gathering_period % 1000000;
       timeradd(&launch, &tv1, &launch);
@@ -1572,8 +1572,9 @@ char *pinba_error_ex(int return_error, int type, const char *file, int line, con
   }
 
   va_start(args, format);
-  vsnprintf(message_body, sizeof(message_body), format,
-            args);  // NOLINT(clang-analyzer-valist.Uninitialized)
+  // NOLINTBEGIN(clang-analyzer-valist.Uninitialized)
+  vsnprintf(message_body, sizeof(message_body), format, args);
+  // NOLINTEND(clang-analyzer-valist.Uninitialized)
   va_end(args);
   int prefix_len =
       snprintf(errormsg, sizeof(errormsg), "[PINBA] %s: %s:%d ", type_name, file, line);

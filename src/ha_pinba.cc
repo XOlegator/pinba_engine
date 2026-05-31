@@ -933,7 +933,7 @@ static inline pinba_tag_report *pinba_regenerate_tag_info(PINBA_SHARE *share) /*
     report->tags_cnt = 1;
     report->std.add_func = pinba_update_tag_info_add;
     report->std.delete_func = pinba_update_tag_info_delete;
-    pthread_rwlock_init(&report->std.lock, 0);
+    pthread_rwlock_init(&report->std.lock, nullptr);
 
     D->tag_reports = pinba_map_add(D->tag_reports, share->index, report);
 
@@ -995,7 +995,7 @@ static inline pinba_tag_report *pinba_regenerate_tag2_info(PINBA_SHARE *share) /
     report->tags_cnt = 2;
     report->std.add_func = pinba_update_tag2_info_add;
     report->std.delete_func = pinba_update_tag2_info_delete;
-    pthread_rwlock_init(&report->std.lock, 0);
+    pthread_rwlock_init(&report->std.lock, nullptr);
 
     D->tag_reports = pinba_map_add(D->tag_reports, share->index, report);
 
@@ -1053,7 +1053,7 @@ static inline pinba_tag_report *pinba_regenerate_tag_report(PINBA_SHARE *share) 
     report->tags_cnt = 1;
     report->std.add_func = pinba_update_tag_report_add;
     report->std.delete_func = pinba_update_tag_report_delete;
-    pthread_rwlock_init(&report->std.lock, 0);
+    pthread_rwlock_init(&report->std.lock, nullptr);
 
     D->tag_reports = pinba_map_add(D->tag_reports, share->index, report);
 
@@ -1116,7 +1116,7 @@ static inline pinba_tag_report *pinba_regenerate_tag2_report(PINBA_SHARE *share)
     report->tags_cnt = 2;
     report->std.add_func = pinba_update_tag2_report_add;
     report->std.delete_func = pinba_update_tag2_report_delete;
-    pthread_rwlock_init(&report->std.lock, 0);
+    pthread_rwlock_init(&report->std.lock, nullptr);
 
     D->tag_reports = pinba_map_add(D->tag_reports, share->index, report);
 
@@ -1174,7 +1174,7 @@ static inline pinba_tag_report *pinba_regenerate_tag_report2(PINBA_SHARE *share)
     report->tags_cnt = 1;
     report->std.add_func = pinba_update_tag_report2_add;
     report->std.delete_func = pinba_update_tag_report2_delete;
-    pthread_rwlock_init(&report->std.lock, 0);
+    pthread_rwlock_init(&report->std.lock, nullptr);
 
     D->tag_reports = pinba_map_add(D->tag_reports, share->index, report);
 
@@ -1239,7 +1239,7 @@ static inline pinba_tag_report *pinba_regenerate_tag2_report2(PINBA_SHARE *share
     report->tags_cnt = 2;
     report->std.add_func = pinba_update_tag2_report2_add;
     report->std.delete_func = pinba_update_tag2_report2_delete;
-    pthread_rwlock_init(&report->std.lock, 0);
+    pthread_rwlock_init(&report->std.lock, nullptr);
 
     D->tag_reports = pinba_map_add(D->tag_reports, share->index, report);
 
@@ -1319,7 +1319,7 @@ static inline pinba_tag_report *pinba_regenerate_tagN_info(PINBA_SHARE *share) /
       return nullptr;
     }
 
-    pthread_rwlock_init(&report->std.lock, 0);
+    pthread_rwlock_init(&report->std.lock, nullptr);
 
     D->tag_reports = pinba_map_add(D->tag_reports, share->index, report);
 
@@ -1399,7 +1399,7 @@ static inline pinba_tag_report *pinba_regenerate_tagN_report(PINBA_SHARE *share)
       return nullptr;
     }
 
-    pthread_rwlock_init(&report->std.lock, 0);
+    pthread_rwlock_init(&report->std.lock, nullptr);
 
     D->tag_reports = pinba_map_add(D->tag_reports, share->index, report);
 
@@ -1478,7 +1478,7 @@ static inline pinba_tag_report *pinba_regenerate_tagN_report2(PINBA_SHARE *share
       return nullptr;
     }
 
-    pthread_rwlock_init(&report->std.lock, 0);
+    pthread_rwlock_init(&report->std.lock, nullptr);
 
     D->tag_reports = pinba_map_add(D->tag_reports, share->index, report);
 
@@ -1533,7 +1533,7 @@ static inline pinba_rtag_report *pinba_regenerate_rtag_info(PINBA_SHARE *share) 
     report->tags_cnt = 1;
     report->std.add_func = pinba_update_rtag_info_add;
     report->std.delete_func = pinba_update_rtag_info_delete;
-    pthread_rwlock_init(&report->std.lock, 0);
+    pthread_rwlock_init(&report->std.lock, nullptr);
 
     D->rtag_reports = pinba_map_add(D->rtag_reports, share->index, report);
 
@@ -1595,7 +1595,7 @@ static inline pinba_rtag_report *pinba_regenerate_rtag2_info(PINBA_SHARE *share)
     report->tags_cnt = 1;
     report->std.add_func = pinba_update_rtag2_info_add;
     report->std.delete_func = pinba_update_rtag2_info_delete;
-    pthread_rwlock_init(&report->std.lock, 0);
+    pthread_rwlock_init(&report->std.lock, nullptr);
 
     D->rtag_reports = pinba_map_add(D->rtag_reports, share->index, report);
 
@@ -1672,7 +1672,7 @@ static inline pinba_rtag_report *pinba_regenerate_rtagN_info(PINBA_SHARE *share)
       return nullptr;
     }
 
-    pthread_rwlock_init(&report->std.lock, 0);
+    pthread_rwlock_init(&report->std.lock, nullptr);
 
     D->rtag_reports = pinba_map_add(D->rtag_reports, share->index, report);
 
@@ -1728,7 +1728,7 @@ static inline pinba_rtag_report *pinba_regenerate_rtag_report(PINBA_SHARE *share
     report->tags_cnt = 1;
     report->std.add_func = pinba_update_rtag_report_add;
     report->std.delete_func = pinba_update_rtag_report_delete;
-    pthread_rwlock_init(&report->std.lock, 0);
+    pthread_rwlock_init(&report->std.lock, nullptr);
 
     D->rtag_reports = pinba_map_add(D->rtag_reports, share->index, report);
 
@@ -1791,7 +1791,7 @@ static inline pinba_rtag_report *pinba_regenerate_rtag2_report(PINBA_SHARE *shar
     report->tags_cnt = 1;
     report->std.add_func = pinba_update_rtag2_report_add;
     report->std.delete_func = pinba_update_rtag2_report_delete;
-    pthread_rwlock_init(&report->std.lock, 0);
+    pthread_rwlock_init(&report->std.lock, nullptr);
 
     D->rtag_reports = pinba_map_add(D->rtag_reports, share->index, report);
 
@@ -1869,7 +1869,7 @@ static inline pinba_rtag_report *pinba_regenerate_rtagN_report(PINBA_SHARE *shar
       return nullptr;
     }
 
-    pthread_rwlock_init(&report->std.lock, 0);
+    pthread_rwlock_init(&report->std.lock, nullptr);
 
     D->rtag_reports = pinba_map_add(D->rtag_reports, share->index, report);
 
