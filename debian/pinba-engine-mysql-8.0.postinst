@@ -1,0 +1,34 @@
+#!/bin/sh
+set -e
+
+PLUGIN_SONAME="ha_pinba.so"
+MYSQL_SOCKET="/var/run/mysqld/mysqld.sock"
+
+case "$1" in
+    configure)
+        if mysql --no-defaults -u root -S "$MYSQL_SOCKET" \
+                 -e "SELECT 1" >/dev/null 2>&1; then
+            mysql --no-defaults -u root -S "$MYSQL_SOCKET" \
+                  -e "INSTALL PLUGIN IF NOT EXISTS pinba SONAME '${PLUGIN_SONAME}';" \
+                  2>/dev/null \
+              && echo "pinba-engine: plugin installed successfully." \
+              || true
+        else
+            echo "-------------------------------------------------------"
+            echo "pinba-engine: MySQL is not running or root socket access"
+            echo "is unavailable. Activate the plugin manually:"
+            echo ""
+            echo "  mysql -u root -p -e \\"
+            echo "    \"INSTALL PLUGIN pinba SONAME '${PLUGIN_SONAME}';\""
+            echo ""
+            echo "Then create the default tables:"
+            echo ""
+            echo "  mysql -u root -p pinba < \\"
+            echo "    /usr/share/pinba_engine/default_tables.sql"
+            echo "-------------------------------------------------------"
+        fi
+        ;;
+esac
+
+#DEBHELPER#
+exit 0

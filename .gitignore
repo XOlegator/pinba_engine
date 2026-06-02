@@ -61,6 +61,23 @@ docs/docker.personal.md
 config.h
 src/config.h
 
+# Debian packaging build artifacts
+debian/build-mysql80/
+debian/build-mysql84/
+debian/tmp-mysql80/
+debian/tmp-mysql84/
+debian/pinba-engine-mysql-8.0/
+debian/pinba-engine-mysql-8.4/
+debian/pinba-engine-common/
+debian/files
+debian/debhelper-build-stamp
+debian/*.substvars
+debian/*.log
+debian/.debhelper/
+
+# MySQL source tarballs used by tools/extract-mysql-headers.sh (not committed)
+vendor/*.tar.gz
+
 # OS files
 .DS_Store
 Thumbs.db

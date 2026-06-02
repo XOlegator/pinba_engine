@@ -1,0 +1,45 @@
+#!/usr/bin/make -f
+
+MYSQL80_SOURCE_DIR  = $(CURDIR)/vendor/mysql-headers-8.0
+MYSQL84_SOURCE_DIR  = $(CURDIR)/vendor/mysql-headers-8.4
+MYSQL80_VERSION    ?= 8.0.46
+MYSQL84_VERSION    ?= 8.4.9
+NPROC              := $(shell nproc)
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	cmake -B debian/build-mysql80 \
+	  -DCMAKE_BUILD_TYPE=Release \
+	  -DPINBA_MYSQL_SERIES=8.0 \
+	  -DPINBA_MYSQL_SOURCE_DIR=$(MYSQL80_SOURCE_DIR) \
+	  -DPINBA_MYSQL_SOURCE_VERSION=$(MYSQL80_VERSION) \
+	  -DPINBA_WITH_TESTS=OFF \
+	  -DPINBA_FETCH_DEPENDENCIES=OFF \
+	  -DCMAKE_INSTALL_PREFIX=/usr \
+	  -DCMAKE_INSTALL_LIBDIR=lib
+	cmake -B debian/build-mysql84 \
+	  -DCMAKE_BUILD_TYPE=Release \
+	  -DPINBA_MYSQL_SERIES=8.4 \
+	  -DPINBA_MYSQL_SOURCE_DIR=$(MYSQL84_SOURCE_DIR) \
+	  -DPINBA_MYSQL_SOURCE_VERSION=$(MYSQL84_VERSION) \
+	  -DPINBA_WITH_TESTS=OFF \
+	  -DPINBA_FETCH_DEPENDENCIES=OFF \
+	  -DCMAKE_INSTALL_PREFIX=/usr \
+	  -DCMAKE_INSTALL_LIBDIR=lib
+
+override_dh_auto_build:
+	cmake --build debian/build-mysql80 --parallel $(NPROC)
+	cmake --build debian/build-mysql84 --parallel $(NPROC)
+
+override_dh_auto_install:
+	DESTDIR=$(CURDIR)/debian/tmp-mysql80 cmake --install debian/build-mysql80
+	DESTDIR=$(CURDIR)/debian/tmp-mysql84 cmake --install debian/build-mysql84
+
+override_dh_install:
+	dh_install --sourcedir=debian/tmp-mysql80 -ppinba-engine-mysql-8.0
+	dh_install --sourcedir=debian/tmp-mysql84 -ppinba-engine-mysql-8.4
+	dh_install --sourcedir=debian/tmp-mysql80 -ppinba-engine-common
+
+override_dh_auto_test: ;

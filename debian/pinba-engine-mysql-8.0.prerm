@@ -1,0 +1,25 @@
+#!/bin/sh
+set -e
+
+MYSQL_SOCKET="/var/run/mysqld/mysqld.sock"
+
+case "$1" in
+    remove|purge)
+        if mysql --no-defaults -u root -S "$MYSQL_SOCKET" \
+                 -e "SELECT 1" >/dev/null 2>&1; then
+            mysql --no-defaults -u root -S "$MYSQL_SOCKET" \
+                  -e "UNINSTALL PLUGIN IF EXISTS pinba;" \
+                  2>/dev/null || true
+        else
+            echo "-------------------------------------------------------"
+            echo "pinba-engine: MySQL is not running. Unload the plugin"
+            echo "manually before removing the package:"
+            echo ""
+            echo "  mysql -u root -p -e \"UNINSTALL PLUGIN pinba;\""
+            echo "-------------------------------------------------------"
+        fi
+        ;;
+esac
+
+#DEBHELPER#
+exit 0
