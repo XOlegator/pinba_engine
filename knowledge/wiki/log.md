@@ -5,7 +5,7 @@ sources: []
 related:
   - wiki/index.md
 confidence: high
-updated: 2026-05-23
+updated: 2026-06-04
 ---
 
 # Activity Log
@@ -192,6 +192,38 @@ Both containers validated:
 
 **Concept page created:**
 - `wiki/concepts/github-actions-docker.md` — project-specific workflow (two jobs for 8.0 and 8.4 LTS, correct tag names, GHA cache scopes)
+
+---
+
+## 2026-06-04 — Ingest: Debian PPA Packaging Session
+
+**Action:** Сессия разработки и отладки Debian/PPA пакетирования pinba_engine.
+Закрыты ЭТАП 1.5 и ЭТАП 2 из плана `ai_ppa_dev.log`.
+
+**Raw document added:**
+- `raw/sessions/ppa-packaging-session-2026-06-04.md` — лог сессии с диагностикой
+
+**Source page created:**
+- `wiki/sources/ppa-packaging-session-2026-06-04.md`
+
+**Concept pages created:**
+- `wiki/concepts/debian-ppa-packaging.md` — полный процесс PPA packaging для MySQL плагина:
+  структура debian/, схема версионирования, вендоринг headers, lintian, Launchpad
+- `wiki/concepts/mysql-postinst-patterns.md` — паттерны и ловушки postinst/prerm:
+  каскад аутентификации (debian.cnf → auth_socket), `plugin-load-add` vs `INSTALL PLUGIN`,
+  синтаксические ловушки MySQL 8.0 vs 9.0, DROP DATABASE + незагруженный ENGINE
+- `wiki/concepts/mysql-vendor-headers-minimal.md` — стратегия минимизации vendor headers:
+  анализ .d файлов компилятора, алгоритм whitelist-extraction, результат 1317→162 файлов
+
+**Key findings documented:**
+- `INSTALL PLUGIN IF NOT EXISTS` / `UNINSTALL PLUGIN IF EXISTS` — MySQL 9.0+ синтаксис,
+  в MySQL 8.0 даёт ERROR 1064; нужна проверка через `information_schema.PLUGINS`
+- `debian-sys-maint` на Ubuntu 24.04 MySQL 8.0 НЕ имеет `SYSTEM_VARIABLES_ADMIN`;
+  `plugin-load-add` конфиг — правильный основной механизм установки плагина
+- Compiler `.d` dependency files — точный источник минимального набора vendor headers
+- `DROP DATABASE` с ENGINE=PINBA таблицами требует загруженного плагина
+
+**Commits:** `df68221`, `db66097`, `d2a19fb`, `57ed76a`
 
 ---
 

@@ -4,14 +4,14 @@ type: index
 sources: []
 related: []
 confidence: high
-updated: 2026-05-23
+updated: 2026-06-04
 ---
 
 # Pinba Engine — Knowledge Base Index
 
 Master catalog. Maintained by LLM agents.
 
-## Concepts (12 articles)
+## Concepts (15 articles)
 
 | Article | Key Topic |
 |---------|-----------|
@@ -27,8 +27,11 @@ Master catalog. Maintained by LLM agents.
 | [[docker-tag-strategy]] | Docker Hub naming rules, rolling vs pinned tags |
 | [[github-actions-docker]] | CI/CD workflow for Docker Hub build+push automation |
 | [[pinboard-architecture]] | Pinboard (Symfony 8) stack, aggregation logic, docker compose |
+| [[debian-ppa-packaging]] | Debian/PPA packaging: debian/ structure, rules, versioning, Launchpad |
+| [[mysql-postinst-patterns]] | postinst/prerm: auth cascade, plugin-load-add, MySQL 8.0 syntax traps |
+| [[mysql-vendor-headers-minimal]] | Minimal vendor headers via .d files analysis (1317→162 files) |
 
-## Sources (9 documents)
+## Sources (10 documents)
 
 | Source | Raw File |
 |--------|---------|
@@ -41,6 +44,7 @@ Master catalog. Maintained by LLM agents.
 | [[pinboard-architecture]] (raw) | `raw/repos/pinboard-architecture.md` |
 | [[mysql-80-to-84-migration]] (raw) | `raw/docs/mysql-80-to-84-migration.md` |
 | [[github-actions-docker-workflow]] (raw) | `raw/docs/github-actions-docker-workflow.md` |
+| [[ppa-packaging-session-2026-06-04]] | `raw/sessions/ppa-packaging-session-2026-06-04.md` |
 
 ## Raw Documents
 
@@ -66,3 +70,5 @@ raw/docs/
 - PHP site integration examples (real php.ini configuration with real server names)
 - Production deployment: docker-compose with volumes, backups, log rotation
 - Pinboard UI: controller/route structure, what each page shows
+- GitHub Actions PPA build workflow (ppa-build.yml) — ЭТАП 5 плана
+- MySQL version monitor workflow — ЭТАП 6 плана
