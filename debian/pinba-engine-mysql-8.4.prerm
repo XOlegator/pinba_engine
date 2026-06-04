@@ -2,18 +2,43 @@
 set -e
 
 MYSQL_SOCKET="/var/run/mysqld/mysqld.sock"
+DEBIAN_CNF="/etc/mysql/debian.cnf"
+PLUGIN_CNF="/etc/mysql/conf.d/pinba-engine.cnf"
+
+mysql_available() {
+    if [ -r "$DEBIAN_CNF" ] && \
+       mysql --defaults-file="$DEBIAN_CNF" -e "SELECT 1" >/dev/null 2>&1; then
+        return 0
+    fi
+    mysql --no-defaults -u root -S "$MYSQL_SOCKET" -e "SELECT 1" >/dev/null 2>&1
+}
+
+mysql_exec() {
+    if [ -r "$DEBIAN_CNF" ]; then
+        mysql --defaults-file="$DEBIAN_CNF" "$@"
+    else
+        mysql --no-defaults -u root -S "$MYSQL_SOCKET" "$@"
+    fi
+}
 
 case "$1" in
     remove|purge)
-        if mysql --no-defaults -u root -S "$MYSQL_SOCKET" \
-                 -e "SELECT 1" >/dev/null 2>&1; then
-            mysql --no-defaults -u root -S "$MYSQL_SOCKET" \
-                  -e "UNINSTALL PLUGIN IF EXISTS pinba;" \
-                  2>/dev/null || true
+        # Remove plugin-load-add config so MySQL won't reload the plugin on
+        # the next restart after the package is gone.
+        rm -f "$PLUGIN_CNF"
+
+        if mysql_available 2>/dev/null; then
+            PLUGIN_ACTIVE=$(mysql_exec --skip-column-names \
+                -e "SELECT COUNT(*) FROM information_schema.PLUGINS \
+                    WHERE PLUGIN_NAME='pinba' AND PLUGIN_STATUS='ACTIVE';" \
+                2>/dev/null || echo "0")
+            if [ "${PLUGIN_ACTIVE:-0}" != "0" ]; then
+                mysql_exec -e "UNINSTALL PLUGIN pinba;" 2>&1 || true
+            fi
         else
             echo "-------------------------------------------------------"
-            echo "pinba-engine: MySQL is not running. Unload the plugin"
-            echo "manually before removing the package:"
+            echo "pinba-engine: MySQL is not running or no usable"
+            echo "connection method found. Unload the plugin manually:"
             echo ""
             echo "  mysql -u root -p -e \"UNINSTALL PLUGIN pinba;\""
             echo "-------------------------------------------------------"
