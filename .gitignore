@@ -78,6 +78,10 @@ debian/.debhelper/
 # MySQL source tarballs used by tools/extract-mysql-headers.sh (not committed)
 vendor/*.tar.gz
 
+# CMake-generated files inside vendor/mysql-headers-* (written to
+# PINBA_MYSQL_SOURCE_DIR/builddir/ during cmake configure; reproducible)
+vendor/*/builddir/
+
 # OS files
 .DS_Store
 Thumbs.db
