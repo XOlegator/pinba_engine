@@ -52,13 +52,13 @@ jobs:
         run: |
           case "${{ github.event_name }}:${{ inputs.target_distribution || 'all' }}" in
             workflow_dispatch:noble)
-              include='[{"distribution":"noble","ubuntu_version":"24.04","enable_mysql80":"1","enable_mysql84":"0","mysql80_version":"8.0.46","mysql84_version":"8.4.9"}]'
+              include='[{"distribution":"noble","ubuntu_version":"24.04","enable_mysql80":"1","enable_mysql84":"0","mysql80_version":"8.0.46","mysql84_version":"8.4.9","include_orig":"1"}]'
               ;;
             workflow_dispatch:resolute)
-              include='[{"distribution":"resolute","ubuntu_version":"26.04","enable_mysql80":"0","enable_mysql84":"1","mysql80_version":"8.0.46","mysql84_version":"8.4.9"}]'
+              include='[{"distribution":"resolute","ubuntu_version":"26.04","enable_mysql80":"0","enable_mysql84":"1","mysql80_version":"8.0.46","mysql84_version":"8.4.9","include_orig":"1"}]'
               ;;
             *)
-              include='[{"distribution":"noble","ubuntu_version":"24.04","enable_mysql80":"1","enable_mysql84":"0","mysql80_version":"8.0.46","mysql84_version":"8.4.9"},{"distribution":"resolute","ubuntu_version":"26.04","enable_mysql80":"0","enable_mysql84":"1","mysql80_version":"8.0.46","mysql84_version":"8.4.9"}]'
+              include='[{"distribution":"noble","ubuntu_version":"24.04","enable_mysql80":"1","enable_mysql84":"0","mysql80_version":"8.0.46","mysql84_version":"8.4.9","include_orig":"1"},{"distribution":"resolute","ubuntu_version":"26.04","enable_mysql80":"0","enable_mysql84":"1","mysql80_version":"8.0.46","mysql84_version":"8.4.9","include_orig":"0"}]'
               ;;
           esac
 
@@ -136,7 +136,11 @@ jobs:
 
       - name: Build source package
         run: |
-          dpkg-buildpackage -S -sa -us -uc
+          if [[ "${{ matrix.include_orig }}" == "1" ]]; then
+            dpkg-buildpackage -S -sa -us -uc
+          else
+            dpkg-buildpackage -S -sd -us -uc
+          fi
 
       - name: Check source package with lintian
         run: |
@@ -222,4 +226,6 @@ jobs:
 
       - name: Upload to Launchpad
         run: |
-          dput xolegator-packages "$RUNNER_TEMP"/ppa-artifacts/*_source.changes
+          for changes_file in "$RUNNER_TEMP"/ppa-artifacts/*_source.changes; do
+            dput xolegator-packages "$changes_file"
+          done

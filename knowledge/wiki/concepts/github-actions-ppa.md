@@ -52,6 +52,13 @@ releases and publishing them to `ppa:xolegator/packages` from GitHub Actions.
   `*.buildinfo` alongside `.dsc`, `.changes`, `.orig.tar.gz`, and `.debian.tar.*`.
   `debsign` expects the matching `*_source.buildinfo` next to the `.changes` file and
   fails before SSH upload if that file is missing.
+- For multi-series uploads of the same upstream version, only one source package should
+  carry the full `.orig.tar.gz` (`-sa`). Additional series uploads should use `-sd`,
+  otherwise Launchpad may reject repeated orig uploads or behave inconsistently on the
+  second transfer.
+- Each `*_source.changes` should be uploaded with a separate `dput` invocation. Sending
+  multiple series through one shell-expanded command makes failure attribution harder
+  and can interact badly with per-upload connection state on the server side.
 - Launchpad's official docs support both FTP and SFTP uploads. For GitHub-hosted
   automation, plain FTP with `login = anonymous` is the simpler and more robust path
   because it avoids separate SSH-key provisioning for the runner while preserving GPG
