@@ -64,6 +64,12 @@ releases and publishing them to `ppa:xolegator/packages` from GitHub Actions.
   `orig.tar.gz` and potentially a different `debian.tar.*`, which Launchpad rejects for
   the same version. Manual upload flows should therefore package an explicit tag or SHA,
   not the moving branch tip.
+- If a wrong `orig.tar.gz` was already uploaded to the same PPA under a given upstream
+  version, that upstream version is effectively burned for future corrected uploads in
+  that archive. The engineering-correct recovery path is to cut a new upstream release
+  and publish that release as a new source version, so the orig filename changes
+  naturally and the archive sees a clean version namespace. In practice, `v2.2.1`
+  fixed the `2.2.0` conflict.
 - Launchpad's official docs support both FTP and SFTP uploads. For GitHub-hosted
   automation, plain FTP with `login = anonymous` is the simpler and more robust path
   because it avoids separate SSH-key provisioning for the runner while preserving GPG

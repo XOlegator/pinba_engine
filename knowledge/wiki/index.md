@@ -26,7 +26,7 @@ Master catalog. Maintained by LLM agents.
 | [[docker-build-strategy]] | Multi-stage build, libprotobuf copy, filename gotchas |
 | [[docker-tag-strategy]] | Docker Hub naming rules, rolling vs pinned tags |
 | [[github-actions-docker]] | CI/CD workflow for Docker Hub build+push automation |
-| [[github-actions-ppa]] | GitHub Actions workflow for source package build, source-ref pinning, signing, multi-series artifact handoff, and Launchpad upload |
+| [[github-actions-ppa]] | GitHub Actions workflow for source package build, source-ref pinning, release-based recovery, signing, multi-series artifact handoff, and Launchpad upload |
 | [[github-actions-mysql-version-monitor]] | Weekly detection of Ubuntu MySQL versions for PPA target suites |
 | [[pinboard-architecture]] | Pinboard (Symfony 8) stack, aggregation logic, docker compose |
 | [[debian-ppa-packaging]] | Debian/PPA packaging: debian/ structure, rules, versioning, Build-Depends, rapidjson |

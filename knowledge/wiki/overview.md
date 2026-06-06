@@ -65,8 +65,11 @@ from the builder stage. Missing this breaks the plugin at load time.
 See [[docker-build-strategy]].
 
 ### 6. PPA Publication Is Automated
-Source packages for Launchpad PPA are now built and uploaded from GitHub Actions,
-using the Launchpad signing key and SFTP upload path. See [[github-actions-ppa]].
+Source packages for Launchpad PPA are now built and uploaded from GitHub Actions.
+The workflow signs the source package, uploads via Launchpad's FTP path, and uses
+explicit source refs for manual rebuilds. When a bad upstream tarball version was
+burned in the PPA, the correct recovery was to cut a new upstream release (`v2.2.1`)
+rather than inventing a pseudo-version. See [[github-actions-ppa]].
 
 ### 7. Target MySQL Versions Are Monitored
 Ubuntu MySQL availability for the PPA target suites is checked by a weekly GitHub Actions
