@@ -227,6 +227,43 @@ Both containers validated:
 
 ---
 
+## 2026-06-06 — Ingest: PPA Upload Session (ЭТАП 3–4)
+
+**Action:** Сессия загрузки pinba_engine 2.1.2 в Launchpad PPA. Закрыты ЭТАП 3 и ЭТАП 4 плана.
+
+**Raw document added:**
+- `raw/sessions/ppa-upload-session-2026-06-06.md`
+
+**Source page created:**
+- `wiki/sources/ppa-upload-session-2026-06-06.md`
+
+**Concept page created:**
+- `wiki/concepts/launchpad-ppa-workflow.md` — полный рабочий процесс: dput SFTP конфиг,
+  SSH аутентификация, подписание, версионирование, мониторинг сборки, установка из PPA
+
+**Concept page updated:**
+- `wiki/concepts/debian-ppa-packaging.md` — добавлены секции:
+  - Создание orig.tar.gz через `git archive` (dpkg-buildpackage не создаёт сам)
+  - Уточнение версионного формата (`2.1.2-1~noble1`, не `~ubuntu24.04~mysql8.0`)
+  - dput SFTP конфигурация (FTP порт 21 заблокирован)
+  - `rapidjson-dev` обязателен в Build-Depends (MySQL headers → sdi_fwd.h → rapidjson/fwd.h)
+  - GPGKeyTemporarilyNotFoundError при первом `add-apt-repository`
+  - Дублирование sources (.list vs .sources)
+
+**Key findings documented:**
+- `rapidjson-dev` — скрытая зависимость: стale cmake-кэш маскирует её при локальной сборке,
+  но Launchpad строит в чистом chroot → fatal error
+- `method = sftp` в dput — практически всегда нужен вместо `method = ftp`
+- Launchpad не принимает `UNRELEASED` в distribution поле changelog
+- orig.tar.gz создавать вручную через `git archive` перед `dpkg-buildpackage -S`
+
+**Итог сессии:** `pinba-engine 2.1.2-2~noble1` опубликован в PPA `ppa:xolegator/packages`,
+установка `sudo apt install pinba-engine-mysql-8.0` работает полностью автоматически.
+Build: https://launchpad.net/~xolegator/+archive/ubuntu/packages/+build/32942019
+Commit: `a14f8ac`
+
+---
+
 ## 2026-05-23 — LINT: docker-tag-strategy.md
 
 **Action:** Removed stale "Tags to Remove (Legacy)" table from `wiki/concepts/docker-tag-strategy.md`.

@@ -4,14 +4,14 @@ type: index
 sources: []
 related: []
 confidence: high
-updated: 2026-06-04
+updated: 2026-06-06
 ---
 
 # Pinba Engine — Knowledge Base Index
 
 Master catalog. Maintained by LLM agents.
 
-## Concepts (15 articles)
+## Concepts (16 articles)
 
 | Article | Key Topic |
 |---------|-----------|
@@ -27,9 +27,10 @@ Master catalog. Maintained by LLM agents.
 | [[docker-tag-strategy]] | Docker Hub naming rules, rolling vs pinned tags |
 | [[github-actions-docker]] | CI/CD workflow for Docker Hub build+push automation |
 | [[pinboard-architecture]] | Pinboard (Symfony 8) stack, aggregation logic, docker compose |
-| [[debian-ppa-packaging]] | Debian/PPA packaging: debian/ structure, rules, versioning, Launchpad |
+| [[debian-ppa-packaging]] | Debian/PPA packaging: debian/ structure, rules, versioning, Build-Depends, rapidjson |
 | [[mysql-postinst-patterns]] | postinst/prerm: auth cascade, plugin-load-add, MySQL 8.0 syntax traps |
 | [[mysql-vendor-headers-minimal]] | Minimal vendor headers via .d files analysis (1317→162 files) |
+| [[launchpad-ppa-workflow]] | dput SFTP setup, signing, версионирование, GPGKeyTemporarilyNotFoundError |
 
 ## Sources (10 documents)
 
@@ -45,6 +46,7 @@ Master catalog. Maintained by LLM agents.
 | [[mysql-80-to-84-migration]] (raw) | `raw/docs/mysql-80-to-84-migration.md` |
 | [[github-actions-docker-workflow]] (raw) | `raw/docs/github-actions-docker-workflow.md` |
 | [[ppa-packaging-session-2026-06-04]] | `raw/sessions/ppa-packaging-session-2026-06-04.md` |
+| [[ppa-upload-session-2026-06-06]] | `raw/sessions/ppa-upload-session-2026-06-06.md` |
 
 ## Raw Documents
 
@@ -72,3 +74,4 @@ raw/docs/
 - Pinboard UI: controller/route structure, what each page shows
 - GitHub Actions PPA build workflow (ppa-build.yml) — ЭТАП 5 плана
 - MySQL version monitor workflow — ЭТАП 6 плана
+- Управление несколькими Ubuntu releases в одном PPA (noble + oracular/plucky)
