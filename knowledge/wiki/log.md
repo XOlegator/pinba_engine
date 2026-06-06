@@ -218,6 +218,19 @@ Both containers validated:
 **Key findings documented:**
 - `INSTALL PLUGIN IF NOT EXISTS` / `UNINSTALL PLUGIN IF EXISTS` — MySQL 9.0+ синтаксис,
   в MySQL 8.0 даёт ERROR 1064; нужна проверка через `information_schema.PLUGINS`
+
+---
+
+## 2026-06-06 — Workflow Fix: Dynamic Matrix for PPA Build
+
+**Action:** Исправлен `ppa-build.yml` после merge в `master`, когда release PR показал
+невалидность workflow-файла на push в release branch.
+
+**Key finding documented:**
+- В GitHub Actions `job.if`, ссылающийся на `matrix.*`, валидируется до разворота matrix.
+  Из-за этого seemingly valid condition ломает workflow на уровне parser/validator.
+  Для выбора `noble`/`resolute` по `workflow_dispatch` нужен отдельный preparatory job,
+  который генерирует JSON matrix и передаёт её через `needs.<job>.outputs`.
 - `debian-sys-maint` на Ubuntu 24.04 MySQL 8.0 НЕ имеет `SYSTEM_VARIABLES_ADMIN`;
   `plugin-load-add` конфиг — правильный основной механизм установки плагина
 - Compiler `.d` dependency files — точный источник минимального набора vendor headers

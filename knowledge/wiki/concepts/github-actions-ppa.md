@@ -43,6 +43,10 @@ releases and publishing them to `ppa:xolegator/packages` from GitHub Actions.
   matrix over MySQL series. Instead, each source package carries a generated
   `debian/pinba-ppa-build.mk` file, and `debian/rules` uses that to decide whether
   to build `pinba-engine-mysql-8.0`, `pinba-engine-mysql-8.4`, or both.
+- GitHub Actions cannot safely filter a matrix job with `job.if` conditions that
+  reference `matrix.*`. That condition is validated before matrix expansion, which
+  causes workflow-file errors on branch push. Dynamic distro selection must be done
+  by generating the matrix in a preceding job and passing it through job outputs.
 - `git archive` is required because `dpkg-buildpackage -S -sa` expects the matching
   `orig.tar.gz` one directory above the package tree.
 - `dput` should be configured for `method = sftp`; Launchpad upload docs and local
