@@ -11,7 +11,7 @@ updated: 2026-06-06
 
 Master catalog. Maintained by LLM agents.
 
-## Concepts (16 articles)
+## Concepts (17 articles)
 
 | Article | Key Topic |
 |---------|-----------|
@@ -26,6 +26,7 @@ Master catalog. Maintained by LLM agents.
 | [[docker-build-strategy]] | Multi-stage build, libprotobuf copy, filename gotchas |
 | [[docker-tag-strategy]] | Docker Hub naming rules, rolling vs pinned tags |
 | [[github-actions-docker]] | CI/CD workflow for Docker Hub build+push automation |
+| [[github-actions-ppa]] | GitHub Actions workflow for source package build, signing, and PPA upload |
 | [[pinboard-architecture]] | Pinboard (Symfony 8) stack, aggregation logic, docker compose |
 | [[debian-ppa-packaging]] | Debian/PPA packaging: debian/ structure, rules, versioning, Build-Depends, rapidjson |
 | [[mysql-postinst-patterns]] | postinst/prerm: auth cascade, plugin-load-add, MySQL 8.0 syntax traps |
@@ -72,6 +73,5 @@ raw/docs/
 - PHP site integration examples (real php.ini configuration with real server names)
 - Production deployment: docker-compose with volumes, backups, log rotation
 - Pinboard UI: controller/route structure, what each page shows
-- GitHub Actions PPA build workflow (ppa-build.yml) — ЭТАП 5 плана
 - MySQL version monitor workflow — ЭТАП 6 плана
 - Управление несколькими Ubuntu releases в одном PPA (noble + oracular/plucky)

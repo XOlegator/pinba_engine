@@ -5,6 +5,7 @@ sources:
   - raw/sessions/ppa-upload-session-2026-06-06.md
 related:
   - wiki/concepts/debian-ppa-packaging.md
+  - wiki/concepts/github-actions-ppa.md
 confidence: high
 updated: 2026-06-06
 ---

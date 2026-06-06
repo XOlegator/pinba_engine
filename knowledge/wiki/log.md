@@ -264,6 +264,30 @@ Commit: `a14f8ac`
 
 ---
 
+## 2026-06-06 — Implementation: GitHub Actions PPA Build (ЭТАП 5)
+
+**Action:** Added the GitHub Actions workflow for building, signing, and uploading
+the Launchpad PPA source package.
+
+**Files added:**
+- `.github/workflows/ppa-build.yml` — release/manual workflow for source package build,
+  lintian check, GPG signing, Launchpad SFTP upload
+- `wiki/concepts/github-actions-ppa.md` — workflow design, required secrets, and launchpad
+  upload mechanics
+
+**Wiki updates:**
+- `wiki/index.md` — added the new GitHub Actions PPA concept and removed the stage 5 gap
+- `wiki/overview.md` — added a project-status note that PPA publication is automated
+
+**Key findings documented:**
+- One source package already builds both `pinba-engine-mysql-8.0` and
+  `pinba-engine-mysql-8.4`, so the workflow does not need a MySQL-series matrix.
+- `dpkg-buildpackage -S -sa` still needs a matching `orig.tar.gz`, so the workflow
+  creates it with `git archive` before packaging.
+- Launchpad upload uses GPG for package signing and SSH/SFTP for `dput`.
+
+---
+
 ## 2026-05-23 — LINT: docker-tag-strategy.md
 
 **Action:** Removed stale "Tags to Remove (Legacy)" table from `wiki/concepts/docker-tag-strategy.md`.

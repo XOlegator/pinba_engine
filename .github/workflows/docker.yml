@@ -22,7 +22,7 @@ jobs:
           - dockerfile: Dockerfile.mysql84
             series: "8.4"
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           ref: ${{ inputs.release-tag != '' && inputs.release-tag || github.ref }}
 
