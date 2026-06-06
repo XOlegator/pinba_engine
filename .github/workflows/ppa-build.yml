@@ -147,6 +147,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/ppa-artifacts"
           cp ../pinba-engine_*.dsc "$RUNNER_TEMP/ppa-artifacts/"
           cp ../pinba-engine_*.orig.tar.gz "$RUNNER_TEMP/ppa-artifacts/"
+          cp ../pinba-engine_*.buildinfo "$RUNNER_TEMP/ppa-artifacts/"
           cp ../pinba-engine_*_source.changes "$RUNNER_TEMP/ppa-artifacts/"
           cp ../pinba-engine_*.debian.tar.* "$RUNNER_TEMP/ppa-artifacts/"
 
