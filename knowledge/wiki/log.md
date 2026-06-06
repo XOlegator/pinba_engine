@@ -257,6 +257,19 @@ release-triggered PPA workflow успешно собрал `noble` и `resolute`
 - `dput` с `method = sftp` на GitHub-hosted Ubuntu runner требует установленный
   `python3-paramiko`. Без него upload step падает с `paramiko must be installed to
   use sftp transport`, даже если GPG подпись и SSH-конфигурация уже корректны.
+
+---
+
+## 2026-06-06 — Workflow Change: Switch Launchpad upload from SFTP to FTP
+
+**Action:** После того как SFTP upload дошёл до реального соединения с Launchpad и
+упёрся в `Permission denied (publickey)`, workflow переведён на documented FTP path.
+
+**Key finding documented:**
+- Для GitHub Actions Launchpad FTP upload (`method = ftp`, `login = anonymous`) проще
+  и надёжнее SFTP path: он не требует отдельного SSH key lifecycle в Launchpad и
+  GitHub secrets, при этом проверка подписи source package всё равно остаётся на
+  стороне `dput`/Launchpad.
 - `debian-sys-maint` на Ubuntu 24.04 MySQL 8.0 НЕ имеет `SYSTEM_VARIABLES_ADMIN`;
   `plugin-load-add` конфиг — правильный основной механизм установки плагина
 - Compiler `.d` dependency files — точный источник минимального набора vendor headers

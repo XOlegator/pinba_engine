@@ -171,9 +171,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             devscripts \
             dput \
-            gnupg \
-            openssh-client \
-            python3-paramiko
+            gnupg
 
       - name: Download source package artifacts
         uses: actions/download-artifact@v8
@@ -211,31 +209,14 @@ jobs:
             -k"$LAUNCHPAD_GPG_FINGERPRINT" \
             "$RUNNER_TEMP"/ppa-artifacts/*_source.changes
 
-      - name: Configure Launchpad SSH
-        env:
-          LAUNCHPAD_SSH_PRIVATE_KEY: ${{ secrets.LAUNCHPAD_SSH_PRIVATE_KEY }}
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          printf '%s\n' "$LAUNCHPAD_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519_launchpad
-          chmod 600 ~/.ssh/id_ed25519_launchpad
-          ssh-keyscan ppa.launchpad.net >> ~/.ssh/known_hosts
-          cat > ~/.ssh/config <<'EOF'
-          Host ppa.launchpad.net
-              User xolegator
-              IdentityFile ~/.ssh/id_ed25519_launchpad
-              IdentitiesOnly yes
-          EOF
-          chmod 600 ~/.ssh/config
-
       - name: Configure dput
         run: |
           cat > ~/.dput.cf <<'EOF'
           [xolegator-packages]
           fqdn = ppa.launchpad.net
-          method = sftp
+          method = ftp
           incoming = ~xolegator/packages/ubuntu/
-          login = xolegator
+          login = anonymous
           allow_unsigned_uploads = 0
           EOF
 
