@@ -245,6 +245,18 @@ release-triggered PPA workflow успешно собрал `noble` и `resolute`
   workflow переносит только `.dsc`, `.changes`, `.orig.tar.gz` и `.debian.tar.*`,
   подпись падает ещё до SSH upload в Launchpad. `*.buildinfo` нужно переносить как
   полноценный source artifact.
+
+---
+
+## 2026-06-06 — Workflow Fix: `dput` SFTP transport requires `python3-paramiko`
+
+**Action:** Исправлен upload job после ручного `workflow_dispatch` прогона, где
+подпись source package уже проходила, но сам Launchpad upload падал на GitHub runner.
+
+**Key finding documented:**
+- `dput` с `method = sftp` на GitHub-hosted Ubuntu runner требует установленный
+  `python3-paramiko`. Без него upload step падает с `paramiko must be installed to
+  use sftp transport`, даже если GPG подпись и SSH-конфигурация уже корректны.
 - `debian-sys-maint` на Ubuntu 24.04 MySQL 8.0 НЕ имеет `SYSTEM_VARIABLES_ADMIN`;
   `plugin-load-add` конфиг — правильный основной механизм установки плагина
 - Compiler `.d` dependency files — точный источник минимального набора vendor headers
