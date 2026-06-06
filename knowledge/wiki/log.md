@@ -198,7 +198,7 @@ Both containers validated:
 ## 2026-06-04 — Ingest: Debian PPA Packaging Session
 
 **Action:** Сессия разработки и отладки Debian/PPA пакетирования pinba_engine.
-Закрыты ЭТАП 1.5 и ЭТАП 2 из плана `ai_ppa_dev.log`.
+Закрыты ЭТАП 1.5 и ЭТАП 2 внутреннего плана PPA-автоматизации.
 
 **Raw document added:**
 - `raw/sessions/ppa-packaging-session-2026-06-04.md` — лог сессии с диагностикой
@@ -229,7 +229,7 @@ Both containers validated:
 
 ## 2026-06-06 — Ingest: PPA Upload Session (ЭТАП 3–4)
 
-**Action:** Сессия загрузки pinba_engine 2.1.2 в Launchpad PPA. Закрыты ЭТАП 3 и ЭТАП 4 плана.
+**Action:** Сессия загрузки pinba_engine 2.1.2 в Launchpad PPA. Закрыты ЭТАП 3 и ЭТАП 4 внутреннего плана PPA-автоматизации.
 
 **Raw document added:**
 - `raw/sessions/ppa-upload-session-2026-06-06.md`
