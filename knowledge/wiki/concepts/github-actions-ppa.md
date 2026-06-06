@@ -59,6 +59,11 @@ releases and publishing them to `ppa:xolegator/packages` from GitHub Actions.
 - Each `*_source.changes` should be uploaded with a separate `dput` invocation. Sending
   multiple series through one shell-expanded command makes failure attribution harder
   and can interact badly with per-upload connection state on the server side.
+- The declared `upstream_version` must match the checked-out source tree used for
+  `git archive`. Rebuilding `2.2.0` from a later `master` commit produces a different
+  `orig.tar.gz` and potentially a different `debian.tar.*`, which Launchpad rejects for
+  the same version. Manual upload flows should therefore package an explicit tag or SHA,
+  not the moving branch tip.
 - Launchpad's official docs support both FTP and SFTP uploads. For GitHub-hosted
   automation, plain FTP with `login = anonymous` is the simpler and more robust path
   because it avoids separate SSH-key provisioning for the runner while preserving GPG

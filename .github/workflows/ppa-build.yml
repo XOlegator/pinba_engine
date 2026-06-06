@@ -6,6 +6,10 @@ on:
       - published
   workflow_dispatch:
     inputs:
+      source_ref:
+        description: Git ref to package, e.g. v2.2.0 or a commit SHA; required for manual uploads
+        required: false
+        type: string
       upstream_version:
         description: Upstream version override, e.g. 2.1.2
         required: false
@@ -73,8 +77,19 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.prepare-matrix.outputs.include) }}
     steps:
+      - name: Validate manual upload inputs
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.upload }}" == "true" ]]; then
+            if [[ -z "${{ github.event.inputs.source_ref || '' }}" ]]; then
+              echo "workflow_dispatch uploads must provide source_ref (for example v2.2.0)." >&2
+              exit 1
+            fi
+          fi
+
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.source_ref || github.sha }}
 
       - name: Install packaging tools
         run: |
