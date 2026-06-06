@@ -9,7 +9,8 @@ Build-Depends:
  protobuf-compiler,
  libmysqlclient-dev,
  libssl-dev,
- pkg-config
+ pkg-config,
+ rapidjson-dev
 Standards-Version: 4.6.2
 Homepage: https://github.com/XOlegator/pinba_engine
 Vcs-Git: https://github.com/XOlegator/pinba_engine.git
