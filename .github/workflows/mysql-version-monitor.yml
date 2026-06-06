@@ -1,0 +1,117 @@
+name: MySQL Version Monitor
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check-versions:
+    name: Check MySQL versions (${{ matrix.suite }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: noble
+            container_image: ubuntu:24.04
+          - suite: resolute
+            container_image: ubuntu:26.04
+    container:
+      image: ${{ matrix.container_image }}
+    steps:
+      - name: Install tools
+        run: |
+          apt-get update -q
+          apt-get install -y --no-install-recommends \
+            ca-certificates \
+            git \
+            jq
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Detect available MySQL versions
+        id: detect
+        run: |
+          result="$(bash "$GITHUB_WORKSPACE/.github/scripts/check-mysql-versions.sh" "${{ matrix.suite }}")"
+          echo "$result" > /tmp/mysql-version-result.json
+          cat /tmp/mysql-version-result.json
+          echo "mysql80=$(jq -r '.mysql80 // empty' /tmp/mysql-version-result.json)" >> "$GITHUB_OUTPUT"
+          echo "mysql84=$(jq -r '.mysql84 // empty' /tmp/mysql-version-result.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Compare with tracked versions
+        id: compare
+        env:
+          SUITE: ${{ matrix.suite }}
+          DETECTED_MYSQL80: ${{ steps.detect.outputs.mysql80 }}
+          DETECTED_MYSQL84: ${{ steps.detect.outputs.mysql84 }}
+        run: |
+          known_mysql80="$(jq -r --arg suite "$SUITE" '.[$suite].mysql80 // empty' .github/mysql-versions.json)"
+          known_mysql84="$(jq -r --arg suite "$SUITE" '.[$suite].mysql84 // empty' .github/mysql-versions.json)"
+
+          changed=false
+          message=""
+
+          if [[ "$DETECTED_MYSQL80" != "$known_mysql80" ]]; then
+            changed=true
+            message="${message}mysql80: ${known_mysql80:-none} -> ${DETECTED_MYSQL80:-none}; "
+          fi
+
+          if [[ "$DETECTED_MYSQL84" != "$known_mysql84" ]]; then
+            changed=true
+            message="${message}mysql84: ${known_mysql84:-none} -> ${DETECTED_MYSQL84:-none}; "
+          fi
+
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "message=${message% }" >> "$GITHUB_OUTPUT"
+
+      - name: Open issue for changed MySQL versions
+        if: steps.compare.outputs.changed == 'true'
+        uses: actions/github-script@v9
+        env:
+          SUITE: ${{ matrix.suite }}
+          CHANGE_MESSAGE: ${{ steps.compare.outputs.message }}
+          DETECTED_MYSQL80: ${{ steps.detect.outputs.mysql80 }}
+          DETECTED_MYSQL84: ${{ steps.detect.outputs.mysql84 }}
+        with:
+          script: |
+            const suite = process.env.SUITE;
+            const title = `Update PPA MySQL matrix for ${suite}: ${process.env.CHANGE_MESSAGE}`;
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: "ppa,automated",
+              per_page: 100,
+            });
+
+            if (issues.some((issue) => issue.title === title)) {
+              core.info(`Issue already open: ${title}`);
+              return;
+            }
+
+            const body = [
+              `MySQL availability changed for Ubuntu suite \`${suite}\`.`,
+              ``,
+              `Detected versions:`,
+              `- mysql80: ${process.env.DETECTED_MYSQL80 || "none"}`,
+              `- mysql84: ${process.env.DETECTED_MYSQL84 || "none"}`,
+              ``,
+              `Follow-up:`,
+              `- update \`.github/mysql-versions.json\``,
+              `- update \`.github/workflows/ppa-build.yml\` matrix if the supported distro/series set changed`,
+              `- bump Debian revision before re-uploading to Launchpad`,
+            ].join("\n");
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ["ppa", "automated"],
+            });

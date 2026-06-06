@@ -68,6 +68,11 @@ See [[docker-build-strategy]].
 Source packages for Launchpad PPA are now built and uploaded from GitHub Actions,
 using the Launchpad signing key and SFTP upload path. See [[github-actions-ppa]].
 
+### 7. Target MySQL Versions Are Monitored
+Ubuntu MySQL availability for the PPA target suites is checked by a weekly GitHub Actions
+workflow so changes in `noble` or `resolute` can be surfaced before the next release.
+See [[github-actions-mysql-version-monitor]].
+
 ## Key Configuration Points
 
 | What | Where | Critical Setting |
@@ -84,6 +89,7 @@ Active modernization fork. Both MySQL 8.0 and 8.4 builds are tested via Docker.
 Docker Hub: `xolegator/pinba-engine` with tags `8.0`, `8.4-lts`.
 Tag cleanup in progress (removing `*-pinboard*` legacy tags).
 Launchpad PPA publication is automated through GitHub Actions for the source package flow.
+MySQL version drift across Ubuntu target suites is tracked by automation as well.
 
 ## Knowledge Gaps
 

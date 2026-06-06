@@ -6,15 +6,24 @@ on:
       - published
   workflow_dispatch:
     inputs:
-      debian_version:
-        description: Full Debian version to inject into debian/changelog, e.g. 2.1.2-3~noble1
+      upstream_version:
+        description: Upstream version override, e.g. 2.1.2
         required: false
         type: string
-      distribution:
-        description: Debian distribution to use when debian_version is provided
+      debian_revision:
+        description: Debian revision number used in {version}-{revision}~{suite}1
         required: false
-        default: noble
+        default: "1"
         type: string
+      target_distribution:
+        description: Limit workflow_dispatch to one distro or build both
+        required: false
+        default: all
+        type: choice
+        options:
+          - all
+          - noble
+          - resolute
       upload:
         description: Upload the signed source package to Launchpad
         required: false
@@ -33,8 +42,25 @@ env:
 
 jobs:
   build-source-package:
-    name: Build source package
+    name: Build source package (${{ matrix.distribution }})
     runs-on: ubuntu-24.04
+    if: github.event_name != 'workflow_dispatch' || inputs.target_distribution == 'all' || inputs.target_distribution == matrix.distribution
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distribution: noble
+            ubuntu_version: "24.04"
+            enable_mysql80: "1"
+            enable_mysql84: "0"
+            mysql80_version: "8.0.46"
+            mysql84_version: "8.4.9"
+          - distribution: resolute
+            ubuntu_version: "26.04"
+            enable_mysql80: "0"
+            enable_mysql84: "1"
+            mysql80_version: "8.0.46"
+            mysql84_version: "8.4.9"
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -48,6 +74,7 @@ jobs:
             debhelper \
             devscripts \
             fakeroot \
+            jq \
             lintian \
             libprotobuf-dev \
             protobuf-compiler \
@@ -56,24 +83,38 @@ jobs:
             pkg-config \
             rapidjson-dev
 
-      - name: Optionally update debian/changelog
-        if: github.event_name == 'workflow_dispatch' && inputs.debian_version != ''
-        env:
-          INPUT_DEBIAN_VERSION: ${{ inputs.debian_version }}
-          INPUT_DISTRIBUTION: ${{ inputs.distribution }}
-        run: |
-          dch --force-distribution \
-            --distribution "$INPUT_DISTRIBUTION" \
-            --newversion "$INPUT_DEBIAN_VERSION" \
-            "Automated PPA build from GitHub Actions."
-
       - name: Resolve package version
         id: version
         run: |
-          full_version="$(dpkg-parsechangelog -SVersion)"
-          upstream_version="${full_version%-*}"
-          echo "full_version=$full_version" >> "$GITHUB_OUTPUT"
+          if [[ -n "${{ github.event.inputs.upstream_version || '' }}" ]]; then
+            upstream_version="${{ github.event.inputs.upstream_version }}"
+          elif [[ "${{ github.event_name }}" == "release" ]]; then
+            upstream_version="${{ github.event.release.tag_name }}"
+            upstream_version="${upstream_version#v}"
+          else
+            upstream_version="$(jq -r '."."' .release-please-manifest.json)"
+          fi
+
+          full_version="${upstream_version}-${{ github.event.inputs.debian_revision || '1' }}~${{ matrix.distribution }}1"
+
           echo "upstream_version=$upstream_version" >> "$GITHUB_OUTPUT"
+          echo "full_version=$full_version" >> "$GITHUB_OUTPUT"
+
+      - name: Generate distro build configuration
+        run: |
+          cat > debian/pinba-ppa-build.mk <<EOF
+          ENABLE_MYSQL80=${{ matrix.enable_mysql80 }}
+          ENABLE_MYSQL84=${{ matrix.enable_mysql84 }}
+          MYSQL80_VERSION=${{ matrix.mysql80_version }}
+          MYSQL84_VERSION=${{ matrix.mysql84_version }}
+          EOF
+
+      - name: Rewrite debian/changelog for target distro
+        run: |
+          dch --force-distribution \
+            --distribution "${{ matrix.distribution }}" \
+            --newversion "${{ steps.version.outputs.full_version }}" \
+            "Automated PPA build from GitHub Actions for Ubuntu ${{ matrix.ubuntu_version }}."
 
       - name: Create orig tarball
         run: |
@@ -101,7 +142,7 @@ jobs:
       - name: Upload source package artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: ppa-source-package
+          name: ppa-source-package-${{ matrix.distribution }}
           path: ${{ runner.temp }}/ppa-artifacts/*
           if-no-files-found: error
           retention-days: 7
@@ -124,7 +165,8 @@ jobs:
       - name: Download source package artifacts
         uses: actions/download-artifact@v8
         with:
-          name: ppa-source-package
+          pattern: ppa-source-package-*
+          merge-multiple: true
           path: ${{ runner.temp }}/ppa-artifacts
 
       - name: Import Launchpad GPG key

@@ -288,6 +288,34 @@ the Launchpad PPA source package.
 
 ---
 
+## 2026-06-06 — Implementation: Multi-Distro PPA Automation + Version Monitor
+
+**Action:** Expanded PPA automation to handle Ubuntu release-specific source uploads and
+added MySQL version monitoring.
+
+**Files added:**
+- `.github/workflows/mysql-version-monitor.yml` — weekly/manual monitor of Ubuntu MySQL availability
+- `.github/mysql-versions.json` — tracked MySQL version map for `noble` and `resolute`
+- `.github/scripts/check-mysql-versions.sh` — apt-based detector
+- `wiki/concepts/github-actions-mysql-version-monitor.md` — monitor workflow rationale and behavior
+
+**Files updated:**
+- `.github/workflows/ppa-build.yml` — distro matrix (`noble`, `resolute`), generated
+  `debian/pinba-ppa-build.mk`, distro-specific changelog versions, multi-artifact upload
+- `debian/rules` — package exclusion and conditional build/install based on generated config
+- `wiki/concepts/github-actions-ppa.md` — updated to reflect multi-distro source package flow
+- `wiki/concepts/debian-ppa-packaging.md` — documented generated build config and multi-distro versioning
+
+**Key findings documented:**
+- Launchpad cannot see GitHub runner matrix env directly; distro-specific series selection
+  must travel inside the source package itself.
+- `debian/pinba-ppa-build.mk` is sufficient to select `8.0 only`, `8.4 only`, or both,
+  without forking `debian/control`.
+- MySQL version monitoring should open issues, not auto-upload, because a fresh Launchpad
+  upload still needs an explicit Debian revision bump.
+
+---
+
 ## 2026-05-23 — LINT: docker-tag-strategy.md
 
 **Action:** Removed stale "Tags to Remove (Legacy)" table from `wiki/concepts/docker-tag-strategy.md`.

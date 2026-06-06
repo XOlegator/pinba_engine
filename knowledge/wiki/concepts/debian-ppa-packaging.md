@@ -51,7 +51,24 @@ debian/
 
 ## debian/rules
 
-Два отдельных cmake-конфига для одного source package:
+Базово source package умеет собирать два бинарных пакета, но реальный набор можно
+сузить generated-файлом `debian/pinba-ppa-build.mk`:
+
+```makefile
+-include debian/pinba-ppa-build.mk
+ENABLE_MYSQL80 ?= 1
+ENABLE_MYSQL84 ?= 1
+
+ifeq ($(ENABLE_MYSQL80),0)
+    DH_EXCLUDE_PACKAGES += -Npinba-engine-mysql-8.0
+endif
+```
+
+Это позволяет из GitHub Actions генерировать разные source uploads для:
+- `noble` → только `pinba-engine-mysql-8.0`
+- `resolute` → только `pinba-engine-mysql-8.4`
+
+Основная схема CMake-конфигов остаётся такой:
 
 ```makefile
 override_dh_auto_configure:
@@ -158,6 +175,10 @@ dpkg-buildpackage -S -sa -us -uc
 
 Кратность `-N` (deb revision) увеличивается при каждом повторном upload одной и той же upstream версии.
 Launchpad не принимает повторную загрузку той же версии — нужно поднять revision.
+
+Для multi-distro CI это означает разные версии source uploads:
+- `2.1.2-1~noble1`
+- `2.1.2-1~resolute1`
 
 ## Загрузка в Launchpad (dput)
 

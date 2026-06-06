@@ -45,6 +45,7 @@ coverage-*.info
 !CMakePresets.json
 !.release-please-manifest.json
 !release-please-config.json
+!.github/mysql-versions.json
 
 # Generated documentation
 docs/api/
@@ -74,6 +75,7 @@ debian/debhelper-build-stamp
 debian/*.substvars
 debian/*.log
 debian/.debhelper/
+debian/pinba-ppa-build.mk
 
 # MySQL source tarballs used by tools/extract-mysql-headers.sh (not committed)
 vendor/*.tar.gz
