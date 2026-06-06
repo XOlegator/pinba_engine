@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0](https://github.com/XOlegator/pinba_engine/compare/v2.1.2...v2.2.0) (2026-06-06)
+
+
+### Features
+
+* **ci:** automate multi-distro Launchpad PPA builds ([#21](https://github.com/XOlegator/pinba_engine/issues/21)) ([c3107a6](https://github.com/XOlegator/pinba_engine/commit/c3107a6dfc27f1196591fffb4a39f8224a088ae0))
+
+
+### Bug Fixes
+
+* **ci:** repair ppa workflow matrix selection ([#23](https://github.com/XOlegator/pinba_engine/issues/23)) ([26dccd5](https://github.com/XOlegator/pinba_engine/commit/26dccd5bb8ff11eab27f1f4b72dd4e93559b9574))
+
 ## [2.1.2](https://github.com/XOlegator/pinba_engine/compare/v2.1.1...v2.1.2) (2026-05-31)
 
 
