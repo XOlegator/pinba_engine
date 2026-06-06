@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1](https://github.com/XOlegator/pinba_engine/compare/v2.2.0...v2.2.1) (2026-06-06)
+
+
+### Bug Fixes
+
+* **ci:** install paramiko for ppa upload ([#26](https://github.com/XOlegator/pinba_engine/issues/26)) ([a5706d0](https://github.com/XOlegator/pinba_engine/commit/a5706d01d26f25b195cea9717b6d99c4a34070d1))
+* **ci:** pin manual ppa uploads to source refs ([#29](https://github.com/XOlegator/pinba_engine/issues/29)) ([e7d9b54](https://github.com/XOlegator/pinba_engine/commit/e7d9b548ffa62a12e904947d369b175ca7fd6d7d))
+* **ci:** preserve buildinfo for ppa signing ([#24](https://github.com/XOlegator/pinba_engine/issues/24)) ([a350c9e](https://github.com/XOlegator/pinba_engine/commit/a350c9eb800659c9938c9f8982f614297aaba853))
+* **ci:** split multi-series ppa uploads ([#28](https://github.com/XOlegator/pinba_engine/issues/28)) ([b344106](https://github.com/XOlegator/pinba_engine/commit/b34410624d8a6acbcfb0ac3341085adee5d58cf0))
+* **ci:** upload launchpad packages over ftp ([#27](https://github.com/XOlegator/pinba_engine/issues/27)) ([7ed63e5](https://github.com/XOlegator/pinba_engine/commit/7ed63e53bc3c7e5e1ac6bef6d6c9e46695dfa0db))
+
 ## [2.2.0](https://github.com/XOlegator/pinba_engine/compare/v2.1.2...v2.2.0) (2026-06-06)
 
 
