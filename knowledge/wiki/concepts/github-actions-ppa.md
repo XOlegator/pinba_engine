@@ -35,7 +35,6 @@ releases and publishing them to `ppa:xolegator/packages` from GitHub Actions.
 | `LAUNCHPAD_GPG_PRIVATE_KEY` | Base64-encoded armored private key used for package signing |
 | `LAUNCHPAD_GPG_PASSPHRASE` | Passphrase for the signing key |
 | `LAUNCHPAD_GPG_FINGERPRINT` | Exact key fingerprint passed to `gpg` |
-| `LAUNCHPAD_SSH_PRIVATE_KEY` | SSH key used by `dput` for Launchpad SFTP upload |
 
 ## Design notes
 
@@ -53,13 +52,13 @@ releases and publishing them to `ppa:xolegator/packages` from GitHub Actions.
   `*.buildinfo` alongside `.dsc`, `.changes`, `.orig.tar.gz`, and `.debian.tar.*`.
   `debsign` expects the matching `*_source.buildinfo` next to the `.changes` file and
   fails before SSH upload if that file is missing.
-- `dput` should be configured for `method = sftp`; Launchpad upload docs and local
-  testing both pointed to SSH-based upload as the reliable path.
-- On GitHub-hosted Ubuntu runners, `dput` needs `python3-paramiko` installed for
-  `method = sftp`. Without it, the upload step fails with `paramiko must be installed
-  to use sftp transport` after signing succeeds.
-- Uploading with SFTP still needs Launchpad SSH key registration, even though the
-  package signature itself is GPG-based.
+- Launchpad's official docs support both FTP and SFTP uploads. For GitHub-hosted
+  automation, plain FTP with `login = anonymous` is the simpler and more robust path
+  because it avoids separate SSH-key provisioning for the runner while preserving GPG
+  signature verification on the uploaded source package.
+- SFTP remains possible, but it adds two extra moving parts on GitHub Actions:
+  `python3-paramiko` on the runner and a Launchpad-registered SSH key with matching
+  secret material in GitHub.
 
 ## MySQL version monitoring
 
