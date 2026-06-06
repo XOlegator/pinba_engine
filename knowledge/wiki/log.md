@@ -270,6 +270,19 @@ release-triggered PPA workflow успешно собрал `noble` и `resolute`
   и надёжнее SFTP path: он не требует отдельного SSH key lifecycle в Launchpad и
   GitHub secrets, при этом проверка подписи source package всё равно остаётся на
   стороне `dput`/Launchpad.
+
+---
+
+## 2026-06-06 — Workflow Fix: One `.orig.tar.gz` per upstream across series uploads
+
+**Action:** После перехода на FTP выяснилось, что `noble` upload проходит, а второй
+upload для `resolute` падает уже после первого успешного пакета в той же job.
+
+**Key finding documented:**
+- Для multi-series source uploads одного и того же upstream нужно загружать полный
+  source (`-sa`) только один раз; последующие series должны идти как `-sd`.
+- Также безопаснее вызывать `dput` отдельно на каждый `*_source.changes`, а не
+  передавать несколько файлов одним shell-expanded вызовом.
 - `debian-sys-maint` на Ubuntu 24.04 MySQL 8.0 НЕ имеет `SYSTEM_VARIABLES_ADMIN`;
   `plugin-load-add` конфиг — правильный основной механизм установки плагина
 - Compiler `.d` dependency files — точный источник минимального набора vendor headers
