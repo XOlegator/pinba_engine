@@ -49,6 +49,10 @@ releases and publishing them to `ppa:xolegator/packages` from GitHub Actions.
   by generating the matrix in a preceding job and passing it through job outputs.
 - `git archive` is required because `dpkg-buildpackage -S -sa` expects the matching
   `orig.tar.gz` one directory above the package tree.
+- When source-package artifacts move between jobs, the workflow must preserve
+  `*.buildinfo` alongside `.dsc`, `.changes`, `.orig.tar.gz`, and `.debian.tar.*`.
+  `debsign` expects the matching `*_source.buildinfo` next to the `.changes` file and
+  fails before SSH upload if that file is missing.
 - `dput` should be configured for `method = sftp`; Launchpad upload docs and local
   testing both pointed to SSH-based upload as the reliable path.
 - Uploading with SFTP still needs Launchpad SSH key registration, even though the

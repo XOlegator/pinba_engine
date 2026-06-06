@@ -231,6 +231,20 @@ Both containers validated:
   Из-за этого seemingly valid condition ломает workflow на уровне parser/validator.
   Для выбора `noble`/`resolute` по `workflow_dispatch` нужен отдельный preparatory job,
   который генерирует JSON matrix и передаёт её через `needs.<job>.outputs`.
+
+---
+
+## 2026-06-06 — Workflow Fix: Preserve source `.buildinfo` for `debsign`
+
+**Action:** Исправлен `ppa-build.yml` после первого боевого релиза `v2.2.0`, где
+release-triggered PPA workflow успешно собрал `noble` и `resolute`, но упал на
+подписи source package.
+
+**Key finding documented:**
+- `debsign` ожидает `*_source.buildinfo` рядом с `*_source.changes`. Если multi-job
+  workflow переносит только `.dsc`, `.changes`, `.orig.tar.gz` и `.debian.tar.*`,
+  подпись падает ещё до SSH upload в Launchpad. `*.buildinfo` нужно переносить как
+  полноценный source artifact.
 - `debian-sys-maint` на Ubuntu 24.04 MySQL 8.0 НЕ имеет `SYSTEM_VARIABLES_ADMIN`;
   `plugin-load-add` конфиг — правильный основной механизм установки плагина
 - Compiler `.d` dependency files — точный источник минимального набора vendor headers
