@@ -172,7 +172,8 @@ jobs:
             devscripts \
             dput \
             gnupg \
-            openssh-client
+            openssh-client \
+            python3-paramiko
 
       - name: Download source package artifacts
         uses: actions/download-artifact@v8

@@ -55,6 +55,9 @@ releases and publishing them to `ppa:xolegator/packages` from GitHub Actions.
   fails before SSH upload if that file is missing.
 - `dput` should be configured for `method = sftp`; Launchpad upload docs and local
   testing both pointed to SSH-based upload as the reliable path.
+- On GitHub-hosted Ubuntu runners, `dput` needs `python3-paramiko` installed for
+  `method = sftp`. Without it, the upload step fails with `paramiko must be installed
+  to use sftp transport` after signing succeeds.
 - Uploading with SFTP still needs Launchpad SSH key registration, even though the
   package signature itself is GPG-based.
 
