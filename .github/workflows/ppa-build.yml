@@ -41,26 +41,37 @@ env:
   PPA_DPUT_NAME: xolegator-packages
 
 jobs:
+  prepare-matrix:
+    name: Prepare build matrix
+    runs-on: ubuntu-24.04
+    outputs:
+      include: ${{ steps.matrix.outputs.include }}
+    steps:
+      - name: Resolve target matrix
+        id: matrix
+        run: |
+          case "${{ github.event_name }}:${{ inputs.target_distribution || 'all' }}" in
+            workflow_dispatch:noble)
+              include='[{"distribution":"noble","ubuntu_version":"24.04","enable_mysql80":"1","enable_mysql84":"0","mysql80_version":"8.0.46","mysql84_version":"8.4.9"}]'
+              ;;
+            workflow_dispatch:resolute)
+              include='[{"distribution":"resolute","ubuntu_version":"26.04","enable_mysql80":"0","enable_mysql84":"1","mysql80_version":"8.0.46","mysql84_version":"8.4.9"}]'
+              ;;
+            *)
+              include='[{"distribution":"noble","ubuntu_version":"24.04","enable_mysql80":"1","enable_mysql84":"0","mysql80_version":"8.0.46","mysql84_version":"8.4.9"},{"distribution":"resolute","ubuntu_version":"26.04","enable_mysql80":"0","enable_mysql84":"1","mysql80_version":"8.0.46","mysql84_version":"8.4.9"}]'
+              ;;
+          esac
+
+          echo "include=$include" >> "$GITHUB_OUTPUT"
+
   build-source-package:
     name: Build source package (${{ matrix.distribution }})
+    needs: prepare-matrix
     runs-on: ubuntu-24.04
-    if: github.event_name != 'workflow_dispatch' || inputs.target_distribution == 'all' || inputs.target_distribution == matrix.distribution
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - distribution: noble
-            ubuntu_version: "24.04"
-            enable_mysql80: "1"
-            enable_mysql84: "0"
-            mysql80_version: "8.0.46"
-            mysql84_version: "8.4.9"
-          - distribution: resolute
-            ubuntu_version: "26.04"
-            enable_mysql80: "0"
-            enable_mysql84: "1"
-            mysql80_version: "8.0.46"
-            mysql84_version: "8.4.9"
+        include: ${{ fromJson(needs.prepare-matrix.outputs.include) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
