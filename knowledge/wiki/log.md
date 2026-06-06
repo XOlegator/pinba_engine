@@ -5,7 +5,7 @@ sources: []
 related:
   - wiki/index.md
 confidence: high
-updated: 2026-05-23
+updated: 2026-06-04
 ---
 
 # Activity Log
@@ -192,6 +192,127 @@ Both containers validated:
 
 **Concept page created:**
 - `wiki/concepts/github-actions-docker.md` — project-specific workflow (two jobs for 8.0 and 8.4 LTS, correct tag names, GHA cache scopes)
+
+---
+
+## 2026-06-04 — Ingest: Debian PPA Packaging Session
+
+**Action:** Сессия разработки и отладки Debian/PPA пакетирования pinba_engine.
+Закрыты ЭТАП 1.5 и ЭТАП 2 внутреннего плана PPA-автоматизации.
+
+**Raw document added:**
+- `raw/sessions/ppa-packaging-session-2026-06-04.md` — лог сессии с диагностикой
+
+**Source page created:**
+- `wiki/sources/ppa-packaging-session-2026-06-04.md`
+
+**Concept pages created:**
+- `wiki/concepts/debian-ppa-packaging.md` — полный процесс PPA packaging для MySQL плагина:
+  структура debian/, схема версионирования, вендоринг headers, lintian, Launchpad
+- `wiki/concepts/mysql-postinst-patterns.md` — паттерны и ловушки postinst/prerm:
+  каскад аутентификации (debian.cnf → auth_socket), `plugin-load-add` vs `INSTALL PLUGIN`,
+  синтаксические ловушки MySQL 8.0 vs 9.0, DROP DATABASE + незагруженный ENGINE
+- `wiki/concepts/mysql-vendor-headers-minimal.md` — стратегия минимизации vendor headers:
+  анализ .d файлов компилятора, алгоритм whitelist-extraction, результат 1317→162 файлов
+
+**Key findings documented:**
+- `INSTALL PLUGIN IF NOT EXISTS` / `UNINSTALL PLUGIN IF EXISTS` — MySQL 9.0+ синтаксис,
+  в MySQL 8.0 даёт ERROR 1064; нужна проверка через `information_schema.PLUGINS`
+- `debian-sys-maint` на Ubuntu 24.04 MySQL 8.0 НЕ имеет `SYSTEM_VARIABLES_ADMIN`;
+  `plugin-load-add` конфиг — правильный основной механизм установки плагина
+- Compiler `.d` dependency files — точный источник минимального набора vendor headers
+- `DROP DATABASE` с ENGINE=PINBA таблицами требует загруженного плагина
+
+**Commits:** `df68221`, `db66097`, `d2a19fb`, `57ed76a`
+
+---
+
+## 2026-06-06 — Ingest: PPA Upload Session (ЭТАП 3–4)
+
+**Action:** Сессия загрузки pinba_engine 2.1.2 в Launchpad PPA. Закрыты ЭТАП 3 и ЭТАП 4 внутреннего плана PPA-автоматизации.
+
+**Raw document added:**
+- `raw/sessions/ppa-upload-session-2026-06-06.md`
+
+**Source page created:**
+- `wiki/sources/ppa-upload-session-2026-06-06.md`
+
+**Concept page created:**
+- `wiki/concepts/launchpad-ppa-workflow.md` — полный рабочий процесс: dput SFTP конфиг,
+  SSH аутентификация, подписание, версионирование, мониторинг сборки, установка из PPA
+
+**Concept page updated:**
+- `wiki/concepts/debian-ppa-packaging.md` — добавлены секции:
+  - Создание orig.tar.gz через `git archive` (dpkg-buildpackage не создаёт сам)
+  - Уточнение версионного формата (`2.1.2-1~noble1`, не `~ubuntu24.04~mysql8.0`)
+  - dput SFTP конфигурация (FTP порт 21 заблокирован)
+  - `rapidjson-dev` обязателен в Build-Depends (MySQL headers → sdi_fwd.h → rapidjson/fwd.h)
+  - GPGKeyTemporarilyNotFoundError при первом `add-apt-repository`
+  - Дублирование sources (.list vs .sources)
+
+**Key findings documented:**
+- `rapidjson-dev` — скрытая зависимость: стale cmake-кэш маскирует её при локальной сборке,
+  но Launchpad строит в чистом chroot → fatal error
+- `method = sftp` в dput — практически всегда нужен вместо `method = ftp`
+- Launchpad не принимает `UNRELEASED` в distribution поле changelog
+- orig.tar.gz создавать вручную через `git archive` перед `dpkg-buildpackage -S`
+
+**Итог сессии:** `pinba-engine 2.1.2-2~noble1` опубликован в PPA `ppa:xolegator/packages`,
+установка `sudo apt install pinba-engine-mysql-8.0` работает полностью автоматически.
+Build: https://launchpad.net/~xolegator/+archive/ubuntu/packages/+build/32942019
+Commit: `a14f8ac`
+
+---
+
+## 2026-06-06 — Implementation: GitHub Actions PPA Build (ЭТАП 5)
+
+**Action:** Added the GitHub Actions workflow for building, signing, and uploading
+the Launchpad PPA source package.
+
+**Files added:**
+- `.github/workflows/ppa-build.yml` — release/manual workflow for source package build,
+  lintian check, GPG signing, Launchpad SFTP upload
+- `wiki/concepts/github-actions-ppa.md` — workflow design, required secrets, and launchpad
+  upload mechanics
+
+**Wiki updates:**
+- `wiki/index.md` — added the new GitHub Actions PPA concept and removed the stage 5 gap
+- `wiki/overview.md` — added a project-status note that PPA publication is automated
+
+**Key findings documented:**
+- One source package already builds both `pinba-engine-mysql-8.0` and
+  `pinba-engine-mysql-8.4`, so the workflow does not need a MySQL-series matrix.
+- `dpkg-buildpackage -S -sa` still needs a matching `orig.tar.gz`, so the workflow
+  creates it with `git archive` before packaging.
+- Launchpad upload uses GPG for package signing and SSH/SFTP for `dput`.
+
+---
+
+## 2026-06-06 — Implementation: Multi-Distro PPA Automation + Version Monitor
+
+**Action:** Expanded PPA automation to handle Ubuntu release-specific source uploads and
+added MySQL version monitoring.
+
+**Files added:**
+- `.github/workflows/mysql-version-monitor.yml` — weekly/manual monitor of Ubuntu MySQL availability
+- `.github/mysql-versions.json` — tracked MySQL version map for `noble` and `resolute`
+- `.github/scripts/check-mysql-versions.sh` — apt-based detector
+- `wiki/concepts/github-actions-mysql-version-monitor.md` — monitor workflow rationale and behavior
+
+**Files updated:**
+- `.github/workflows/ppa-build.yml` — distro matrix (`noble`, `resolute`), generated
+  `debian/pinba-ppa-build.mk`, distro-specific changelog versions, multi-artifact upload
+- `debian/rules` — package exclusion and conditional build/install based on generated config
+- `wiki/concepts/github-actions-ppa.md` — updated to reflect multi-distro source package flow
+- `wiki/concepts/debian-ppa-packaging.md` — documented generated build config and multi-distro versioning
+
+**Key findings documented:**
+- Launchpad cannot see GitHub runner matrix env directly; distro-specific series selection
+  must travel inside the source package itself.
+- `debian/pinba-ppa-build.mk` is sufficient to select `8.0 only`, `8.4 only`, or both,
+  without forking `debian/control`.
+- MySQL version monitoring should open issues, not auto-upload, because a fresh Launchpad
+  upload still needs an explicit Debian revision bump.
 
 ---
 

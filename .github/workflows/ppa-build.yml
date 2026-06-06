@@ -1,0 +1,231 @@
+name: PPA Build and Publish
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      upstream_version:
+        description: Upstream version override, e.g. 2.1.2
+        required: false
+        type: string
+      debian_revision:
+        description: Debian revision number used in {version}-{revision}~{suite}1
+        required: false
+        default: "1"
+        type: string
+      target_distribution:
+        description: Limit workflow_dispatch to one distro or build both
+        required: false
+        default: all
+        type: choice
+        options:
+          - all
+          - noble
+          - resolute
+      upload:
+        description: Upload the signed source package to Launchpad
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  DEBEMAIL: o.ekhlakov@protonmail.com
+  DEBFULLNAME: Oleg Ekhlakov
+  PPA_OWNER: xolegator
+  PPA_NAME: packages
+  PPA_DPUT_NAME: xolegator-packages
+
+jobs:
+  build-source-package:
+    name: Build source package (${{ matrix.distribution }})
+    runs-on: ubuntu-24.04
+    if: github.event_name != 'workflow_dispatch' || inputs.target_distribution == 'all' || inputs.target_distribution == matrix.distribution
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - distribution: noble
+            ubuntu_version: "24.04"
+            enable_mysql80: "1"
+            enable_mysql84: "0"
+            mysql80_version: "8.0.46"
+            mysql84_version: "8.4.9"
+          - distribution: resolute
+            ubuntu_version: "26.04"
+            enable_mysql80: "0"
+            enable_mysql84: "1"
+            mysql80_version: "8.0.46"
+            mysql84_version: "8.4.9"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            debhelper \
+            devscripts \
+            fakeroot \
+            jq \
+            lintian \
+            libprotobuf-dev \
+            protobuf-compiler \
+            libmysqlclient-dev \
+            libssl-dev \
+            pkg-config \
+            rapidjson-dev
+
+      - name: Resolve package version
+        id: version
+        run: |
+          if [[ -n "${{ github.event.inputs.upstream_version || '' }}" ]]; then
+            upstream_version="${{ github.event.inputs.upstream_version }}"
+          elif [[ "${{ github.event_name }}" == "release" ]]; then
+            upstream_version="${{ github.event.release.tag_name }}"
+            upstream_version="${upstream_version#v}"
+          else
+            upstream_version="$(jq -r '."."' .release-please-manifest.json)"
+          fi
+
+          full_version="${upstream_version}-${{ github.event.inputs.debian_revision || '1' }}~${{ matrix.distribution }}1"
+
+          echo "upstream_version=$upstream_version" >> "$GITHUB_OUTPUT"
+          echo "full_version=$full_version" >> "$GITHUB_OUTPUT"
+
+      - name: Generate distro build configuration
+        run: |
+          cat > debian/pinba-ppa-build.mk <<EOF
+          ENABLE_MYSQL80=${{ matrix.enable_mysql80 }}
+          ENABLE_MYSQL84=${{ matrix.enable_mysql84 }}
+          MYSQL80_VERSION=${{ matrix.mysql80_version }}
+          MYSQL84_VERSION=${{ matrix.mysql84_version }}
+          EOF
+
+      - name: Rewrite debian/changelog for target distro
+        run: |
+          dch --force-distribution \
+            --distribution "${{ matrix.distribution }}" \
+            --newversion "${{ steps.version.outputs.full_version }}" \
+            "Automated PPA build from GitHub Actions for Ubuntu ${{ matrix.ubuntu_version }}."
+
+      - name: Create orig tarball
+        run: |
+          git archive \
+            --prefix="pinba-engine-${{ steps.version.outputs.upstream_version }}/" \
+            HEAD \
+            | gzip -9 > "../pinba-engine_${{ steps.version.outputs.upstream_version }}.orig.tar.gz"
+
+      - name: Build source package
+        run: |
+          dpkg-buildpackage -S -sa -us -uc
+
+      - name: Check source package with lintian
+        run: |
+          lintian --fail-on error ../pinba-engine_*_source.changes
+
+      - name: Collect source package artifacts
+        run: |
+          mkdir -p "$RUNNER_TEMP/ppa-artifacts"
+          cp ../pinba-engine_*.dsc "$RUNNER_TEMP/ppa-artifacts/"
+          cp ../pinba-engine_*.orig.tar.gz "$RUNNER_TEMP/ppa-artifacts/"
+          cp ../pinba-engine_*_source.changes "$RUNNER_TEMP/ppa-artifacts/"
+          cp ../pinba-engine_*.debian.tar.* "$RUNNER_TEMP/ppa-artifacts/"
+
+      - name: Upload source package artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: ppa-source-package-${{ matrix.distribution }}
+          path: ${{ runner.temp }}/ppa-artifacts/*
+          if-no-files-found: error
+          retention-days: 7
+
+  upload-to-ppa:
+    name: Sign and upload to Launchpad
+    needs: build-source-package
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.upload)
+    steps:
+      - name: Install upload tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            devscripts \
+            dput \
+            gnupg \
+            openssh-client
+
+      - name: Download source package artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: ppa-source-package-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/ppa-artifacts
+
+      - name: Import Launchpad GPG key
+        env:
+          LAUNCHPAD_GPG_PRIVATE_KEY: ${{ secrets.LAUNCHPAD_GPG_PRIVATE_KEY }}
+        run: |
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"
+          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
+          mkdir -p "$GNUPGHOME"
+          chmod 700 "$GNUPGHOME"
+          printf 'allow-loopback-pinentry\n' > "$GNUPGHOME/gpg-agent.conf"
+          printf '%s' "$LAUNCHPAD_GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import
+          gpg --batch --list-secret-keys --keyid-format LONG
+
+      - name: Sign source package
+        env:
+          LAUNCHPAD_GPG_FINGERPRINT: ${{ secrets.LAUNCHPAD_GPG_FINGERPRINT }}
+          LAUNCHPAD_GPG_PASSPHRASE: ${{ secrets.LAUNCHPAD_GPG_PASSPHRASE }}
+        run: |
+          cat > "$RUNNER_TEMP/debsign-gpg-wrapper" <<'EOF'
+          #!/bin/sh
+          exec gpg --batch --yes \
+            --pinentry-mode loopback \
+            --passphrase "$LAUNCHPAD_GPG_PASSPHRASE" \
+            "$@"
+          EOF
+          chmod +x "$RUNNER_TEMP/debsign-gpg-wrapper"
+          debsign --no-re-sign -p"$RUNNER_TEMP/debsign-gpg-wrapper" \
+            -k"$LAUNCHPAD_GPG_FINGERPRINT" \
+            "$RUNNER_TEMP"/ppa-artifacts/*_source.changes
+
+      - name: Configure Launchpad SSH
+        env:
+          LAUNCHPAD_SSH_PRIVATE_KEY: ${{ secrets.LAUNCHPAD_SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$LAUNCHPAD_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519_launchpad
+          chmod 600 ~/.ssh/id_ed25519_launchpad
+          ssh-keyscan ppa.launchpad.net >> ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<'EOF'
+          Host ppa.launchpad.net
+              User xolegator
+              IdentityFile ~/.ssh/id_ed25519_launchpad
+              IdentitiesOnly yes
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Configure dput
+        run: |
+          cat > ~/.dput.cf <<'EOF'
+          [xolegator-packages]
+          fqdn = ppa.launchpad.net
+          method = sftp
+          incoming = ~xolegator/packages/ubuntu/
+          login = xolegator
+          allow_unsigned_uploads = 0
+          EOF
+
+      - name: Upload to Launchpad
+        run: |
+          dput xolegator-packages "$RUNNER_TEMP"/ppa-artifacts/*_source.changes

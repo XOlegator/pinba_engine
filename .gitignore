@@ -45,6 +45,7 @@ coverage-*.info
 !CMakePresets.json
 !.release-please-manifest.json
 !release-please-config.json
+!.github/mysql-versions.json
 
 # Generated documentation
 docs/api/
@@ -60,6 +61,28 @@ docs/docker.personal.md
 # Generated local configuration
 config.h
 src/config.h
+
+# Debian packaging build artifacts
+debian/build-mysql80/
+debian/build-mysql84/
+debian/tmp-mysql80/
+debian/tmp-mysql84/
+debian/pinba-engine-mysql-8.0/
+debian/pinba-engine-mysql-8.4/
+debian/pinba-engine-common/
+debian/files
+debian/debhelper-build-stamp
+debian/*.substvars
+debian/*.log
+debian/.debhelper/
+debian/pinba-ppa-build.mk
+
+# MySQL source tarballs used by tools/extract-mysql-headers.sh (not committed)
+vendor/*.tar.gz
+
+# CMake-generated files inside vendor/mysql-headers-* (written to
+# PINBA_MYSQL_SOURCE_DIR/builddir/ during cmake configure; reproducible)
+vendor/*/builddir/
 
 # OS files
 .DS_Store

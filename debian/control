@@ -1,0 +1,60 @@
+Source: pinba-engine
+Section: database
+Priority: optional
+Maintainer: Oleg Ekhlakov <o.ekhlakov@protonmail.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ cmake (>= 3.24),
+ libprotobuf-dev,
+ protobuf-compiler,
+ libmysqlclient-dev,
+ libssl-dev,
+ pkg-config,
+ rapidjson-dev
+Standards-Version: 4.6.2
+Homepage: https://github.com/XOlegator/pinba_engine
+Vcs-Git: https://github.com/XOlegator/pinba_engine.git
+Vcs-Browser: https://github.com/XOlegator/pinba_engine
+Rules-Requires-Root: no
+
+Package: pinba-engine-common
+Architecture: all
+Depends: ${misc:Depends}
+Description: Pinba MySQL Storage Engine — common files
+ Pinba is a MySQL storage engine used to collect and analyze PHP runtime
+ statistics sent over UDP by the Pinba PHP extension.
+ .
+ This package contains shared data files: SQL schema for default tables
+ and documentation.
+
+Package: pinba-engine-mysql-8.0
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, pinba-engine-common
+Recommends: mysql-server-8.0 | mysql-community-server-8.0
+Description: Pinba MySQL Storage Engine — MySQL 8.0
+ Pinba is a MySQL storage engine used to collect and analyze PHP runtime
+ statistics sent over UDP by the Pinba PHP extension.
+ .
+ This package contains ha_pinba.so compiled against MySQL 8.0 server headers.
+ Install this package if you run MySQL 8.0.
+ .
+ After installation, activate the plugin in MySQL:
+   INSTALL PLUGIN pinba SONAME 'ha_pinba.so';
+ Then create the default tables:
+   SOURCE /usr/share/pinba_engine/default_tables.sql
+
+Package: pinba-engine-mysql-8.4
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, pinba-engine-common
+Recommends: mysql-server-8.4 | mysql-community-server-8.4
+Description: Pinba MySQL Storage Engine — MySQL 8.4
+ Pinba is a MySQL storage engine used to collect and analyze PHP runtime
+ statistics sent over UDP by the Pinba PHP extension.
+ .
+ This package contains ha_pinba.so compiled against MySQL 8.4 server headers.
+ Install this package if you run MySQL 8.4.
+ .
+ After installation, activate the plugin in MySQL:
+   INSTALL PLUGIN pinba SONAME 'ha_pinba.so';
+ Then create the default tables:
+   SOURCE /usr/share/pinba_engine/default_tables.sql

@@ -1,0 +1,7 @@
+# Exclude local development artifacts that are not in git (gitignored or
+# personal files). dpkg-source in 3.0 (quilt) mode diffs the working tree
+# against the orig tarball; any file absent from orig causes an error.
+# The orig tarball is built with "git archive HEAD" so it contains only
+# git-tracked files.
+
+extend-diff-ignore = ^(\.venv|\.pre-commit-cache|\.claude|\.codex|\.idea|knowledge/raw|knowledge/output|knowledge/\.obsidian|vendor/mysql-headers-.*/builddir|build|build-.*|cmake-build-.*|src/include|ai_develop\.log|ai_ppa_dev\.log|pinba_engine\.code-workspace|docs/docker\.personal\.md)(/|$)

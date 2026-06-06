@@ -1,0 +1,69 @@
+---
+title: "GitHub Actions: Launchpad PPA Build + Upload"
+type: concept
+sources:
+  - raw/sessions/ppa-upload-session-2026-06-06.md
+related:
+  - wiki/concepts/debian-ppa-packaging.md
+  - wiki/concepts/launchpad-ppa-workflow.md
+confidence: medium
+updated: 2026-06-06
+---
+
+# GitHub Actions: Launchpad PPA Build + Upload
+
+Workflows for packaging `pinba_engine` into Debian source packages for multiple Ubuntu
+releases and publishing them to `ppa:xolegator/packages` from GitHub Actions.
+
+## What the workflow does
+
+1. Checks out the repository.
+2. Generates distro-specific `debian/pinba-ppa-build.mk` so the source package knows
+   which MySQL series to build on Launchpad.
+3. Rewrites `debian/changelog` to a distro-specific version such as `2.1.2-1~noble1`
+   or `2.1.2-1~resolute1`.
+4. Creates `pinba-engine_<upstream>.orig.tar.gz` with `git archive`.
+5. Builds the source package with `dpkg-buildpackage -S -sa -us -uc`.
+6. Runs `lintian` on the generated `.changes` file.
+7. Signs the `.dsc` and `.changes` files with the Launchpad GPG key.
+8. Uploads the signed source package to Launchpad with `dput` over SFTP.
+
+## Required secrets
+
+| Secret | Purpose |
+|--------|---------|
+| `LAUNCHPAD_GPG_PRIVATE_KEY` | Base64-encoded armored private key used for package signing |
+| `LAUNCHPAD_GPG_PASSPHRASE` | Passphrase for the signing key |
+| `LAUNCHPAD_GPG_FINGERPRINT` | Exact key fingerprint passed to `gpg` |
+| `LAUNCHPAD_SSH_PRIVATE_KEY` | SSH key used by `dput` for Launchpad SFTP upload |
+
+## Design notes
+
+- The workflow uses a distro matrix (`noble`, `resolute`), but not a separate GitHub
+  matrix over MySQL series. Instead, each source package carries a generated
+  `debian/pinba-ppa-build.mk` file, and `debian/rules` uses that to decide whether
+  to build `pinba-engine-mysql-8.0`, `pinba-engine-mysql-8.4`, or both.
+- `git archive` is required because `dpkg-buildpackage -S -sa` expects the matching
+  `orig.tar.gz` one directory above the package tree.
+- `dput` should be configured for `method = sftp`; Launchpad upload docs and local
+  testing both pointed to SSH-based upload as the reliable path.
+- Uploading with SFTP still needs Launchpad SSH key registration, even though the
+  package signature itself is GPG-based.
+
+## MySQL version monitoring
+
+Separate workflow: `.github/workflows/mysql-version-monitor.yml`
+
+What it does:
+- runs weekly and on manual dispatch
+- checks `libmysqlclient-dev` versions inside `ubuntu:24.04` and `ubuntu:26.04`
+- compares them with `.github/mysql-versions.json`
+- opens a GitHub issue if the tracked MySQL availability changed
+
+This workflow does not auto-upload to Launchpad because a new PPA upload still requires
+an explicit Debian revision bump.
+
+## Triggering
+
+- `release.published` for automatic PPA publication from a GitHub Release.
+- `workflow_dispatch` for manual rebuilds and version overrides.

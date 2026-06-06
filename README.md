@@ -46,3 +46,17 @@ This fork uses a semi-automated GitHub release flow with automatic `CHANGELOG.md
 ## Project Status
 
 This is an in-progress modernization fork. Interfaces, internals, and build details may continue to evolve while MySQL 8+ support is being stabilized.
+
+## License
+
+This project is licensed under the [GNU General Public License v2.0](LICENSE) (GPL-2.0-only), inheriting the license of the original Pinba Engine by Antony Dovgal.
+
+Copyright (c) 2007–2009 Antony Dovgal  
+Copyright (c) 2025–2026 Oleg Ekhlakov
+
+Third-party components bundled in this repository:
+
+| Component | Files | License |
+|---|---|---|
+| [xxHash](https://github.com/Cyan4973/xxHash) | `src/xxhash.[ch]` | BSD-2-Clause |
+| [protobuf-c](https://github.com/protobuf-c/protobuf-c) | `src/protobuf-c.h` | BSD-3-Clause |

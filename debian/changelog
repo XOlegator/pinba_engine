@@ -1,0 +1,13 @@
+pinba-engine (2.1.2-2~noble1) noble; urgency=medium
+
+  * Add rapidjson-dev to Build-Depends; MySQL 8.0/8.4 headers reference
+    rapidjson/fwd.h via sql/dd/sdi_fwd.h.
+
+ -- Oleg Ekhlakov <o.ekhlakov@protonmail.com>  Sat, 06 Jun 2026 13:00:00 +0000
+
+pinba-engine (2.1.2-1~noble1) noble; urgency=medium
+
+  * Initial Debian packaging for Ubuntu 24.04 (Noble Numbat).
+  * Includes ha_pinba.so compiled against MySQL 8.0 and MySQL 8.4 headers.
+
+ -- Oleg Ekhlakov <o.ekhlakov@protonmail.com>  Sat, 06 Jun 2026 12:00:00 +0000
