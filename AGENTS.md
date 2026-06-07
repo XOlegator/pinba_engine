@@ -93,6 +93,8 @@ Pre-commit also references `clang-format`, `cppcheck`, `cmake-lint`, and `hadoli
 
 ## Commit Messages
 
+All commit messages and PR titles/descriptions must be written in **English**.
+
 Follow `docs/releasing.md`: use Conventional Commits so Release Please can calculate SemVer and changelog entries.
 
 Allowed common types:
