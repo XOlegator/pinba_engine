@@ -276,10 +276,22 @@ jobs:
           incoming = ~xolegator/packages/ubuntu/
           login = anonymous
           allow_unsigned_uploads = 0
+          passive_ftp = 1
           EOF
 
       - name: Upload to Launchpad
         run: |
           for changes_file in "$RUNNER_TEMP"/ppa-artifacts/*_source.changes; do
-            dput xolegator-packages "$changes_file"
+            for attempt in 1 2 3; do
+              if dput xolegator-packages "$changes_file"; then
+                break
+              fi
+              if [[ $attempt -lt 3 ]]; then
+                echo "Attempt $attempt failed, retrying in 30s..."
+                sleep 30
+              else
+                echo "All $attempt attempts failed for $changes_file" >&2
+                exit 1
+              fi
+            done
           done

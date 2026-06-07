@@ -5,12 +5,32 @@ sources: []
 related:
   - wiki/index.md
 confidence: high
-updated: 2026-06-04
+updated: 2026-06-07
 ---
 
 # Activity Log
 
 Chronological record of all ingest, query, and lint operations.
+
+---
+
+## 2026-06-07 — Workflow Fix: Launchpad FTP upload 550 error — passive mode
+
+**Symptom:** `upload-to-ppa` job: noble upload succeeds, resolute upload fails with
+`550 Requested action not taken: internal server error`. dput prints:
+`Note: This error might indicate a problem with your passive_ftp setting.`
+
+**Root cause:** GitHub Actions runners are behind NAT. Active FTP mode requires
+Launchpad's server to open a data connection back to the runner, which NAT blocks.
+This is a different issue from the earlier orig-tarball conflict (fixed by `-sd`).
+
+**Fix applied in #34:**
+- `passive_ftp = 1` in dput config — client initiates data connection, works through NAT
+- retry loop (3 attempts, 30 s gap) — resilience against transient Launchpad FTP errors
+
+**Distinguishing from prior issue (noble OK / resolute fails):**
+- Prior (2026-06-06): resolute failed because orig.tar.gz was uploaded twice → fixed by `-sd`
+- Current (2026-06-07): resolute failed with `550` on `.dsc` upload → FTP passive mode
 
 ---
 
