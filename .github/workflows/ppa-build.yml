@@ -4,20 +4,23 @@ on:
   release:
     types:
       - published
+  push:
+    branches: [master]
+    paths:
+      - '.github/mysql-versions.json'
   workflow_dispatch:
     inputs:
       source_ref:
-        description: Git ref to package, e.g. v2.2.0 or a commit SHA; required for manual uploads
+        description: Git ref to package, e.g. v2.3.0 or a commit SHA; required for manual uploads
         required: false
         type: string
       upstream_version:
-        description: Upstream version override, e.g. 2.1.2
+        description: Upstream version override, e.g. 2.3.0
         required: false
         type: string
       debian_revision:
-        description: Debian revision number used in {version}-{revision}~{suite}1
+        description: Override debian_revision (default — read from mysql-versions.json)
         required: false
-        default: "1"
         type: string
       target_distribution:
         description: Limit workflow_dispatch to one distro or build both
@@ -51,18 +54,43 @@ jobs:
     outputs:
       include: ${{ steps.matrix.outputs.include }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.source_ref || github.sha }}
+
       - name: Resolve target matrix
         id: matrix
         run: |
+          MYSQL80=$(jq -r '.noble.mysql80 // "8.0.46"'   .github/mysql-versions.json)
+          MYSQL84=$(jq -r '.resolute.mysql84 // "8.4.9"' .github/mysql-versions.json)
+          NOBLE_REV=$(jq -r '.noble.debian_revision    // 1' .github/mysql-versions.json)
+          RESOLUTE_REV=$(jq -r '.resolute.debian_revision // 1' .github/mysql-versions.json)
+
+          echo "MySQL versions from JSON: 8.0=$MYSQL80  8.4=$MYSQL84"
+          echo "Debian revisions:  noble=$NOBLE_REV  resolute=$RESOLUTE_REV"
+
           case "${{ github.event_name }}:${{ inputs.target_distribution || 'all' }}" in
             workflow_dispatch:noble)
-              include='[{"distribution":"noble","ubuntu_version":"24.04","enable_mysql80":"1","enable_mysql84":"0","mysql80_version":"8.0.46","mysql84_version":"8.4.9","include_orig":"1"}]'
+              include=$(jq -cn \
+                --arg m80 "$MYSQL80" --arg m84 "$MYSQL84" --argjson rev "$NOBLE_REV" \
+                '[{"distribution":"noble","ubuntu_version":"24.04","enable_mysql80":"1","enable_mysql84":"0",
+                   "mysql80_version":$m80,"mysql84_version":$m84,"include_orig":"1","debian_revision":$rev}]')
               ;;
             workflow_dispatch:resolute)
-              include='[{"distribution":"resolute","ubuntu_version":"26.04","enable_mysql80":"0","enable_mysql84":"1","mysql80_version":"8.0.46","mysql84_version":"8.4.9","include_orig":"1"}]'
+              include=$(jq -cn \
+                --arg m80 "$MYSQL80" --arg m84 "$MYSQL84" --argjson rev "$RESOLUTE_REV" \
+                '[{"distribution":"resolute","ubuntu_version":"26.04","enable_mysql80":"0","enable_mysql84":"1",
+                   "mysql80_version":$m80,"mysql84_version":$m84,"include_orig":"1","debian_revision":$rev}]')
               ;;
             *)
-              include='[{"distribution":"noble","ubuntu_version":"24.04","enable_mysql80":"1","enable_mysql84":"0","mysql80_version":"8.0.46","mysql84_version":"8.4.9","include_orig":"1"},{"distribution":"resolute","ubuntu_version":"26.04","enable_mysql80":"0","enable_mysql84":"1","mysql80_version":"8.0.46","mysql84_version":"8.4.9","include_orig":"0"}]'
+              include=$(jq -cn \
+                --arg m80 "$MYSQL80" --arg m84 "$MYSQL84" \
+                --argjson nrev "$NOBLE_REV" --argjson rrev "$RESOLUTE_REV" \
+                '[{"distribution":"noble","ubuntu_version":"24.04","enable_mysql80":"1","enable_mysql84":"0",
+                   "mysql80_version":$m80,"mysql84_version":$m84,"include_orig":"1","debian_revision":$nrev},
+                  {"distribution":"resolute","ubuntu_version":"26.04","enable_mysql80":"0","enable_mysql84":"1",
+                   "mysql80_version":$m80,"mysql84_version":$m84,"include_orig":"0","debian_revision":$rrev}]')
               ;;
           esac
 
@@ -81,7 +109,7 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.upload }}" == "true" ]]; then
             if [[ -z "${{ github.event.inputs.source_ref || '' }}" ]]; then
-              echo "workflow_dispatch uploads must provide source_ref (for example v2.2.0)." >&2
+              echo "workflow_dispatch uploads must provide source_ref (for example v2.3.0)." >&2
               exit 1
             fi
           fi
@@ -121,10 +149,18 @@ jobs:
             upstream_version="$(jq -r '."."' .release-please-manifest.json)"
           fi
 
-          full_version="${upstream_version}-${{ github.event.inputs.debian_revision || '1' }}~${{ matrix.distribution }}1"
+          # Debian revision: manual override → matrix value from JSON → fallback 1
+          if [[ -n "${{ github.event.inputs.debian_revision || '' }}" ]]; then
+            deb_rev="${{ github.event.inputs.debian_revision }}"
+          else
+            deb_rev="${{ matrix.debian_revision }}"
+          fi
+
+          full_version="${upstream_version}-${deb_rev}~${{ matrix.distribution }}1"
 
           echo "upstream_version=$upstream_version" >> "$GITHUB_OUTPUT"
           echo "full_version=$full_version" >> "$GITHUB_OUTPUT"
+          echo "Building: $full_version"
 
       - name: Generate distro build configuration
         run: |
@@ -182,7 +218,10 @@ jobs:
     name: Sign and upload to Launchpad
     needs: build-source-package
     runs-on: ubuntu-24.04
-    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.upload)
+    if: >-
+      github.event_name == 'release' ||
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && inputs.upload == true)
     steps:
       - name: Install upload tools
         run: |

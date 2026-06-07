@@ -4,114 +4,221 @@ on:
   schedule:
     - cron: '0 6 * * 1'
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Check versions but do not create PR or update files'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
   issues: write
 
 jobs:
-  check-versions:
-    name: Check MySQL versions (${{ matrix.suite }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - suite: noble
-            container_image: ubuntu:24.04
-          - suite: resolute
-            container_image: ubuntu:26.04
-    container:
-      image: ${{ matrix.container_image }}
+  detect-versions:
+    name: Detect MySQL versions in Ubuntu suites
+    runs-on: ubuntu-24.04
+    outputs:
+      noble_80: ${{ steps.noble.outputs.mysql80 }}
+      noble_84: ${{ steps.noble.outputs.mysql84 }}
+      resolute_80: ${{ steps.resolute.outputs.mysql80 }}
+      resolute_84: ${{ steps.resolute.outputs.mysql84 }}
     steps:
-      - name: Install tools
+      - name: Detect noble (24.04) versions
+        id: noble
         run: |
-          apt-get update -q
-          apt-get install -y --no-install-recommends \
-            ca-certificates \
-            git \
-            jq
+          VERSIONS=$(docker run --rm ubuntu:24.04 bash -c "
+            apt-get update -q >/dev/null 2>&1
+            apt-cache madison libmysqlclient-dev 2>/dev/null
+          " | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
+          V80=$(echo "$VERSIONS" | grep -E '^8\.0\.' | sort -V | tail -1 || true)
+          V84=$(echo "$VERSIONS" | grep -E '^8\.4\.' | sort -V | tail -1 || true)
+          echo "mysql80=${V80:-null}" >> "$GITHUB_OUTPUT"
+          echo "mysql84=${V84:-null}" >> "$GITHUB_OUTPUT"
+          echo "Noble: mysql80=${V80:-null} mysql84=${V84:-null}"
 
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Detect available MySQL versions
-        id: detect
+      - name: Detect resolute (26.04) versions
+        id: resolute
         run: |
-          result="$(bash "$GITHUB_WORKSPACE/.github/scripts/check-mysql-versions.sh" "${{ matrix.suite }}")"
-          echo "$result" > /tmp/mysql-version-result.json
-          cat /tmp/mysql-version-result.json
-          echo "mysql80=$(jq -r '.mysql80 // empty' /tmp/mysql-version-result.json)" >> "$GITHUB_OUTPUT"
-          echo "mysql84=$(jq -r '.mysql84 // empty' /tmp/mysql-version-result.json)" >> "$GITHUB_OUTPUT"
+          VERSIONS=$(docker run --rm ubuntu:26.04 bash -c "
+            apt-get update -q >/dev/null 2>&1
+            apt-cache madison libmysqlclient-dev 2>/dev/null
+          " | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
+          V80=$(echo "$VERSIONS" | grep -E '^8\.0\.' | sort -V | tail -1 || true)
+          V84=$(echo "$VERSIONS" | grep -E '^8\.4\.' | sort -V | tail -1 || true)
+          echo "mysql80=${V80:-null}" >> "$GITHUB_OUTPUT"
+          echo "mysql84=${V84:-null}" >> "$GITHUB_OUTPUT"
+          echo "Resolute: mysql80=${V80:-null} mysql84=${V84:-null}"
+
+  update-if-changed:
+    name: Update headers and create PR if versions changed
+    needs: detect-versions
+    runs-on: ubuntu-24.04
+    env:
+      NOBLE_80: ${{ needs.detect-versions.outputs.noble_80 }}
+      NOBLE_84: ${{ needs.detect-versions.outputs.noble_84 }}
+      RESOLUTE_80: ${{ needs.detect-versions.outputs.resolute_80 }}
+      RESOLUTE_84: ${{ needs.detect-versions.outputs.resolute_84 }}
+    steps:
+      - uses: actions/checkout@v6
 
       - name: Compare with tracked versions
         id: compare
-        env:
-          SUITE: ${{ matrix.suite }}
-          DETECTED_MYSQL80: ${{ steps.detect.outputs.mysql80 }}
-          DETECTED_MYSQL84: ${{ steps.detect.outputs.mysql84 }}
         run: |
-          known_mysql80="$(jq -r --arg suite "$SUITE" '.[$suite].mysql80 // empty' .github/mysql-versions.json)"
-          known_mysql84="$(jq -r --arg suite "$SUITE" '.[$suite].mysql84 // empty' .github/mysql-versions.json)"
+          KNOWN_N80=$(jq -r '.noble.mysql80 // "null"' .github/mysql-versions.json)
+          KNOWN_N84=$(jq -r '.noble.mysql84 // "null"' .github/mysql-versions.json)
+          KNOWN_R80=$(jq -r '.resolute.mysql80 // "null"' .github/mysql-versions.json)
+          KNOWN_R84=$(jq -r '.resolute.mysql84 // "null"' .github/mysql-versions.json)
 
-          changed=false
-          message=""
+          echo "=== Known ==="
+          echo "Noble:    mysql80=$KNOWN_N80  mysql84=$KNOWN_N84"
+          echo "Resolute: mysql80=$KNOWN_R80  mysql84=$KNOWN_R84"
+          echo "=== Detected ==="
+          echo "Noble:    mysql80=$NOBLE_80  mysql84=$NOBLE_84"
+          echo "Resolute: mysql80=$RESOLUTE_80  mysql84=$RESOLUTE_84"
 
-          if [[ "$DETECTED_MYSQL80" != "$known_mysql80" ]]; then
-            changed=true
-            message="${message}mysql80: ${known_mysql80:-none} -> ${DETECTED_MYSQL80:-none}; "
+          NOBLE_CHANGED=false
+          RESOLUTE_CHANGED=false
+          CHANGES=""
+
+          if [[ "$NOBLE_80" != "null" && "$NOBLE_80" != "$KNOWN_N80" ]]; then
+            NOBLE_CHANGED=true
+            CHANGES="${CHANGES}noble/mysql80: ${KNOWN_N80} → ${NOBLE_80}; "
+          fi
+          if [[ "$NOBLE_84" != "null" && "$NOBLE_84" != "$KNOWN_N84" ]]; then
+            NOBLE_CHANGED=true
+            CHANGES="${CHANGES}noble/mysql84: ${KNOWN_N84} → ${NOBLE_84}; "
+          fi
+          if [[ "$RESOLUTE_80" != "null" && "$RESOLUTE_80" != "$KNOWN_R80" ]]; then
+            RESOLUTE_CHANGED=true
+            CHANGES="${CHANGES}resolute/mysql80: ${KNOWN_R80} → ${RESOLUTE_80}; "
+          fi
+          if [[ "$RESOLUTE_84" != "null" && "$RESOLUTE_84" != "$KNOWN_R84" ]]; then
+            RESOLUTE_CHANGED=true
+            CHANGES="${CHANGES}resolute/mysql84: ${KNOWN_R84} → ${RESOLUTE_84}; "
           fi
 
-          if [[ "$DETECTED_MYSQL84" != "$known_mysql84" ]]; then
-            changed=true
-            message="${message}mysql84: ${known_mysql84:-none} -> ${DETECTED_MYSQL84:-none}; "
+          ANY_CHANGED=false
+          [[ "$NOBLE_CHANGED" == "true" || "$RESOLUTE_CHANGED" == "true" ]] && ANY_CHANGED=true || true
+
+          echo "noble_changed=$NOBLE_CHANGED" >> "$GITHUB_OUTPUT"
+          echo "resolute_changed=$RESOLUTE_CHANGED" >> "$GITHUB_OUTPUT"
+          echo "any_changed=$ANY_CHANGED" >> "$GITHUB_OUTPUT"
+          # Strip trailing "; "
+          echo "changes=${CHANGES%"; "}" >> "$GITHUB_OUTPUT"
+          echo "=== any_changed=$ANY_CHANGED ==="
+
+      - name: Report and exit (dry run)
+        if: inputs.dry_run == true
+        run: |
+          echo "=== DRY RUN — no files modified ==="
+          echo "any_changed: ${{ steps.compare.outputs.any_changed }}"
+          echo "changes:     ${{ steps.compare.outputs.changes }}"
+          exit 0
+
+      - name: Install tools for header extraction
+        if: steps.compare.outputs.any_changed == 'true'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends wget ca-certificates
+
+      - name: Update MySQL 8.0 vendor headers
+        if: steps.compare.outputs.noble_changed == 'true' && env.NOBLE_80 != 'null'
+        run: bash tools/extract-mysql-headers.sh 8.0 "$NOBLE_80"
+
+      - name: Update MySQL 8.4 vendor headers
+        if: steps.compare.outputs.resolute_changed == 'true' && env.RESOLUTE_84 != 'null'
+        run: bash tools/extract-mysql-headers.sh 8.4 "$RESOLUTE_84"
+
+      - name: Update mysql-versions.json
+        if: steps.compare.outputs.any_changed == 'true'
+        run: |
+          JSON=$(cat .github/mysql-versions.json)
+
+          if [[ "${{ steps.compare.outputs.noble_changed }}" == "true" ]]; then
+            JSON=$(echo "$JSON" | jq \
+              --arg v80 "$NOBLE_80" \
+              --arg v84 "$NOBLE_84" \
+              '.noble.mysql80 = (if $v80 == "null" then null else $v80 end) |
+               .noble.mysql84 = (if $v84 == "null" then null else $v84 end) |
+               .noble.debian_revision += 1')
           fi
 
-          echo "changed=$changed" >> "$GITHUB_OUTPUT"
-          echo "message=${message% }" >> "$GITHUB_OUTPUT"
+          if [[ "${{ steps.compare.outputs.resolute_changed }}" == "true" ]]; then
+            JSON=$(echo "$JSON" | jq \
+              --arg v80 "$RESOLUTE_80" \
+              --arg v84 "$RESOLUTE_84" \
+              '.resolute.mysql80 = (if $v80 == "null" then null else $v80 end) |
+               .resolute.mysql84 = (if $v84 == "null" then null else $v84 end) |
+               .resolute.debian_revision += 1')
+          fi
 
-      - name: Open issue for changed MySQL versions
-        if: steps.compare.outputs.changed == 'true'
-        uses: actions/github-script@v9
-        env:
-          SUITE: ${{ matrix.suite }}
-          CHANGE_MESSAGE: ${{ steps.compare.outputs.message }}
-          DETECTED_MYSQL80: ${{ steps.detect.outputs.mysql80 }}
-          DETECTED_MYSQL84: ${{ steps.detect.outputs.mysql84 }}
+          echo "$JSON" | jq . > .github/mysql-versions.json
+          echo "=== Updated mysql-versions.json ==="
+          cat .github/mysql-versions.json
+
+      - name: Update Dockerfile MySQL image versions
+        if: steps.compare.outputs.any_changed == 'true'
+        run: |
+          if [[ "${{ steps.compare.outputs.noble_changed }}" == "true" && "$NOBLE_80" != "null" ]]; then
+            sed -i -E "s|(ARG MYSQL_IMAGE=mysql:8\.0\.[0-9]+)[^[:space:]\"]*|\1-bookworm|" Dockerfile.mysql80
+            sed -i -E "s|(ARG MYSQL_IMAGE=mysql:8\.0\.)[0-9]+|\1${NOBLE_80#8.0.}|" Dockerfile.mysql80
+            # Reconstruct: replace entire version in the line
+            sed -i "s|ARG MYSQL_IMAGE=mysql:8\.0\.[0-9.]*[^[:space:]\"]*|ARG MYSQL_IMAGE=mysql:${NOBLE_80}-bookworm|" Dockerfile.mysql80
+          fi
+          if [[ "${{ steps.compare.outputs.resolute_changed }}" == "true" && "$RESOLUTE_84" != "null" ]]; then
+            sed -i "s|ARG MYSQL_IMAGE=mysql:8\.4\.[0-9.]*[^[:space:]\"]*|ARG MYSQL_IMAGE=mysql:${RESOLUTE_84}|" Dockerfile.mysql84
+          fi
+          echo "=== Dockerfile.mysql80 MYSQL_IMAGE line ==="
+          grep 'ARG MYSQL_IMAGE' Dockerfile.mysql80 || true
+          echo "=== Dockerfile.mysql84 MYSQL_IMAGE line ==="
+          grep 'ARG MYSQL_IMAGE' Dockerfile.mysql84 || true
+
+      - name: Create update PR
+        if: steps.compare.outputs.any_changed == 'true'
+        id: create-pr
+        uses: peter-evans/create-pull-request@v7
         with:
-          script: |
-            const suite = process.env.SUITE;
-            const title = `Update PPA MySQL matrix for ${suite}: ${process.env.CHANGE_MESSAGE}`;
-            const { data: issues } = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: "open",
-              labels: "ppa,automated",
-              per_page: 100,
-            });
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: chore/mysql-version-update
+          delete-branch: true
+          commit-message: |
+            chore(deps): update MySQL vendor headers
 
-            if (issues.some((issue) => issue.title === title)) {
-              core.info(`Issue already open: ${title}`);
-              return;
-            }
+            ${{ steps.compare.outputs.changes }}
+          title: "chore(deps): update MySQL vendor headers (${{ steps.compare.outputs.changes }})"
+          body: |
+            Automated MySQL version update detected by the weekly monitor.
 
-            const body = [
-              `MySQL availability changed for Ubuntu suite \`${suite}\`.`,
-              ``,
-              `Detected versions:`,
-              `- mysql80: ${process.env.DETECTED_MYSQL80 || "none"}`,
-              `- mysql84: ${process.env.DETECTED_MYSQL84 || "none"}`,
-              ``,
-              `Follow-up:`,
-              `- update \`.github/mysql-versions.json\``,
-              `- update \`.github/workflows/ppa-build.yml\` matrix if the supported distro/series set changed`,
-              `- bump Debian revision before re-uploading to Launchpad`,
-            ].join("\n");
+            **Changes:** ${{ steps.compare.outputs.changes }}
 
-            await github.rest.issues.create({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              title,
-              body,
-              labels: ["ppa", "automated"],
-            });
+            **What this PR does:**
+            - Updates `vendor/mysql-headers-*` to headers from the new MySQL tarball
+            - Updates `.github/mysql-versions.json` (new versions + incremented `debian_revision`)
+            - Updates `Dockerfile.mysql80` / `Dockerfile.mysql84` `MYSQL_IMAGE` ARG
+
+            **Automatic release cycle on merge:**
+            - `ppa-build` triggers (path filter on `mysql-versions.json`) → rebuilds `.deb` packages and uploads to Launchpad PPA
+            - `docker` triggers (path filter on `Dockerfile.*`) → rebuilds and pushes Docker images to Docker Hub
+
+            > Created automatically by the `mysql-version-monitor` workflow.
+          labels: |
+            ppa
+            automated
+            dependencies
+
+      - name: Enable auto-merge on PR
+        if: steps.create-pr.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr merge "${{ steps.create-pr.outputs.pull-request-number }}" \
+            --auto --squash \
+            --repo "${{ github.repository }}" \
+          || echo "::warning::Auto-merge could not be enabled — enable branch protection with required CI checks to activate it. The PR can be merged manually."
+
+      - name: No changes detected
+        if: steps.compare.outputs.any_changed != 'true'
+        run: echo "All MySQL versions are up to date. No action needed."
