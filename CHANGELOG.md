@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0](https://github.com/XOlegator/pinba_engine/compare/v2.3.0...v2.4.0) (2026-06-07)
+
+
+### Features
+
+* **ci:** automate full release cycle on MySQL version updates ([#32](https://github.com/XOlegator/pinba_engine/issues/32)) ([c6dc449](https://github.com/XOlegator/pinba_engine/commit/c6dc449cd978059db990b46afeaafe29869cb4e8))
+
 ## [2.3.0](https://github.com/XOlegator/pinba_engine/compare/v2.2.1...v2.3.0) (2026-06-07)
 
 
