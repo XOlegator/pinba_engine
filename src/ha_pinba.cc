@@ -6345,7 +6345,7 @@ inline int ha_pinba::tag2_info_fetch_row(unsigned char *) /* {{{ */
     }                                                                                          \
                                                                                                \
     if (UNLIKELY(!data)) {                                                                     \
-      key_map = pinba_map_next(report->results, index_key, sizeof(index_key));                  \
+      key_map = pinba_map_next(report->results, index_key, sizeof(index_key));                 \
       free(this_index[0].str.val);                                                             \
       this_index[0].str.val = nullptr;                                                         \
                                                                                                \
@@ -7168,7 +7168,7 @@ inline int ha_pinba::tagN_info_fetch_row(unsigned char *) /* {{{ */
     }                                                                                \
                                                                                      \
     if (UNLIKELY(!data)) {                                                           \
-      key_map = pinba_map_next(report->results, index_key, sizeof(index_key));        \
+      key_map = pinba_map_next(report->results, index_key, sizeof(index_key));       \
       free(this_index[0].str.val);                                                   \
       this_index[0].str.val = nullptr;                                               \
       if (key_map) {                                                                 \
