@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0](https://github.com/XOlegator/pinba_engine/compare/v2.5.0...v2.6.0) (2026-06-07)
+
+
+### Features
+
+* **engine:** close all roadmap items and remove roadmap.md ([#42](https://github.com/XOlegator/pinba_engine/issues/42)) ([e1bc191](https://github.com/XOlegator/pinba_engine/commit/e1bc19115edd011d5d92f4d1e3720c4d6320e467))
+
 ## [2.5.0](https://github.com/XOlegator/pinba_engine/compare/v2.4.2...v2.5.0) (2026-06-07)
 
 
