@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="generic">
+  <id>io.github.xolegator.pinba-engine</id>
+  <metadata_license>MIT</metadata_license>
+  <project_license>GPL-2.0-only</project_license>
+
+  <name>Pinba Engine</name>
+  <summary>MySQL storage engine for PHP runtime statistics</summary>
+
+  <description>
+    <p>
+      Pinba is a MySQL storage engine that collects and processes PHP runtime
+      statistics sent over UDP by the Pinba PHP extension. It provides
+      real-time per-script performance monitoring without any additional
+      infrastructure.
+    </p>
+    <p>
+      This fork adds support for MySQL 8.0 and MySQL 8.4, continuing the
+      original project by Antony Dovgal.
+    </p>
+  </description>
+
+  <developer id="io.github.xolegator">
+    <name>Oleg Ekhlakov</name>
+  </developer>
+
+  <url type="homepage">https://github.com/XOlegator/pinba_engine</url>
+  <url type="bugtracker">https://github.com/XOlegator/pinba_engine/issues</url>
+  <url type="vcs-browser">https://github.com/XOlegator/pinba_engine</url>
+
+  <categories>
+    <category>Database</category>
+  </categories>
+
+  <releases>
+    <release version="2.2.1" date="2026-06-06"/>
+    <release version="2.1.2" date="2026-06-06"/>
+  </releases>
+
+  <content_rating type="oars-1.1"/>
+</component>
