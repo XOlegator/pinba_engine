@@ -41,6 +41,7 @@ benchmark_results/
 *.profdata
 coverage-*.info
 *.xml
+!debian/*.metainfo.xml
 *.json
 !CMakePresets.json
 !.release-please-manifest.json

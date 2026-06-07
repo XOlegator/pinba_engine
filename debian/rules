@@ -78,5 +78,7 @@ ifeq ($(ENABLE_MYSQL84),1)
 else
 	dh_install --sourcedir=debian/tmp-mysql80 -ppinba-engine-common
 endif
+	install -D -m 644 debian/pinba-engine.metainfo.xml \
+		$(CURDIR)/debian/pinba-engine-common/usr/share/metainfo/io.github.xolegator.pinba-engine.metainfo.xml
 
 override_dh_auto_test: ;
