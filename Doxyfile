@@ -17,8 +17,8 @@ USE_MDFILE_AS_MAINPAGE = README.md
 INPUT                  = README.md \
                          src/ha_pinba.h src/pinba.h src/pinba_types.h \
                          src/pinba_limits.h src/threadpool.h \
-                         docs/build.md docs/docker.md docs/releasing.md \
-                         docs/roadmap.md
+                         docs/build.md docs/docker.md docs/tables.md \
+                         docs/releasing.md
 RECURSIVE              = NO
 EXCLUDE_PATTERNS       = */xxhash* */protobuf-c* */pinba.pb-c*
 FILE_PATTERNS          = *.h *.md

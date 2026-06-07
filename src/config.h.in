@@ -19,7 +19,7 @@
 #undef HAVE_SYSCONF
 
 /* custom build string */
-#undef PINBA_BUILD_STRING
+#cmakedefine PINBA_BUILD_STRING "@PINBA_BUILD_STRING@"
 
 /* vcs branch */
 #undef VCS_BRANCH

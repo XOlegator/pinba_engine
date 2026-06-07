@@ -364,6 +364,7 @@ if(PINBA_WITH_TESTS)
   target_include_directories(pinba_test PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
+set(PINBA_BUILD_STRING "${PROJECT_VERSION}")
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/src/config.h @ONLY)
 
 find_package(Git QUIET)
