@@ -17,8 +17,10 @@
 #ifndef HAVE_PINBA_MAP_H
 #define HAVE_PINBA_MAP_H
 
-void *pinba_map_first(void *map_report, char *index_to_fill);
-void *pinba_map_next(void *map_report, char *index_to_fill);
+#include <cstddef>
+
+void *pinba_map_first(void *map_report, char *index_to_fill, size_t buf_size = 8192);
+void *pinba_map_next(void *map_report, char *index_to_fill, size_t buf_size = 8192);
 void *pinba_map_get(void *map_report, const char *index);
 void *pinba_map_add(void *map_report, const char *index, const void *report);
 int pinba_map_delete(void *map_report, const char *index);

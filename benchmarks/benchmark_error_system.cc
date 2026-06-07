@@ -3,9 +3,11 @@
  * Benchmarks for error handling system
  */
 
-#include "pinba_error_modern.h"
 #include <benchmark/benchmark.h>
+
 #include <exception>
+
+#include "pinba_error_modern.h"
 
 using namespace pinba;
 
@@ -35,8 +37,7 @@ BENCHMARK(BM_ResultSuccess);
 
 static void BM_ResultError(benchmark::State &state) {
   for (auto _ : state) {
-    auto result =
-        Result<int>::error(PinbaErrorCode::INVALID_PACKET, "Error message");
+    auto result = Result<int>::error(PinbaErrorCode::INVALID_PACKET, "Error message");
     benchmark::DoNotOptimize(result);
   }
 }

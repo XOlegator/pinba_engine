@@ -91,6 +91,23 @@ pre-commit run --all-files
 
 Pre-commit also references `clang-format`, `cppcheck`, `cmake-lint`, and `hadolint`; install these locally when working on relevant files.
 
+## Branching and Pull Requests
+
+All development must happen in a dedicated branch, never directly on `master`.
+
+**Workflow:**
+1. Create a branch from the current `master`: `git checkout -b <type>/<short-description>`
+2. Make all commits on that branch following the Conventional Commits rules below.
+3. Open a Pull Request targeting `master` — never push commits directly to `master`.
+4. The PR title must follow the same Conventional Commits format (e.g. `fix(build): ...`).
+5. Merge only after CI passes; use squash merge.
+
+Branch naming convention: `<type>/<short-kebab-description>`, for example:
+- `fix/snprintf-overflow-pinba-map`
+- `feat/mysql-version-monitor`
+- `docs/update-agents-branching-rules`
+- `chore/update-vendor-headers`
+
 ## Commit Messages
 
 All commit messages and PR titles/descriptions must be written in **English**.

@@ -20,9 +20,9 @@
 
 uint64_t murmurhash3_64(const uint8_t *str, uint64_t len, uint32_t seed) /* {{{ */
 {
-	uint64_t res[2];
-	
-	MurmurHash3_x64_128(str, len, seed, res);
-	return res[0];
+  uint64_t res[2];
+
+  MurmurHash3_x64_128(str, len, seed, res);
+  return res[0];
 }
 /* }}} */

@@ -6311,7 +6311,7 @@ inline int ha_pinba::tag2_info_fetch_row(unsigned char *) /* {{{ */
                                                                                                \
   pthread_rwlock_rdlock(&report->std.lock);                                                    \
   if (this_index[0].str.val == nullptr) {                                                      \
-    key_map = pinba_map_first(report->results, index_key);                                     \
+    key_map = pinba_map_first(report->results, index_key, sizeof(index_key));                  \
                                                                                                \
     if (!key_map) {                                                                            \
       pthread_rwlock_unlock(&report->std.lock);                                                \
@@ -6345,7 +6345,7 @@ inline int ha_pinba::tag2_info_fetch_row(unsigned char *) /* {{{ */
     }                                                                                          \
                                                                                                \
     if (UNLIKELY(!data)) {                                                                     \
-      key_map = pinba_map_next(report->results, index_key);                                    \
+      key_map = pinba_map_next(report->results, index_key, sizeof(index_key));                 \
       free(this_index[0].str.val);                                                             \
       this_index[0].str.val = nullptr;                                                         \
                                                                                                \
@@ -6685,7 +6685,7 @@ inline int ha_pinba::tag2_report2_fetch_row(unsigned char *) /* {{{ */
                                                                                                \
   pthread_rwlock_rdlock(&report->std.lock);                                                    \
   if (!this_index[0].str.val) {                                                                \
-    key_map = pinba_map_first(report->results, index_key);                                     \
+    key_map = pinba_map_first(report->results, index_key, sizeof(index_key));                  \
     if (LIKELY(key_map != nullptr)) {                                                          \
       this_index[0].str.val = strdup(index_key);                                               \
     }                                                                                          \
@@ -7132,7 +7132,7 @@ inline int ha_pinba::tagN_info_fetch_row(unsigned char *) /* {{{ */
                                                                                      \
   pthread_rwlock_rdlock(&report->std.lock);                                          \
   if (this_index[0].str.val == nullptr) {                                            \
-    key_map = pinba_map_first(report->results, index_key);                           \
+    key_map = pinba_map_first(report->results, index_key, sizeof(index_key));        \
     if (!key_map) {                                                                  \
       free(index);                                                                   \
       pthread_rwlock_unlock(&report->std.lock);                                      \
@@ -7168,7 +7168,7 @@ inline int ha_pinba::tagN_info_fetch_row(unsigned char *) /* {{{ */
     }                                                                                \
                                                                                      \
     if (UNLIKELY(!data)) {                                                           \
-      key_map = pinba_map_next(report->results, index_key);                          \
+      key_map = pinba_map_next(report->results, index_key, sizeof(index_key));       \
       free(this_index[0].str.val);                                                   \
       this_index[0].str.val = nullptr;                                               \
       if (key_map) {                                                                 \

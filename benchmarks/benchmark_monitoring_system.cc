@@ -3,10 +3,12 @@
  * Benchmarks for monitoring system
  */
 
-#include "pinba_monitoring_modern.h"
 #include <benchmark/benchmark.h>
+
 #include <thread>
 #include <vector>
+
+#include "pinba_monitoring_modern.h"
 
 using namespace pinba;
 
@@ -58,8 +60,7 @@ BENCHMARK(BM_GaugeIncrement);
 
 static void BM_HistogramObserve(benchmark::State &state) {
   std::vector<double> buckets = {0.1, 0.5, 1.0, 5.0, 10.0};
-  auto &histogram =
-      MetricsRegistry::instance().histogram("bench_histogram", buckets);
+  auto &histogram = MetricsRegistry::instance().histogram("bench_histogram", buckets);
 
   for (auto _ : state) {
     histogram.observe(1.5);

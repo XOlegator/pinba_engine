@@ -47,8 +47,8 @@ class pinba_map {
   }
   int data_add(const char *index, const void *report);
   int data_delete(const char *index);
-  void *data_first(char *first_index);
-  void *data_next(char *index);
+  void *data_first(char *first_index, size_t buf_size);
+  void *data_next(char *index, size_t buf_size);
   void *data_get(const char *index);
   int is_empty();
   size_t size();
@@ -76,18 +76,18 @@ int pinba_map::data_delete(const char *index) /* {{{ */
 }
 /* }}} */
 
-void *pinba_map::data_first(char *index_to_fill) /* {{{ */
+void *pinba_map::data_first(char *index_to_fill, size_t buf_size) /* {{{ */
 {
   dense_hash_t::iterator it = hash_map.begin();
   if (it == hash_map.end()) {
     return nullptr;
   }
-  snprintf(index_to_fill, PINBA_TAG_VALUE_SIZE, "%s", it->first);
+  snprintf(index_to_fill, buf_size, "%s", it->first);
   return (void *)it->second;
 }
 /* }}} */
 
-void *pinba_map::data_next(char *index_to_fill) /* {{{ */
+void *pinba_map::data_next(char *index_to_fill, size_t buf_size) /* {{{ */
 {
   dense_hash_t::iterator it = hash_map.find(index_to_fill);
   if (it == hash_map.end()) {
@@ -99,7 +99,7 @@ void *pinba_map::data_next(char *index_to_fill) /* {{{ */
     return nullptr;
   }
 
-  snprintf(index_to_fill, PINBA_TAG_VALUE_SIZE, "%s", it->first);
+  snprintf(index_to_fill, buf_size, "%s", it->first);
   return (void *)it->second;
 }
 /* }}} */
@@ -136,18 +136,18 @@ size_t pinba_map::size() /* {{{ */
 }
 /* }}} */
 
-void *pinba_map_first(void *map_report, char *index_to_fill) /* {{{ */
+void *pinba_map_first(void *map_report, char *index_to_fill, size_t buf_size) /* {{{ */
 {
   if (!map_report) {
     return nullptr;
   }
 
   pinba_map *map = static_cast<pinba_map *>(map_report);
-  return map->data_first(index_to_fill);
+  return map->data_first(index_to_fill, buf_size);
 }
 /* }}} */
 
-void *pinba_map_next(void *map_report, char *index_to_fill) /* {{{ */
+void *pinba_map_next(void *map_report, char *index_to_fill, size_t buf_size) /* {{{ */
 {
   if (!map_report) {
     return nullptr;
@@ -155,7 +155,7 @@ void *pinba_map_next(void *map_report, char *index_to_fill) /* {{{ */
 
   pinba_map *map = static_cast<pinba_map *>(map_report);
 
-  return map->data_next(index_to_fill);
+  return map->data_next(index_to_fill, buf_size);
 }
 /* }}} */
 
