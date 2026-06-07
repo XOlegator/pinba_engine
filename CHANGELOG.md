@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0](https://github.com/XOlegator/pinba_engine/compare/v2.4.2...v2.5.0) (2026-06-07)
+
+
+### Features
+
+* **docs:** add doxygen-awesome theme, source browser, and call graphs ([#39](https://github.com/XOlegator/pinba_engine/issues/39)) ([1488f4c](https://github.com/XOlegator/pinba_engine/commit/1488f4ca29d254d6043db89f0b97ea15ece77a88))
+
 ## [2.4.2](https://github.com/XOlegator/pinba_engine/compare/v2.4.1...v2.4.2) (2026-06-07)
 
 
