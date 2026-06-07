@@ -11,48 +11,57 @@ related:
   - wiki/concepts/cmake-build-system.md
   - wiki/concepts/launchpad-ppa-workflow.md
 confidence: high
-updated: 2026-06-06
+updated: 2026-06-07
 ---
 
 # Debian/PPA Packaging for MySQL Storage Engine Plugins
 
-Как собрать `.deb` пакет для MySQL storage engine плагина и опубликовать его
-в Launchpad PPA. На примере pinba_engine v2.1.2.
+How to build a `.deb` package for a MySQL storage engine plugin and publish it to
+a Launchpad PPA. Using `pinba_engine` as the example.
 
-## Структура debian/
+## debian/ structure
 
 ```
 debian/
-├── control           — Source + Binary пакеты, Build-Depends
-├── rules             — cmake конфигурация для каждой MySQL серии
-├── changelog         — версия пакета, дистрибутив (UNRELEASED или noble)
-├── copyright         — DEP-5 формат
+├── control           — Source + Binary packages, Build-Depends
+├── rules             — cmake configuration per MySQL series
+├── changelog         — package version, distribution (never UNRELEASED for PPA uploads)
+├── copyright         — DEP-5 format
 ├── source/format     — "3.0 (quilt)"
-├── pinba-engine-common.install         — SQL файлы в /usr/share/pinba_engine/
-├── pinba-engine-mysql-8.0.install      — ha_pinba.so в /usr/lib/mysql/plugin/
+├── pinba-engine-common.install         — SQL files to /usr/share/pinba_engine/
+├── pinba-engine-mysql-8.0.install      — ha_pinba.so to /usr/lib/mysql/plugin/
 ├── pinba-engine-mysql-8.4.install
-├── pinba-engine-mysql-8.0.postinst     — установка плагина + создание БД
-├── pinba-engine-mysql-8.0.prerm        — выгрузка плагина
+├── pinba-engine-mysql-8.0.postinst     — plugin install + database creation
+├── pinba-engine-mysql-8.0.prerm        — plugin unload
 ├── pinba-engine-mysql-8.4.postinst
 └── pinba-engine-mysql-8.4.prerm
 ```
 
-## Схема версионирования
+## Version format
 
 ```
-{upstream_version}~{ubuntu_codename}~mysql{major}-{deb_revision}
+{upstream_version}-{deb_revision}~{ubuntu_codename}{n}
 
-Примеры:
-  2.1.2~ubuntu24.04~mysql8.0-1   (Noble + MySQL 8.0)
-  2.1.2~ubuntu24.04~mysql8.4-1   (Noble + MySQL 8.4)
+Examples:
+  2.3.0-1~noble1      (Noble, any MySQL series — series is selected by debian/pinba-ppa-build.mk)
+  2.3.0-1~resolute1   (Resolute)
+  2.3.0-2~noble1      (Noble, second upload of same upstream after packaging fix)
 ```
 
-Символ `~` меньше любого суффикса: `2.1.2~... < 2.1.2` — upstream считается новее.
+The `~` operator sorts lower than any suffix: `2.3.0~... < 2.3.0` — Ubuntu sees upstream
+as newer than the PPA package, which is the correct ordering.
+
+One source package builds both `pinba-engine-mysql-8.0` and `pinba-engine-mysql-8.4` binaries,
+so no `~mysql8.0` suffix is needed in the version string.
+
+In the automated flow, `deb_revision` is stored per suite in `.github/mysql-versions.json`
+under the `debian_revision` key and is incremented automatically when a new MySQL patch
+version is detected.
 
 ## debian/rules
 
-Базово source package умеет собирать два бинарных пакета, но реальный набор можно
-сузить generated-файлом `debian/pinba-ppa-build.mk`:
+The source package can build both binary packages, but the actual set is controlled by the
+generated file `debian/pinba-ppa-build.mk`:
 
 ```makefile
 -include debian/pinba-ppa-build.mk
@@ -64,11 +73,11 @@ ifeq ($(ENABLE_MYSQL80),0)
 endif
 ```
 
-Это позволяет из GitHub Actions генерировать разные source uploads для:
-- `noble` → только `pinba-engine-mysql-8.0`
-- `resolute` → только `pinba-engine-mysql-8.4`
+This allows GitHub Actions to generate different source uploads for:
+- `noble` → only `pinba-engine-mysql-8.0`
+- `resolute` → only `pinba-engine-mysql-8.4`
 
-Основная схема CMake-конфигов остаётся такой:
+The main CMake configuration in `debian/rules`:
 
 ```makefile
 override_dh_auto_configure:
@@ -95,145 +104,104 @@ override_dh_install:
     dh_install --sourcedir=debian/tmp-mysql80 -ppinba-engine-common
 ```
 
-## Вендоринг MySQL headers
+Note: the MySQL version numbers in `debian/rules` are overridden at build time by
+values read from `.github/mysql-versions.json` (via the `ppa-build.yml` workflow).
+`debian/rules` contains defaults; the CI always passes the correct versions explicitly.
 
-MySQL plugin API требует `sql/handler.h` — заголовок из полного исходника MySQL
-(НЕТ в `libmysqlclient-dev`). Launchpad строит в изолированном chroot без сети.
+## Vendoring MySQL headers
 
-**Решение:** вендорить только нужные заголовки (162/175 файлов, ~2.2 MB на серию)
-в `vendor/mysql-headers-{series}/` и коммитить в git.
+MySQL plugin API requires `sql/handler.h` — a header from the full MySQL source tree,
+not available in `libmysqlclient-dev`. Launchpad builds in an isolated network-less chroot.
 
-Подробнее: [[mysql-vendor-headers-minimal]].
+**Solution:** vendor only the headers actually needed (162/175 files, ~2.2 MB per series)
+in `vendor/mysql-headers-{series}/` and commit them to git.
 
-## Сборка и тест
+Details: [[mysql-vendor-headers-minimal]].
+
+## Building and testing locally
 
 ```bash
-# Собрать бинарные пакеты (без подписи):
+# Build binary packages (no signing):
 dpkg-buildpackage -us -uc -b
 
-# Проверить lintian:
+# Check lintian:
 lintian --fail-on error pinba-engine-mysql-8.0_*.deb
 
-# Установить:
+# Install:
 sudo dpkg -i pinba-engine-common_*.deb pinba-engine-mysql-8.0_*.deb
 ```
 
-Ожидаемые lintian warnings (не критичные):
-- `initial-upload-closes-no-bugs` — для PPA нормально, ITP не нужен
-- `debian-changelog-has-wrong-day-of-week` — проверить вручную день недели
+Expected lintian warnings (non-critical):
+- `initial-upload-closes-no-bugs` — normal for PPA uploads, ITP not required
+- `debian-changelog-has-wrong-day-of-week` — verify the day of week manually
 
-## Launchpad PPA
+## Creating the orig.tar.gz and source package
 
-PPA: `ppa:xolegator/packages`
-
-```bash
-# Source package (для загрузки в PPA):
-dpkg-buildpackage -S -sa
-
-# Подпись:
-debsign -k{FINGERPRINT} pinba-engine_*_source.changes
-
-# Загрузка:
-dput ppa:xolegator/packages pinba-engine_*_source.changes
-```
-
-orig.tar.gz включает vendor/mysql-headers-* автоматически (~5 MB суммарно).
-
-## postinst/prerm — детали
-
-Подробно: [[mysql-postinst-patterns]].
-
-Краткая схема:
-1. postinst: пишет `/etc/mysql/conf.d/pinba-engine.cnf` (`plugin-load-add`)
-2. postinst: пробует `INSTALL PLUGIN` для немедленной активации (может упасть, не фатально)
-3. postinst: создаёт БД `pinba` и импортирует `default_tables.sql` (только если плагин активен)
-4. prerm: удаляет конфиг, выгружает плагин если загружен
-
----
-
-## Создание orig.tar.gz и source package
-
-`dpkg-buildpackage -S -sa` **не создаёт** orig.tar.gz сам — он ожидает `../pinba-engine_{VERSION}.orig.tar.gz`.
-Создавать вручную через git archive перед каждой PPA загрузкой:
+`dpkg-buildpackage -S -sa` does **not** create the `orig.tar.gz` itself — it expects
+`../pinba-engine_{VERSION}.orig.tar.gz` to already exist.
+Create it with `git archive` before each PPA upload:
 
 ```bash
-git archive --prefix=pinba-engine-2.1.2/ HEAD | gzip -9 > ../pinba-engine_2.1.2.orig.tar.gz
+git archive --prefix=pinba-engine-2.3.0/ HEAD | gzip -9 > ../pinba-engine_2.3.0.orig.tar.gz
 dpkg-buildpackage -S -sa -us -uc
 ```
 
-`vendor/mysql-headers-*` закоммичены → попадают в orig автоматически. Итоговый размер: ~1.1 MB.
+`vendor/mysql-headers-*` are committed to git → they are included in the orig automatically.
+Final orig size: ~1.1 MB.
 
-Два файла обязательны для корректной source сборки:
-- `debian/clean` — список cmake build-деревьев для удаления (иначе "unwanted binary" ошибка)
-- `debian/source/options` с `--extend-diff-ignore` — исключить нетрекаемые локальные файлы
+Two files are required for a correct source build:
+- `debian/clean` — list of cmake build trees to delete (otherwise "unwanted binary" error)
+- `debian/source/options` with `--extend-diff-ignore` — excludes local untracked files
 
-## Версионирование для PPA (уточнение)
+## Uploading to Launchpad (dput)
 
-Финальный выбор формата: `{upstream}-{deb_rev}~{codename}{n}`
+In the automated GitHub Actions flow, uploads use plain FTP with `passive_ftp = 1`.
+GitHub Actions runners are behind NAT; passive mode is required for FTP data connections
+to work through NAT. See [[github-actions-ppa]] for the full dput configuration.
 
-Пример: `2.1.2-1~noble1` (оба MySQL серии в одном source package → нет суффикса `~mysql8.0`)
-
-Кратность `-N` (deb revision) увеличивается при каждом повторном upload одной и той же upstream версии.
-Launchpad не принимает повторную загрузку той же версии — нужно поднять revision.
-
-Для multi-distro CI это означает разные версии source uploads:
-- `2.1.2-1~noble1`
-- `2.1.2-1~resolute1`
-
-## Загрузка в Launchpad (dput)
-
-**Критично:** порт 21 (FTP) часто заблокирован провайдерами/роутерами.
-Launchpad поддерживает SFTP через порт 22 — всегда настраивать `method = sftp`.
+For local manual uploads, SFTP is recommended (FTP port 21 is often blocked by ISPs):
 
 ```ini
 # ~/.dput.cf
 [xolegator-packages]
-fqdn = ppa.launchpad.net
-method = sftp
-incoming = ~xolegator/packages/ubuntu/
-login = xolegator
+fqdn            = ppa.launchpad.net
+method          = sftp
+incoming        = ~xolegator/packages/ubuntu/
+login           = xolegator
 allow_unsigned_uploads = 0
 ```
 
-```
-# ~/.ssh/config
-Host ppa.launchpad.net
-    User xolegator
-    IdentityFile ~/.ssh/id_ed25519_launchpad
-    IdentitiesOnly yes
-```
-
-Проверка SSH: `ssh -T xolegator@ppa.launchpad.net` → ответ `No shells on this server.` — это норма.
-
-Подписание и загрузка:
+Signing and uploading:
 ```bash
 debsign -k{FINGERPRINT} ../pinba-engine_*_source.changes
 dput xolegator-packages ../pinba-engine_*_source.changes
 ```
 
-`debsign` требует интерактивного терминала (GPG pinentry). Запускать вручную, не через скрипт без TTY.
+`debsign` requires an interactive terminal for GPG pinentry. Do not run it inside a
+non-TTY script.
 
-## rapidjson-dev обязателен в Build-Depends
+## rapidjson-dev is required in Build-Depends
 
-MySQL 8.0 и 8.4 vendor headers тянут `<rapidjson/fwd.h>` через цепочку:
+MySQL 8.0 and 8.4 vendor headers pull in `<rapidjson/fwd.h>` through the chain:
 
 ```
 ha_pinba.cc → sql/table.h → sql/dd/types/foreign_key.h → sql/dd/sdi_fwd.h → rapidjson/fwd.h
 ```
 
-В `vendor/mysql-headers-*` этот файл отсутствует (он из `extra/rapidjson/` полного MySQL source).
-Локальная сборка могла работать из-за stale cmake-кэша с полным MySQL source.
-Launchpad строит в чистом chroot → `rapidjson/fwd.h` не найден → fatal error.
+This file is not in `vendor/mysql-headers-*` (it lives under `extra/rapidjson/` in the full
+MySQL source). Local builds may succeed with a stale cmake cache from a full MySQL source.
+Launchpad builds in a clean chroot and fail immediately.
 
-**Решение:** `rapidjson-dev` в `debian/control` Build-Depends.
-В Ubuntu Noble: `rapidjson-dev 1.1.0+dfsg2-7.2`, доступен в universe.
+**Fix:** `rapidjson-dev` in `debian/control` Build-Depends.
+On Ubuntu Noble: `rapidjson-dev 1.1.0+dfsg2-7.2`, available in the `universe` component.
 
-## Установка из PPA — особенности
+## Installing from PPA — notes
 
-После первой публикации в PPA, `add-apt-repository` может вернуть `GPGKeyTemporarilyNotFoundError`
-(Launchpad 500). Это временная ошибка — ключ PPA генерируется с задержкой 5–30 минут.
+After the first PPA publish, `add-apt-repository` may return `GPGKeyTemporarilyNotFoundError`
+(Launchpad HTTP 500). This is temporary — the PPA signing key is generated with a delay of
+5–30 minutes. Wait and retry.
 
-Если нужен немедленный доступ — добавить source вручную:
+If needed before the key propagates:
 ```bash
 echo "deb https://ppa.launchpadcontent.net/xolegator/packages/ubuntu/ noble main" \
   | sudo tee /etc/apt/sources.list.d/xolegator-packages.list
@@ -241,4 +209,15 @@ sudo gpg --keyserver keyserver.ubuntu.com --recv-keys {FINGERPRINT}
 sudo gpg --export {FINGERPRINT} | sudo tee /etc/apt/trusted.gpg.d/xolegator-packages.gpg > /dev/null
 ```
 
-После успешного `add-apt-repository` удалить ручной `.list` файл во избежание дублирования источников.
+After a successful `add-apt-repository`, remove the manually added `.list` file to avoid
+duplicate sources.
+
+## postinst/prerm details
+
+Full reference: [[mysql-postinst-patterns]].
+
+Summary:
+1. postinst: writes `/etc/mysql/conf.d/pinba-engine.cnf` (`plugin-load-add`)
+2. postinst: attempts `INSTALL PLUGIN` for immediate activation (may fail, non-fatal)
+3. postinst: creates database `pinba` and imports `default_tables.sql` (only if plugin is active)
+4. prerm: removes config, unloads plugin if loaded

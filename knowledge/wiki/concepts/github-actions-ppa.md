@@ -6,8 +6,8 @@ sources:
 related:
   - wiki/concepts/debian-ppa-packaging.md
   - wiki/concepts/launchpad-ppa-workflow.md
-confidence: medium
-updated: 2026-06-06
+confidence: high
+updated: 2026-06-07
 ---
 
 # GitHub Actions: Launchpad PPA Build + Upload
@@ -17,16 +17,26 @@ releases and publishing them to `ppa:xolegator/packages` from GitHub Actions.
 
 ## What the workflow does
 
-1. Checks out the repository.
+1. Checks out the repository at the appropriate ref (tag for releases, explicit `source_ref`
+   for manual runs, or `github.sha` for push-triggered runs).
 2. Generates distro-specific `debian/pinba-ppa-build.mk` so the source package knows
    which MySQL series to build on Launchpad.
-3. Rewrites `debian/changelog` to a distro-specific version such as `2.1.2-1~noble1`
-   or `2.1.2-1~resolute1`.
+3. Rewrites `debian/changelog` to a distro-specific version such as `2.3.0-1~noble1`
+   or `2.3.0-1~resolute1`. The debian revision comes from `.github/mysql-versions.json`
+   (`debian_revision` field) unless overridden by the manual `debian_revision` input.
 4. Creates `pinba-engine_<upstream>.orig.tar.gz` with `git archive`.
 5. Builds the source package with `dpkg-buildpackage -S -sa -us -uc`.
 6. Runs `lintian` on the generated `.changes` file.
 7. Signs the `.dsc` and `.changes` files with the Launchpad GPG key.
-8. Uploads the signed source package to Launchpad with `dput` over SFTP.
+8. Uploads the signed source package to Launchpad with `dput` over plain FTP
+   with `passive_ftp = 1`, using a retry loop (3 attempts, 30 s gap) for resilience.
+
+## Triggering
+
+- `release.published` — automatic PPA publication from a GitHub Release.
+- `push` to `master` where `.github/mysql-versions.json` changed — triggered by the
+  MySQL version monitor auto-merge PR; `debian_revision` is read from that file.
+- `workflow_dispatch` — manual rebuilds and version overrides.
 
 ## Required secrets
 
@@ -51,47 +61,48 @@ releases and publishing them to `ppa:xolegator/packages` from GitHub Actions.
 - When source-package artifacts move between jobs, the workflow must preserve
   `*.buildinfo` alongside `.dsc`, `.changes`, `.orig.tar.gz`, and `.debian.tar.*`.
   `debsign` expects the matching `*_source.buildinfo` next to the `.changes` file and
-  fails before SSH upload if that file is missing.
+  fails before upload if that file is missing.
 - For multi-series uploads of the same upstream version, only one source package should
   carry the full `.orig.tar.gz` (`-sa`). Additional series uploads should use `-sd`,
   otherwise Launchpad may reject repeated orig uploads or behave inconsistently on the
   second transfer.
-- Each `*_source.changes` should be uploaded with a separate `dput` invocation. Sending
+- Each `*_source.changes` is uploaded with a separate `dput` invocation. Sending
   multiple series through one shell-expanded command makes failure attribution harder
   and can interact badly with per-upload connection state on the server side.
 - The declared `upstream_version` must match the checked-out source tree used for
   `git archive`. Rebuilding `2.2.0` from a later `master` commit produces a different
   `orig.tar.gz` and potentially a different `debian.tar.*`, which Launchpad rejects for
-  the same version. Manual upload flows should therefore package an explicit tag or SHA,
+  the same version. Manual upload flows therefore package an explicit tag or SHA,
   not the moving branch tip.
 - If a wrong `orig.tar.gz` was already uploaded to the same PPA under a given upstream
   version, that upstream version is effectively burned for future corrected uploads in
-  that archive. The engineering-correct recovery path is to cut a new upstream release
-  and publish that release as a new source version, so the orig filename changes
-  naturally and the archive sees a clean version namespace. In practice, `v2.2.1`
-  fixed the `2.2.0` conflict.
-- Launchpad's official docs support both FTP and SFTP uploads. For GitHub-hosted
-  automation, plain FTP with `login = anonymous` is the simpler and more robust path
-  because it avoids separate SSH-key provisioning for the runner while preserving GPG
-  signature verification on the uploaded source package.
-- SFTP remains possible, but it adds two extra moving parts on GitHub Actions:
-  `python3-paramiko` on the runner and a Launchpad-registered SSH key with matching
-  secret material in GitHub.
+  that archive. The correct recovery is to cut a new upstream release so the orig
+  filename changes naturally and the archive sees a clean version namespace.
+  In practice, `v2.2.1` fixed the `2.2.0` conflict.
 
-## MySQL version monitoring
+## Launchpad upload transport
 
-Separate workflow: `.github/workflows/mysql-version-monitor.yml`
+Launchpad's official documentation supports both FTP and SFTP for `dput` uploads.
+For GitHub-hosted automation, plain anonymous FTP with `passive_ftp = 1` is used:
 
-What it does:
-- runs weekly and on manual dispatch
-- checks `libmysqlclient-dev` versions inside `ubuntu:24.04` and `ubuntu:26.04`
-- compares them with `.github/mysql-versions.json`
-- opens a GitHub issue if the tracked MySQL availability changed
+```ini
+[xolegator-packages]
+fqdn            = ppa.launchpad.net
+method          = ftp
+incoming        = ~xolegator/packages/ubuntu/
+login           = anonymous
+allow_unsigned_uploads = 0
+passive_ftp     = 1
+```
 
-This workflow does not auto-upload to Launchpad because a new PPA upload still requires
-an explicit Debian revision bump.
+`passive_ftp = 1` is essential: GitHub Actions runners are behind NAT, so the
+server cannot open a data connection back to the runner (active FTP). Passive mode
+reverses that: the client initiates the data connection, which NAT allows.
 
-## Triggering
+SFTP is possible but adds two extra moving parts: `python3-paramiko` on the runner
+and a Launchpad-registered SSH key with matching secret material in GitHub.
+FTP with `passive_ftp = 1` avoids all of that while preserving GPG signature
+verification on the uploaded source package.
 
-- `release.published` for automatic PPA publication from a GitHub Release.
-- `workflow_dispatch` for manual rebuilds and version overrides.
+A retry loop (3 attempts, 30 s gap) is wrapped around each `dput` call for
+resilience against transient Launchpad FTP errors.

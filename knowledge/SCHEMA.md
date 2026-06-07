@@ -117,9 +117,45 @@ The index.md should contain a full link list. The LLM must update index.md on ev
 
 ---
 
+## Language Policy
+
+**All wiki/ content must be written in English.** This includes page titles, body text,
+frontmatter fields, table headings, code comments inside wiki prose, and log entries.
+
+Russian (or any other language) must not appear in any file under wiki/.
+When translating existing Russian content, translate accurately — do not summarize.
+Preserve all technical detail.
+
+---
+
+## Revision / Audit Procedure
+
+Trigger: "audit the wiki", "revision", or when a significant batch of changes has landed in the repo.
+
+Steps:
+1. Read all wiki/ pages.
+2. Cross-check facts against the actual codebase state:
+   - Workflow files in `.github/workflows/`
+   - Configuration files: `debian/control`, `debian/rules`, `.github/mysql-versions.json`
+   - Git log for recent commits that may have superseded documented behavior
+3. Identify and fix:
+   - Stale facts (behavior that has since changed)
+   - Contradictions between pages
+   - Duplicated information across pages
+   - Russian (or non-English) content that must be translated
+   - Pages listed in `index.md` that no longer exist or have wrong descriptions
+   - References to future work that is now implemented
+4. Update `updated:` frontmatter dates on every modified page.
+5. Append an audit entry to `wiki/log.md` summarising what was stale, what changed.
+6. Update `wiki/index.md` if any pages were added, removed, or had their key topic change.
+7. Optionally update `wiki/overview.md` if the high-level picture changed.
+
+---
+
 ## What does NOT belong in wiki/ (even if tempting)
 
 - Code. Code lives in src/. Wiki describes concepts, not implementations.
 - Task lists or in-progress work. That's for git issues/PRs.
 - Credentials, server-specific paths, or personal configs.
 - Ephemeral debugging notes. Those go in output/, not wiki/.
+- Non-English text.

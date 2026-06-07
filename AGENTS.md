@@ -95,6 +95,10 @@ Pre-commit also references `clang-format`, `cppcheck`, `cmake-lint`, and `hadoli
 
 All commit messages and PR titles/descriptions must be written in **English**.
 
+All knowledge base entries under `knowledge/wiki/` must also be written in **English**.
+Russian or any other language is not permitted in wiki pages, source summaries, or log entries.
+See `knowledge/SCHEMA.md` → Language Policy for details.
+
 Follow `docs/releasing.md`: use Conventional Commits so Release Please can calculate SemVer and changelog entries.
 
 Allowed common types:

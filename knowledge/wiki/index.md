@@ -4,7 +4,7 @@ type: index
 sources: []
 related: []
 confidence: high
-updated: 2026-06-06
+updated: 2026-06-07
 ---
 
 # Pinba Engine — Knowledge Base Index
@@ -26,13 +26,13 @@ Master catalog. Maintained by LLM agents.
 | [[docker-build-strategy]] | Multi-stage build, libprotobuf copy, filename gotchas |
 | [[docker-tag-strategy]] | Docker Hub naming rules, rolling vs pinned tags |
 | [[github-actions-docker]] | CI/CD workflow for Docker Hub build+push automation |
-| [[github-actions-ppa]] | GitHub Actions workflow for source package build, source-ref pinning, release-based recovery, signing, multi-series artifact handoff, and Launchpad upload |
-| [[github-actions-mysql-version-monitor]] | Weekly detection of Ubuntu MySQL versions for PPA target suites |
+| [[github-actions-ppa]] | GitHub Actions workflow: source package build, signing, multi-series, FTP upload with passive mode and retry |
+| [[github-actions-mysql-version-monitor]] | Weekly MySQL version monitor: auto-PR with vendor header update and full release cycle trigger |
 | [[pinboard-architecture]] | Pinboard (Symfony 8) stack, aggregation logic, docker compose |
 | [[debian-ppa-packaging]] | Debian/PPA packaging: debian/ structure, rules, versioning, Build-Depends, rapidjson |
-| [[mysql-postinst-patterns]] | postinst/prerm: auth cascade, plugin-load-add, MySQL 8.0 syntax traps |
-| [[mysql-vendor-headers-minimal]] | Minimal vendor headers via .d files analysis (1317→162 files) |
-| [[launchpad-ppa-workflow]] | dput SFTP setup, signing, версионирование, GPGKeyTemporarilyNotFoundError |
+| [[mysql-postinst-patterns]] | postinst/prerm: auth cascade, plugin-load-add, MySQL 8.0 syntax pitfalls |
+| [[mysql-vendor-headers-minimal]] | Minimal vendor headers via .d file analysis (1317→162 files) |
+| [[launchpad-ppa-workflow]] | dput configuration, signing, versioning, GPGKeyTemporarilyNotFoundError |
 
 ## Sources (11 documents)
 

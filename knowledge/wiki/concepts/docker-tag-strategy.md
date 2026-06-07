@@ -7,7 +7,7 @@ related:
   - wiki/concepts/docker-build-strategy.md
   - wiki/concepts/mysql-plugin-abi.md
 confidence: high
-updated: 2026-05-23
+updated: 2026-06-07
 ---
 
 # Docker Hub Tag Strategy
@@ -61,11 +61,12 @@ docker push xolegator/pinba-engine:8.4-lts
 docker push xolegator/pinba-engine:8.4-lts-v1.2.3
 ```
 
-## Future: GitHub Actions CI
+## GitHub Actions CI
 
-On release tag `v*`:
-1. Build both images with pinba version embedded
-2. Push rolling tags (`8.0`, `8.4-lts`, `latest`)
-3. Push pinned tags (`8.0-vX.Y.Z`, `8.4-lts-vX.Y.Z`)
+Build and push is automated via `.github/workflows/docker-push.yml`.
+On a `v*` tag push:
+1. Both images are built with the pinba version embedded.
+2. Rolling tags (`8.0`, `8.4-lts`, `latest`) are pushed.
+3. Pinned tags (`8.0-vX.Y.Z`, `8.4-lts-vX.Y.Z`) are pushed.
 
-See: [[docker-build-strategy]], [[mysql-plugin-abi]]
+See: [[docker-build-strategy]], [[github-actions-docker]], [[mysql-plugin-abi]]

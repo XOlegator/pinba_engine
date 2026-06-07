@@ -9,41 +9,41 @@ related:
   - wiki/concepts/mysql-vendor-headers-minimal.md
   - wiki/concepts/mysql-plugin-install.md
 confidence: high
-updated: 2026-06-04
+updated: 2026-06-07
 ---
 
 # Source: Debian PPA Packaging Session — 2026-06-04
 
-Живая сессия отладки и реализации Debian/PPA пакетирования pinba_engine.
-Прошла через несколько итераций исправлений postinst/prerm.
+A live debugging and implementation session for Debian/PPA packaging of `pinba_engine`.
+Went through several fix iterations for postinst/prerm scripts.
 
-## Ключевые факты
+## Key facts
 
-- ЭТАП 1.5 завершён: vendor headers добавлены в git (commit `df68221`)
-- ЭТАП 2 завершён: `dpkg-buildpackage -us -uc -b` работает, lintian чист
-- Тест установки пройден: всё полностью автоматически при `sudo dpkg -i`
-- vendor/mysql-headers-* оптимизированы: 1317→162/175 файлов, 14→2.2 MB на серию
+- Stage 1.5 completed: vendor headers committed to git (commit `df68221`)
+- Stage 2 completed: `dpkg-buildpackage -us -uc -b` succeeds, lintian clean
+- Install test passed: fully automatic on `sudo dpkg -i`
+- `vendor/mysql-headers-*` optimized: 1317 → 162/175 files, 14 → 2.2 MB per series
 
-## Проблемы, обнаруженные при тестировании
+## Problems found during testing
 
-| Проблема | Корневая причина | Решение |
-|----------|-----------------|---------|
-| postinst молчал, база не создавалась | `2>/dev/null` скрывал ошибки | Убрать подавление с рабочих команд |
-| `INSTALL PLUGIN IF NOT EXISTS` → ERROR 1064 | Синтаксис MySQL 9.0+, не 8.0 | Проверка через `information_schema.PLUGINS` |
-| `UNINSTALL PLUGIN IF EXISTS` → ERROR 1064 | То же | То же |
-| ERROR 3883: Operation not permitted | `debian-sys-maint` лишён SYSTEM_VARIABLES_ADMIN | `plugin-load-add` конфиг как основной путь |
-| `DROP DATABASE pinba` → Unknown storage engine | Плагин не загружен, таблицы ENGINE=PINBA | Загрузить плагин → дроп → выгрузить |
-| postinst "MySQL not running" при живом MySQL | root@localhost защищён паролем, не auth_socket | Fallback через `/etc/mysql/debian.cnf` |
+| Problem | Root cause | Fix |
+|---------|-----------|-----|
+| postinst was silent, database not created | `2>/dev/null` suppressed errors | Remove suppression from working commands |
+| `INSTALL PLUGIN IF NOT EXISTS` → ERROR 1064 | MySQL 9.0+ syntax, not 8.0 | Check via `information_schema.PLUGINS` |
+| `UNINSTALL PLUGIN IF EXISTS` → ERROR 1064 | Same | Same |
+| ERROR 3883: Operation not permitted | `debian-sys-maint` lacks SYSTEM_VARIABLES_ADMIN | Use `plugin-load-add` config as the primary path |
+| `DROP DATABASE pinba` → Unknown storage engine | Plugin not loaded, tables are ENGINE=PINBA | Load plugin → drop → unload |
+| postinst "MySQL not running" with MySQL running | root@localhost protected by password, not auth_socket | Fallback via `/etc/mysql/debian.cnf` |
 
 ## Commits
 
 - `df68221` — vendor headers 8.0.46 + 8.4.9
-- `db66097` — fix postinst/prerm (debian.cnf, plugin-load-add, правильный синтаксис)
+- `db66097` — fix postinst/prerm (debian.cnf, plugin-load-add, correct syntax)
 - `d2a19fb` — gitignore vendor/*/builddir/
-- `57ed76a` — trim vendor headers (1317→162/175 файлов)
+- `57ed76a` — trim vendor headers (1317 → 162/175 files)
 
-## Релевантные концепты
+## Related concepts
 
-- [[debian-ppa-packaging]] — полный процесс PPA packaging для MySQL плагина
-- [[mysql-postinst-patterns]] — паттерны и ловушки postinst/prerm для MySQL
-- [[mysql-vendor-headers-minimal]] — стратегия минимизации vendor headers
+- [[debian-ppa-packaging]] — full PPA packaging process for a MySQL plugin
+- [[mysql-postinst-patterns]] — postinst/prerm patterns and pitfalls for MySQL
+- [[mysql-vendor-headers-minimal]] — minimal vendor headers strategy

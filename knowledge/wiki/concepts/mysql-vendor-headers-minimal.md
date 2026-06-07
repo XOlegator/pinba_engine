@@ -8,42 +8,43 @@ related:
   - wiki/concepts/cmake-build-system.md
   - wiki/concepts/mysql-plugin-abi.md
 confidence: high
-updated: 2026-06-04
+updated: 2026-06-07
 ---
 
 # Minimal MySQL Vendor Headers Strategy
 
-MySQL storage engine плагин требует заголовки из полного исходника MySQL
-(например `sql/handler.h`), которых нет в `libmysqlclient-dev`.
+A MySQL storage engine plugin requires headers from the full MySQL source tree
+(e.g., `sql/handler.h`) that are not present in `libmysqlclient-dev`.
 
-Для offline сборки (Launchpad PPA, CI без сети) нужно вендорить эти заголовки.
-Стратегия: хранить **только те файлы, которые реально включаются компилятором**.
+For offline builds (Launchpad PPA, CI without network access) these headers must be
+vendored. The strategy is to store **only the files that the compiler actually includes**.
 
 ---
 
-## Проблема с наивным подходом
+## The problem with the naive approach
 
-Простое `tar -xf mysql.tar.gz mysql-8.0.46/include/ mysql-8.0.46/sql/ ...`
-извлекает ~1300 файлов (~14 MB) на серию. Большинство — внутренности MySQL
-(boost patches, GIS, join optimizer, data dictionary impl, range optimizer...),
-которые pinba никогда не включает.
+A simple `tar -xf mysql.tar.gz mysql-8.0.46/include/ mysql-8.0.46/sql/ ...` extracts
+roughly 1 300 files (~14 MB) per series. The majority are MySQL internals (Boost patches,
+GIS, join optimizer, data dictionary implementation, range optimizer, ...) that
+`pinba_engine` never includes.
 
-**Реальные цифры:**
-| | До | После |
+**Actual numbers:**
+
+| | Before | After |
 |---|---|---|
-| Файлов (8.0) | 1317 | 162 |
-| Файлов (8.4) | ~1317 | 175 |
-| Размер на серию | ~14 MB | ~2.2 MB |
-| Оба вместе в git | ~28 MB | ~4.5 MB |
+| Files (8.0) | 1317 | 162 |
+| Files (8.4) | ~1317 | 175 |
+| Size per series | ~14 MB | ~2.2 MB |
+| Both series in git | ~28 MB | ~4.5 MB |
 
 ---
 
-## Как получить минимальный список
+## How to obtain the minimal file list
 
-Компилятор при сборке записывает все реально включённые файлы в `.d` файлы
-(Makefile dependency files). CMake создаёт их автоматически.
+The compiler records every file it actually includes in `.d` files (Makefile dependency
+files). CMake generates these automatically.
 
-### Шаг 1: сделать сборку
+### Step 1: run a build
 
 ```bash
 cmake -B build-analyze \
@@ -53,7 +54,7 @@ cmake -B build-analyze \
 cmake --build build-analyze
 ```
 
-### Шаг 2: извлечь список файлов из .d
+### Step 2: extract the file list from .d files
 
 ```python
 import re, glob
@@ -65,32 +66,32 @@ for f in glob.glob('build-analyze/CMakeFiles/pinba_engine.dir/**/*.d', recursive
     for line in open(f):
         for m in re.findall(pattern, line):
             p = m.strip()
-            if not p.startswith('builddir/'):  # builddir/ — cmake-generated, не из tarball
+            if not p.startswith('builddir/'):  # builddir/ is cmake-generated, not from the tarball
                 used.add(p)
 print(f'{len(used)} files actually used')
 ```
 
-### Шаг 3: объединить для всех серий
+### Step 3: merge across all series
 
-Некоторые пути отличаются между сериями:
+Some paths differ between series:
 - MySQL 8.0: `libbinlogevents/export/binary_log_funcs.h`
 - MySQL 8.4: `libs/mysql/binlog/event/export/binary_log_funcs.h`
 
-Нужно взять union множеств из 8.0 и 8.4 — тогда при извлечении файлы,
-которых нет в конкретном tarball, просто пропускаются.
+Take the union of both sets — files absent from a specific tarball are simply skipped
+during extraction.
 
 ---
 
-## Алгоритм extract-mysql-headers.sh
+## Algorithm: extract-mysql-headers.sh
 
 ```bash
-# 1. Скачать tarball (~300 MB)
+# 1. Download tarball (~300 MB)
 wget "$URL" -O "$TMPDIR/mysql.tar.gz"
 
-# 2. Получить оглавление (один проход, читает только заголовки tar)
+# 2. List the archive contents (one pass, reads only tar headers)
 tar -tf "$TMPDIR/mysql.tar.gz" > "$TMPDIR/archive-index.txt"
 
-# 3. Пересечь с whitelist
+# 3. Intersect with whitelist
 for rel in $NEEDED_FILES; do
     tarpath="mysql-${VERSION}/${rel}"
     if grep -qF "$tarpath" "$TMPDIR/archive-index.txt"; then
@@ -98,66 +99,66 @@ for rel in $NEEDED_FILES; do
     fi
 done
 
-# 4. Один раз распаковать только нужные файлы
+# 4. Extract only the needed files in a single pass
 tar -xf "$TMPDIR/mysql.tar.gz" \
     --strip-components=1 -C "$DEST" \
     -T "$TMPDIR/to-extract.txt"
 ```
 
-Две операции над tarball: одна для оглавления, одна для распаковки.
-Сравнивать с подходом "распаковать всё, потом удалить" — результат тот же,
-но более явно и без мусора в промежуточном состоянии.
+Two passes over the tarball: one for the index, one for extraction. This is equivalent to
+"extract everything, then delete unwanted files" but more explicit and produces no
+intermediate junk.
 
 ---
 
-## Что НЕ нужно (было удалено)
+## What is NOT needed (removed)
 
-| Директория | Содержимое | Причина удаления |
-|------------|-----------|------------------|
-| `include/boost_1_77_0/` | Boost geometry patches | MySQL внутреннее, pinba не использует |
-| `sql/gis/` (кроме srid.h) | ГИС функции | MySQL внутреннее |
-| `sql/join_optimizer/` | Оптимизатор JOIN | MySQL внутреннее |
-| `sql/range_optimizer/` | Range scan optimizer | MySQL внутреннее |
-| `sql/dd/impl/` | Data Dictionary реализация | Нужны только типы (dd/types/) |
-| `sql/auth/` (кроме auth_acls.h) | Authentication internals | Нужен только acls |
-| `sql/iterators/` | Row iterators | MySQL внутреннее |
-| `sql/server_component/` | Server component реализация | Нужны только биты |
-| `include/authentication_kerberos*` | Kerberos опции | Клиентские опции, не нужны плагину |
+| Directory | Contents | Reason removed |
+|-----------|----------|----------------|
+| `include/boost_1_77_0/` | Boost geometry patches | MySQL internal, not used by pinba |
+| `sql/gis/` (except srid.h) | GIS functions | MySQL internal |
+| `sql/join_optimizer/` | JOIN optimizer | MySQL internal |
+| `sql/range_optimizer/` | Range scan optimizer | MySQL internal |
+| `sql/dd/impl/` | Data Dictionary implementation | Only types needed (`dd/types/`) |
+| `sql/auth/` (except auth_acls.h) | Authentication internals | Only ACLs needed |
+| `sql/iterators/` | Row iterators | MySQL internal |
+| `sql/server_component/` | Server component implementation | Only bits needed |
+| `include/authentication_kerberos*` | Kerberos client options | Not needed by the plugin |
 
 ---
 
-## Что нужно (162 файла для 8.0)
+## What IS needed (162 files for 8.0)
 
-**include/** (111 файлов):
-- `my_*.h` — базовые MySQL типы и утилиты
-- `mysql.h`, `mysql_com.h`, `mysql_time.h` — клиентский API
-- `mysql/plugin.h` — Plugin API (главный!)
+**include/** (111 files):
+- `my_*.h` — basic MySQL types and utilities
+- `mysql.h`, `mysql_com.h`, `mysql_time.h` — client API
+- `mysql/plugin.h` — Plugin API (the main header)
 - `mysql/psi/*.h` — Performance Schema instrumentation
-- `mysql/components/services/bits/*.h` — битовые типы для компонентов
-- `mysql/service_*.h` — сервисы для плагинов
+- `mysql/components/services/bits/*.h` — bit types for components
+- `mysql/service_*.h` — services for plugins
 
-**sql/** (46 файлов):
-- `handler.h`, `table.h`, `field.h` — ядро storage engine API
-- `key.h`, `mdl.h`, `sql_plugin.h` — зависимости handler.h
-- `dd/types/*.h` — типы Data Dictionary
-- `gis/srid.h` — только этот один из gis/
+**sql/** (46 files):
+- `handler.h`, `table.h`, `field.h` — core storage engine API
+- `key.h`, `mdl.h`, `sql_plugin.h` — handler.h dependencies
+- `dd/types/*.h` — Data Dictionary types
+- `gis/srid.h` — only this one file from gis/
 
-**libbinlogevents/** (3 файла, только в 8.0):
+**libbinlogevents/** (3 files, MySQL 8.0 only):
 - `export/binary_log_funcs.h`
 - `include/table_id.h`
 - `include/wrapper_functions.h`
 
-**libs/mysql/binlog/** (3 файла, только в 8.4 — замена libbinlogevents/):
-- Те же три файла, другой путь
+**libs/mysql/binlog/** (3 files, MySQL 8.4 only — replaces libbinlogevents/):
+- Same three files, different path
 
 ---
 
-## Обновление whitelist при изменении кода
+## Updating the whitelist after code changes
 
-Если в pinba_engine добавляется новый `#include <sql/some_new.h>`:
+If `pinba_engine` gains a new `#include <sql/some_new.h>`:
 
-1. Сделать сборку: `cmake --build build`
-2. Запустить python-скрипт выше для 8.0 и 8.4
-3. Добавить новые файлы в `NEEDED_FILES` в `tools/extract-mysql-headers.sh`
-4. Перезапустить `tools/extract-mysql-headers.sh 8.0 8.0.XX` и `8.4 8.4.XX`
-5. Закоммитить обновлённые `vendor/mysql-headers-*/`
+1. Run a build: `cmake --build build`
+2. Run the Python script above for both 8.0 and 8.4
+3. Add new files to `NEEDED_FILES` in `tools/extract-mysql-headers.sh`
+4. Re-run `tools/extract-mysql-headers.sh 8.0 8.0.XX` and `8.4 8.4.XX`
+5. Commit the updated `vendor/mysql-headers-*/`

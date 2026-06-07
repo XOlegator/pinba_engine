@@ -7,34 +7,34 @@ related:
   - wiki/concepts/debian-ppa-packaging.md
   - wiki/concepts/mysql-plugin-install.md
 confidence: high
-updated: 2026-06-04
+updated: 2026-06-07
 ---
 
 # MySQL Plugin postinst/prerm — Patterns and Pitfalls
 
-Справочник по написанию `postinst` и `prerm` скриптов для Debian/Ubuntu пакетов,
-устанавливающих MySQL storage engine плагины. Все ловушки выявлены в ходе реальной
-отладки на Ubuntu 24.04 + MySQL 8.0.46.
+Reference for writing `postinst` and `prerm` scripts for Debian/Ubuntu packages that
+install MySQL storage engine plugins. All pitfalls were discovered during real debugging
+on Ubuntu 24.04 + MySQL 8.0.46.
 
 ---
 
-## Аутентификация в postinst (Ubuntu)
+## Authentication in postinst (Ubuntu)
 
-postinst запускается как `root` через `sudo dpkg -i`. Нужно подключиться к MySQL.
+`postinst` runs as `root` via `sudo dpkg -i`. It needs to connect to MySQL.
 
-### Каскад методов
+### Authentication cascade
 
 ```sh
 DEBIAN_CNF="/etc/mysql/debian.cnf"
 MYSQL_SOCKET="/var/run/mysqld/mysqld.sock"
 
 mysql_available() {
-    # 1. debian-sys-maint через /etc/mysql/debian.cnf (600 root:root)
+    # 1. debian-sys-maint via /etc/mysql/debian.cnf (600 root:root)
     if [ -r "$DEBIAN_CNF" ] && \
        mysql --defaults-file="$DEBIAN_CNF" -e "SELECT 1" >/dev/null 2>&1; then
         return 0
     fi
-    # 2. root через auth_socket (работает если root@localhost без пароля)
+    # 2. root via auth_socket (works if root@localhost has no password)
     mysql --no-defaults -u root -S "$MYSQL_SOCKET" -e "SELECT 1" >/dev/null 2>&1
 }
 
@@ -49,34 +49,35 @@ mysql_exec() {
 
 ### /etc/mysql/debian.cnf
 
-- Существует на всех Ubuntu MySQL установках (`mysql-server-8.0`, `mysql-community-server`)
-- Содержит логин/пароль `debian-sys-maint`
-- Права файла: `600 root:root` → читаем только из postinst (работает как root)
-- `debian-sys-maint` имеет `ALL PRIVILEGES ON *.*` — SELECT, CREATE DATABASE, INSERT, etc.
-- **НО:** в Ubuntu 24.04 MySQL 8.0 НЕ имеет `SYSTEM_VARIABLES_ADMIN` (нужен для INSTALL PLUGIN)
+- Present on all Ubuntu MySQL installations (`mysql-server-8.0`, `mysql-community-server`)
+- Contains the `debian-sys-maint` login and password
+- File permissions: `600 root:root` → readable only from `postinst` (which runs as root)
+- `debian-sys-maint` has `ALL PRIVILEGES ON *.*` — SELECT, CREATE DATABASE, INSERT, etc.
+- **However:** on Ubuntu 24.04 MySQL 8.0, `debian-sys-maint` does NOT have `SYSTEM_VARIABLES_ADMIN`
+  (required for `INSTALL PLUGIN`)
 
-### Итог: что умеет debian-sys-maint
+### What debian-sys-maint can and cannot do
 
-| Операция | Работает |
-|----------|---------|
+| Operation | Works |
+|-----------|-------|
 | SELECT, SHOW | ✓ |
 | CREATE DATABASE | ✓ |
-| source .sql (CREATE TABLE ENGINE=PINBA) | ✓ (если плагин загружен) |
-| INSTALL PLUGIN | ✗ (нет SYSTEM_VARIABLES_ADMIN) |
+| source .sql (CREATE TABLE ENGINE=PINBA) | ✓ (if plugin is loaded) |
+| INSTALL PLUGIN | ✗ (no SYSTEM_VARIABLES_ADMIN) |
 | UNINSTALL PLUGIN | ✗ |
 
 ---
 
-## Установка плагина: plugin-load-add vs INSTALL PLUGIN
+## Plugin installation: plugin-load-add vs INSTALL PLUGIN
 
 ### INSTALL PLUGIN
 
-- Регистрирует плагин в `mysql.plugin` таблице (персистентно)
-- Активирует немедленно
-- **Требует** SYSTEM_VARIABLES_ADMIN или SUPER
-- На Ubuntu 24.04 через `debian-sys-maint` **не работает**
+- Registers the plugin in the `mysql.plugin` table (persistent across restarts)
+- Activates immediately
+- **Requires** `SYSTEM_VARIABLES_ADMIN` or `SUPER`
+- Does not work on Ubuntu 24.04 via `debian-sys-maint`
 
-### plugin-load-add (рекомендуется как основной метод)
+### plugin-load-add (recommended as primary method)
 
 ```sh
 cat > /etc/mysql/conf.d/pinba-engine.cnf << 'EOF'
@@ -85,19 +86,19 @@ plugin-load-add = ha_pinba.so
 EOF
 ```
 
-- Не требует никаких MySQL привилегий — просто создать файл
-- Плагин загружается при каждом старте MySQL
-- **Не активирует немедленно** — нужен рестарт MySQL
-- Работает совместно с INSTALL PLUGIN (если оба задействованы — дублирование, но без ошибок)
+- Requires no MySQL privileges — just create a file
+- Plugin loads on every MySQL startup
+- Does **not** activate immediately — requires a MySQL restart
+- Compatible with `INSTALL PLUGIN` (if both are active, the duplication is harmless)
 
-### Правильная стратегия постинста
+### Correct postinst strategy
 
 ```sh
-# 1. Всегда пишем plugin-load-add (не требует привилегий, перезапуско-надёжно)
+# 1. Always write plugin-load-add (no privileges required, restart-safe)
 mkdir -p /etc/mysql/conf.d
 printf '[mysqld]\nplugin-load-add = ha_pinba.so\n' > /etc/mysql/conf.d/pinba-engine.cnf
 
-# 2. Пробуем INSTALL PLUGIN для немедленной активации (может не сработать)
+# 2. Attempt INSTALL PLUGIN for immediate activation (may not succeed)
 if ! mysql_exec -e "INSTALL PLUGIN pinba SONAME 'ha_pinba.so';" >/dev/null 2>&1; then
     echo "plugin will load on next MySQL restart"
 fi
@@ -105,28 +106,28 @@ fi
 
 ---
 
-## Синтаксические ловушки MySQL 8.0 vs 9.0
+## Syntax pitfalls: MySQL 8.0 vs 9.0
 
-| Синтаксис | MySQL 8.0 | MySQL 9.0+ |
-|-----------|-----------|------------|
+| Syntax | MySQL 8.0 | MySQL 9.0+ |
+|--------|-----------|------------|
 | `INSTALL PLUGIN IF NOT EXISTS name SONAME '...'` | ❌ ERROR 1064 | ✓ |
 | `UNINSTALL PLUGIN IF EXISTS name` | ❌ ERROR 1064 | ✓ |
 
-**Правильно для MySQL 8.0** — проверка через information_schema:
+**Correct approach for MySQL 8.0** — check via information_schema:
 
 ```sh
-# Проверить активен ли плагин
+# Check if plugin is active
 PLUGIN_ACTIVE=$(mysql_exec --skip-column-names \
     -e "SELECT COUNT(*) FROM information_schema.PLUGINS \
         WHERE PLUGIN_NAME='pinba' AND PLUGIN_STATUS='ACTIVE';" \
     2>/dev/null || echo "0")
 
-# Установить только если не активен
+# Install only if not active
 if [ "${PLUGIN_ACTIVE:-0}" = "0" ]; then
     mysql_exec -e "INSTALL PLUGIN pinba SONAME 'ha_pinba.so';"
 fi
 
-# Выгрузить только если активен
+# Unload only if active
 if [ "${PLUGIN_ACTIVE:-0}" != "0" ]; then
     mysql_exec -e "UNINSTALL PLUGIN pinba;" || true
 fi
@@ -134,62 +135,62 @@ fi
 
 ---
 
-## Создание базы и таблиц pinba
+## Creating the pinba database and tables
 
 ```sh
-# Проверить существование базы (не ломается при отсутствии плагина)
+# Check if the database exists (safe even if the plugin is not loaded)
 DB_EXISTS=$(mysql_exec --skip-column-names \
     -e "SELECT COUNT(*) FROM information_schema.SCHEMATA \
         WHERE SCHEMA_NAME='pinba';" 2>/dev/null || echo "0")
 
 if [ "${DB_EXISTS:-0}" = "0" ]; then
     mysql_exec -e "CREATE DATABASE pinba CHARACTER SET latin1;"
-    # Импортировать таблицы — только если плагин АКТИВЕН прямо сейчас
-    # (CREATE TABLE ENGINE=PINBA требует загруженного плагина)
+    # Import tables — only if the plugin is ACTIVE right now
+    # (CREATE TABLE ENGINE=PINBA requires the plugin to be loaded)
     if plugin_active; then
         mysql_exec pinba < /usr/share/pinba_engine/default_tables.sql
     fi
 fi
 ```
 
-**Важно:** `CREATE TABLE ... ENGINE=PINBA` падает если плагин не загружен.
-Если `INSTALL PLUGIN` не сработал (нет привилегий) — импортировать нельзя,
-нужно инструктировать пользователя сделать это после рестарта MySQL.
+**Important:** `CREATE TABLE ... ENGINE=PINBA` fails if the plugin is not loaded.
+If `INSTALL PLUGIN` did not succeed (insufficient privileges), the import cannot run;
+the user must be instructed to do it after the next MySQL restart.
 
 ---
 
-## DROP DATABASE с ENGINE=PINBA таблицами
+## DROP DATABASE with ENGINE=PINBA tables
 
-При удалении пакета (`dpkg -r`) `ha_pinba.so` удаляется с диска.
-Если плагин был загружен через `INSTALL PLUGIN` — запись остаётся в `mysql.plugin`.
+When removing the package (`dpkg -r`), `ha_pinba.so` is deleted from disk.
+If the plugin was loaded via `INSTALL PLUGIN`, the record remains in `mysql.plugin`.
 
-**Ловушка:** если попытаться `DROP DATABASE pinba` без загруженного плагина:
+**Pitfall:** attempting `DROP DATABASE pinba` without the plugin loaded:
 ```
 ERROR 1286 (42000): Unknown storage engine 'PINBA'
 ```
-MySQL вызывает хендлер движка даже при DROP — если плагина нет, падает.
+MySQL calls the engine handler even for DROP — if the plugin is missing, it fails.
 
-**Порядок правильной ручной очистки:**
+**Correct manual cleanup order:**
 ```sql
--- 1. Сначала загрузить плагин
+-- 1. Load the plugin first
 INSTALL PLUGIN pinba SONAME 'ha_pinba.so';
--- 2. Теперь можно дропнуть базу
+-- 2. Now the database can be dropped
 DROP DATABASE pinba;
--- 3. Выгрузить плагин
+-- 3. Unload the plugin
 UNINSTALL PLUGIN pinba;
 ```
 
 ---
 
-## prerm: удаление конфига и выгрузка плагина
+## prerm: removing config and unloading the plugin
 
 ```sh
 case "$1" in
     remove|purge)
-        # Удалить plugin-load-add конфиг (чтобы плагин не загружался после удаления пакета)
+        # Remove the plugin-load-add config so the plugin does not load after package removal
         rm -f /etc/mysql/conf.d/pinba-engine.cnf
 
-        # Выгрузить плагин если он сейчас активен
+        # Unload the plugin if it is currently active
         if mysql_available 2>/dev/null; then
             ACTIVE=$(mysql_exec --skip-column-names \
                 -e "SELECT COUNT(*) FROM information_schema.PLUGINS \
@@ -207,12 +208,12 @@ esac
 
 ## Output UX: [OK] / [--] / [!!]
 
-Рекомендуется явно маркировать статус каждого шага:
-- `[OK]` — выполнено успешно
-- `[--]` — пропущено (ожидаемо, не ошибка)
-- `[!!]` — предупреждение (выполнено частично)
+Recommended approach — mark the status of each step explicitly:
+- `[OK]` — completed successfully
+- `[--]` — skipped (expected, not an error)
+- `[!!]` — warning (partially completed)
 
-Сырые MySQL ошибки нужно скрывать (`>/dev/null 2>&1`) на операциях, которые
-могут ожидаемо упасть (INSTALL PLUGIN), и показывать только свои сообщения.
+Suppress raw MySQL errors (`>/dev/null 2>&1`) on operations that may legitimately fail
+(e.g., `INSTALL PLUGIN`), and emit only your own status messages.
 
-В конце — итоговый блок "Action required" если что-то нужно сделать вручную.
+End with a summary "Action required" block if the user needs to do anything manually.

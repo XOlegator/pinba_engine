@@ -14,7 +14,7 @@ related:
   - wiki/concepts/pinba-data-flow.md
   - wiki/concepts/mysql-plugin-abi.md
 confidence: high
-updated: 2026-06-06
+updated: 2026-06-07
 ---
 
 # Pinba Engine — Knowledge Base Overview
@@ -64,16 +64,20 @@ The MySQL runtime image doesn't have libprotobuf. The Dockerfile explicitly copi
 from the builder stage. Missing this breaks the plugin at load time.
 See [[docker-build-strategy]].
 
-### 6. PPA Publication Is Automated
-Source packages for Launchpad PPA are now built and uploaded from GitHub Actions.
-The workflow signs the source package, uploads via Launchpad's FTP path, and uses
-explicit source refs for manual rebuilds. When a bad upstream tarball version was
-burned in the PPA, the correct recovery was to cut a new upstream release (`v2.2.1`)
-rather than inventing a pseudo-version. See [[github-actions-ppa]].
+### 6. PPA Publication Is Fully Automated
+Source packages for Launchpad PPA are built and uploaded from GitHub Actions.
+The workflow signs the source package, uploads via Launchpad FTP with `passive_ftp = 1`
+and a retry loop, and uses explicit source refs for manual rebuilds.
+When a bad upstream tarball version was burned in the PPA, the correct recovery was to
+cut a new upstream release (`v2.2.1`) rather than inventing a pseudo-version.
+See [[github-actions-ppa]].
 
-### 7. Target MySQL Versions Are Monitored
-Ubuntu MySQL availability for the PPA target suites is checked by a weekly GitHub Actions
-workflow so changes in `noble` or `resolute` can be surfaced before the next release.
+### 7. MySQL Version Updates Trigger Full Release Cycle Automatically
+A weekly GitHub Actions workflow detects new MySQL patch versions for the PPA target suites
+(`noble`, `resolute`). When a change is detected, it re-extracts vendor headers, updates
+`.github/mysql-versions.json` (including `debian_revision`), opens a PR, and enables
+auto-merge. When that PR lands, `ppa-build` and `docker` workflows fire automatically,
+publishing new packages to Launchpad and Docker Hub without manual intervention.
 See [[github-actions-mysql-version-monitor]].
 
 ## Key Configuration Points
@@ -88,11 +92,11 @@ See [[github-actions-mysql-version-monitor]].
 
 ## Project Status
 
-Active modernization fork. Both MySQL 8.0 and 8.4 builds are tested via Docker.
-Docker Hub: `xolegator/pinba-engine` with tags `8.0`, `8.4-lts`.
-Tag cleanup in progress (removing `*-pinboard*` legacy tags).
-Launchpad PPA publication is automated through GitHub Actions for the source package flow.
-MySQL version drift across Ubuntu target suites is tracked by automation as well.
+Active modernization fork. Current release: **2.4.0**. Both MySQL 8.0 and 8.4 builds are
+tested via Docker and published to Docker Hub (`xolegator/pinba-engine`, tags `8.0`, `8.4-lts`).
+Launchpad PPA (`ppa:xolegator/packages`) is fully automated: packages for `noble` (MySQL 8.0)
+and `resolute` (MySQL 8.4) are published on every GitHub Release and on detected MySQL patch
+version changes. MySQL version drift is tracked and acted upon automatically.
 
 ## Knowledge Gaps
 
