@@ -159,3 +159,24 @@ Steps:
 - Credentials, server-specific paths, or personal configs.
 - Ephemeral debugging notes. Those go in output/, not wiki/.
 - Non-English text.
+
+---
+
+## Local Environment Policy
+
+**Never embed local filesystem paths in wiki/ content.** The knowledge base must be
+portable across all developers and environments.
+
+Forbidden patterns:
+- Absolute paths on a developer's machine (e.g., `/mnt/projects/sites/pinba_engine/`)
+- Paths that reveal a specific OS or user home directory (e.g., `/home/alice/`, `C:\Users\bob\`)
+- Hostnames of local dev servers (e.g., `www.myproject.local`, `pinboard-new.local`)
+- Environment-specific credentials or IP addresses
+
+Instead, refer to:
+- Repository-relative paths: `knowledge/wiki/concepts/`, `src/`, `.github/workflows/`
+- GitHub repository URLs: `github.com/XOlegator/pinba_engine`
+- Project or service names: "the Pinboard project", "XOlegator/pinba_extension repository"
+- Standard OS paths that are part of the documented software (e.g., `/usr/lib/php/`, `/etc/php/`)
+
+This rule applies to all files under `wiki/`: concepts, sources, comparisons, index, log, and overview.
