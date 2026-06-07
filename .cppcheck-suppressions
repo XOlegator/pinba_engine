@@ -1,0 +1,10 @@
+// cppcheck-suppress-file: false positives that cannot be fixed in source code
+
+// mysql_declare_plugin() is a MySQL-internal macro that expands to a complex
+// struct initializer. cppcheck cannot parse it without full MySQL headers.
+syntaxError:src/ha_pinba.cc
+
+// new (std::nothrow) T{} value-initializes the object; all fields are
+// zero/default-constructed. cppcheck incorrectly flags the pointer variable
+// as uninitialized even though it is assigned on the same line.
+legacyUninitvar:src/threadpool.cc
