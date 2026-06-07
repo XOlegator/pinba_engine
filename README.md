@@ -77,8 +77,8 @@ cmake --build --preset release
 
 - [docs/build.md](docs/build.md) — build requirements, CMake presets, local plugin install
 - [docs/docker.md](docs/docker.md) — Docker images: build, run, publish
+- [docs/tables.md](docs/tables.md) — all table types: core, report1–18, tag_report, tagN_info, rtag_* with COMMENT syntax
 - [docs/releasing.md](docs/releasing.md) — release flow and commit message rules
-- [docs/roadmap.md](docs/roadmap.md) — open work and known gaps
 - [API reference](https://xolegator.github.io/pinba_engine/) — generated Doxygen documentation
 
 ## License
