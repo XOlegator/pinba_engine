@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.2](https://github.com/XOlegator/pinba_engine/compare/v2.4.1...v2.4.2) (2026-06-07)
+
+
+### Bug Fixes
+
+* **build:** pass buffer size to pinba_map_first/next to suppress snprintf overflow warnings ([#36](https://github.com/XOlegator/pinba_engine/issues/36)) ([1e439d4](https://github.com/XOlegator/pinba_engine/commit/1e439d4c3d526762b26fa5eeaa09a2df4cf9feb3))
+* **docs:** sync CMakeLists.txt version to 2.4.1 and expand API docs ([#37](https://github.com/XOlegator/pinba_engine/issues/37)) ([74a97c6](https://github.com/XOlegator/pinba_engine/commit/74a97c66bf8933093aad43e083c7e999d270f507))
+
 ## [2.4.1](https://github.com/XOlegator/pinba_engine/compare/v2.4.0...v2.4.1) (2026-06-07)
 
 
