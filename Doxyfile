@@ -28,10 +28,26 @@ EXTRACT_STATIC         = NO
 
 GENERATE_HTML          = YES
 HTML_OUTPUT            = html
-HTML_DYNAMIC_SECTIONS  = NO
+HTML_DYNAMIC_SECTIONS  = YES
+HTML_EXTRA_STYLESHEET  = docs/doxygen-awesome-css/doxygen-awesome.css
+HTML_COLORSTYLE        = LIGHT
+GENERATE_TREEVIEW      = YES
+DISABLE_INDEX          = NO
+FULL_SIDEBAR           = NO
 GENERATE_LATEX         = NO
 GENERATE_MAN           = NO
 GENERATE_XML           = NO
+
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+REFERENCED_BY_RELATION = YES
+REFERENCES_RELATION    = YES
+
+HAVE_DOT               = YES
+DOT_IMAGE_FORMAT       = svg
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
+MAX_DOT_GRAPH_DEPTH    = 3
 
 WARN_IF_UNDOCUMENTED   = NO
 QUIET                  = YES
