@@ -3,6 +3,11 @@ name: Docker
 on:
   release:
     types: [published]
+  push:
+    branches: [master]
+    paths:
+      - 'Dockerfile.mysql80'
+      - 'Dockerfile.mysql84'
   workflow_dispatch:
     inputs:
       release-tag:
@@ -24,7 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.release-tag != '' && inputs.release-tag || github.ref }}
+          ref: ${{ github.event_name == 'release' && (inputs.release-tag || github.ref) || github.sha }}
 
       - uses: docker/setup-buildx-action@v4
 
@@ -33,12 +38,18 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Extract version from tag
+      - name: Resolve pinba version
         id: meta
         run: |
-          TAG="${{ inputs.release-tag != '' && inputs.release-tag || github.ref_name }}"
-          VERSION="${TAG#v}"
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            TAG="${{ inputs.release-tag != '' && inputs.release-tag || github.ref_name }}"
+            VERSION="${TAG#v}"
+          else
+            # push (MySQL update) or workflow_dispatch without tag: read from manifest
+            VERSION="$(jq -r '."."' .release-please-manifest.json)"
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building Docker image: pinba-engine $VERSION (MySQL ${{ matrix.series }})"
 
       - uses: docker/build-push-action@v7
         with:
