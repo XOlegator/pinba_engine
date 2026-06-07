@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0](https://github.com/XOlegator/pinba_engine/compare/v2.2.1...v2.3.0) (2026-06-07)
+
+
+### Features
+
+* **debian:** add AppStream metainfo for Discover and GNOME Software ([12f16f9](https://github.com/XOlegator/pinba_engine/commit/12f16f9d601fe0d1abc836ccc2a49e8005c3f2df))
+* **debian:** add AppStream metainfo for Discover and GNOME Software ([22b9f36](https://github.com/XOlegator/pinba_engine/commit/22b9f36fdd97b4ae2a992ffb84a0e378f55b49cc))
+
 ## [2.2.1](https://github.com/XOlegator/pinba_engine/compare/v2.2.0...v2.2.1) (2026-06-06)
 
 
