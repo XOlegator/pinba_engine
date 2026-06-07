@@ -14,6 +14,50 @@ Chronological record of all ingest, query, lint, and revision operations.
 
 ---
 
+## 2026-06-07 — Ingest: PHP Pinba Extension Fork (XOlegator/pinba_extension)
+
+**Action:** Explored the XOlegator/pinba_extension repository and ingested key facts about the fork's
+purpose, structure, API, build system, CI, and packaging plan.
+
+**Source read:** `pinba.c`, `php_pinba.h`, `config.m4`, `pinba.pb-c.h`,
+`tests/*.phpt`, `.github/workflows/ci.yml`, `.github/workflows/discover-php-versions.yml`,
+`.github/scripts/update-php-support-matrix.php`, `.github/php-versions.json`,
+`.github/packaging-matrix.json`, `docs/packaging.md`
+
+**Source page created:**
+- `wiki/sources/pinba-extension-fork.md` — full fork summary: repo structure,
+  key constants, INI directives, changes from upstream tony2001/1.1.2, PHPT test list
+
+**Concept pages created:**
+- `wiki/concepts/php-extension-api.md` — complete PHP function reference:
+  timer lifecycle (start/stop/delete/add), mutation functions, request-level overrides,
+  request-level tags, data access functions, flow control (flush/reset), constants,
+  usage patterns for web and CLI/worker contexts
+- `wiki/concepts/php-extension-build.md` — phpize build system: source file roles,
+  build steps, config.m4 mechanics, PHPT test format, multi-PHP CI matrix,
+  contrast with MySQL plugin CMake build, local install instructions
+- `wiki/concepts/php-extension-packaging.md` — Debian packaging strategy:
+  source package `php-pinba`, binary packages `php{X.Y}-pinba`, per-version install maps,
+  INI template, version scheme, design constraints, current status (debian/ not yet created)
+- `wiki/concepts/php-version-monitoring.md` — automated PHP version discovery:
+  `discover-php-versions.yml` weekly cron, `update-php-support-matrix.php` DOM parsing
+  of php.net, output structure of `php-versions.json`, consumers in CI,
+  gating rule (CI must pass before packaging), contrast with MySQL version monitor
+
+**Files updated:**
+- `wiki/index.md` — concept count 18→22, added 4 new concept rows, source count 11→12,
+  added `[[pinba-extension-fork]]` source row, added gap for debian/ skeleton
+
+**Key findings documented:**
+- The fork uses `mallinfo2()` (glibc 2.33+) replacing deprecated `mallinfo()`,
+  with compile-time fallback — this is the same class of change as `mysql:8.4` OL9 paths
+- `protobuf-c` is bundled — no external `.so` dependency unlike the MySQL plugin
+- PHP version discovery is human-gated (no auto-merge) whereas MySQL version monitor
+  auto-merges and triggers a full release cycle
+- The packaging `debian/` directory is the next planned step in the fork roadmap
+
+---
+
 ## 2026-06-07 — REVISION: Full wiki audit and translation
 
 **Action:** Full revision of the knowledge base per the Karpathy LLM Wiki methodology:
@@ -235,7 +279,7 @@ Both containers validated:
 
 ## 2026-05-23 — Ingest: Pinboard Architecture
 
-**Action:** Explored `/mnt/projects/sites/pinba/www-new/` and compiled architecture doc.
+**Action:** Explored the Pinboard (`www-new`) project and compiled architecture doc.
 
 **Raw document added:**
 - `raw/repos/pinboard-architecture.md` — Symfony 8 stack, aggregate command logic, Docker Compose services, env vars
