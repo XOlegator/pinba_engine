@@ -1,3 +1,25 @@
+/*
+ * Protocol Buffers compatibility shim.
+ *
+ * The engine decodes incoming UDP packets with the C++ Protocol Buffers
+ * runtime (libprotobuf, found via CMake `find_package(Protobuf)` and generated
+ * by `protobuf_generate_cpp` into pinba.pb.{h,cc}). C++ protobuf is used here
+ * deliberately: this engine is a MySQL 8 plugin built with CMake/C++23, and
+ * MySQL itself ships and links the C++ protobuf runtime, so reusing it keeps
+ * the toolchain and ABI aligned with the host server.
+ *
+ * The rest of the engine (data.cc, ha_pinba.cc, pool.cc, ...) predates that
+ * migration and operates on plain C-style structs (Pinba__Request and friends)
+ * defined in the hand-written pinba.pb-c.h. This file bridges the two: it
+ * converts a decoded `Pinba::Request` (C++ message) into a `Pinba__Request`
+ * (flat C struct), so the legacy data path did not have to be rewritten.
+ *
+ * Note: this is NOT the protobuf-c (C) runtime. The PHP extension
+ * (pinba_extension) genuinely uses protobuf-c, which is the right choice for a
+ * lean PHP C extension; the engine and the extension intentionally use
+ * different runtimes. The single shared contract between them is pinba.proto.
+ */
+
 #include "pinba.pb-c.h"
 #include "pinba.pb.h"
 
