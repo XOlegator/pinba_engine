@@ -4,19 +4,20 @@ type: index
 sources: []
 related: []
 confidence: high
-updated: 2026-06-07
+updated: 2026-06-09
 ---
 
 # Pinba Engine — Knowledge Base Index
 
 Master catalog. Maintained by LLM agents.
 
-## Concepts (22 articles)
+## Concepts (23 articles)
 
 | Article | Key Topic |
 |---------|-----------|
 | [[pinba-data-flow]] | End-to-end pipeline: PHP → UDP → pool → SQL |
 | [[pinba-udp-protocol]] | Protobuf message format, timer parallel arrays, field versions |
+| [[protobuf-runtime-strategy]] | Engine (C++ protobuf + shim) vs extension (protobuf-c); shared `pinba.proto` contract; fields 22/23; drift guard |
 | [[pinba-pool-model]] | Cyclic buffer memory model, overflow behaviour, monitoring |
 | [[mysql-plugin-abi]] | **Critical**: 8.0 vs 8.4 ABI incompatibility, implications |
 | [[mysql-plugin-install]] | INSTALL PLUGIN lifecycle, reinstall procedure |
@@ -38,7 +39,7 @@ Master catalog. Maintained by LLM agents.
 | [[mysql-vendor-headers-minimal]] | Minimal vendor headers via .d file analysis (1317→162 files) |
 | [[launchpad-ppa-workflow]] | dput configuration, signing, versioning, GPGKeyTemporarilyNotFoundError |
 
-## Sources (12 documents)
+## Sources (13 documents)
 
 | Source | Raw File |
 |--------|---------|
@@ -54,6 +55,7 @@ Master catalog. Maintained by LLM agents.
 | [[github-actions-docker-workflow]] (raw) | `raw/docs/github-actions-docker-workflow.md` |
 | [[ppa-packaging-session-2026-06-04]] | `raw/sessions/ppa-packaging-session-2026-06-04.md` |
 | [[ppa-upload-session-2026-06-06]] | `raw/sessions/ppa-upload-session-2026-06-06.md` |
+| [[protobuf-modernization-session-2026-06-09]] | PRs: pinba_extension#13, pinba_engine#45 |
 
 ## Raw Documents
 
