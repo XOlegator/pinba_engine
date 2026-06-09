@@ -24,7 +24,6 @@ jobs:
         run: |
           find src tests -type f \( -name "*.cc" -o -name "*.h" -o -name "*.c" \) \
             ! -name "xxhash.c" ! -name "xxhash.h" \
-            ! -name "protobuf-c.h" ! -name "protobuf-c-private.h" \
             ! -name "pinba.pb-c.cc" ! -name "pinba.pb-c.h" \
             | xargs clang-format --dry-run --Werror
 
