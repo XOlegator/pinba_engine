@@ -93,4 +93,3 @@ Third-party components bundled in this repository:
 | Component | Files | License |
 |---|---|---|
 | [xxHash](https://github.com/Cyan4973/xxHash) | `src/xxhash.[ch]` | BSD-2-Clause |
-| [protobuf-c](https://github.com/protobuf-c/protobuf-c) | `src/protobuf-c.h` | BSD-3-Clause |

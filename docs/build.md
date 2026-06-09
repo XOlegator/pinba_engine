@@ -28,6 +28,30 @@ sudo apt-get install -y \
   mysql-server mysql-client-8.0
 ```
 
+## Protocol Buffers
+
+The engine decodes the Pinba UDP wire format with the **C++ Protocol Buffers**
+runtime (`libprotobuf`, 3.x). CMake locates it via `find_package(Protobuf)` and
+generates `pinba.pb.{h,cc}` from `pinba.proto` with `protobuf_generate_cpp`.
+
+C++ protobuf is used on purpose: the engine is a MySQL 8 plugin built with
+CMake/C++23, and MySQL itself ships and links the C++ protobuf runtime, so
+reusing it keeps the toolchain and ABI aligned with the host server.
+
+The legacy data path (`data.cc`, `ha_pinba.cc`, `pool.cc`, ...) works on plain
+C-style structs (`Pinba__Request` and friends) declared in the hand-written
+`src/pinba.pb-c.h`. `src/pinba.pb-c.cc` is a thin shim that converts a decoded
+C++ `Pinba::Request` into that flat C struct, so the data path did not have to
+be rewritten during the MySQL 8 migration. This is **not** the protobuf-c (C)
+runtime — only the struct shape resembles it.
+
+Relationship with the PHP extension: the
+[pinba_extension](https://github.com/XOlegator/pinba_extension) client
+genuinely uses the protobuf-c (C) runtime, which is the right fit for a lean
+PHP C extension. The two projects intentionally use different protobuf runtimes;
+the only shared, stable contract is `pinba.proto`. Keep both copies of
+`pinba.proto` field-compatible — only append fields, never renumber or retype.
+
 ## MySQL Server Headers
 
 A plugin build requires MySQL server headers, not only the client development package.

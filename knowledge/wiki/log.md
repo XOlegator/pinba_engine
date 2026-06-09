@@ -5,12 +5,42 @@ sources: []
 related:
   - wiki/index.md
 confidence: high
-updated: 2026-06-07
+updated: 2026-06-09
 ---
 
 # Activity Log
 
 Chronological record of all ingest, query, lint, and revision operations.
+
+---
+
+## 2026-06-09 — Ingest + revision: protobuf runtime strategy
+
+**Action:** Recorded a working session that modernized protobuf usage across the
+PHP extension and the engine, and analysed whether protobuf should be handled
+uniformly in both projects.
+
+**Pages created:**
+- `wiki/concepts/protobuf-runtime-strategy.md` — engine uses C++ protobuf with a
+  shim; extension uses protobuf-c; shared contract is `pinba.proto`; fields 22/23
+  (per-timer rusage); vendored→system migration; CI drift guard.
+- `wiki/sources/protobuf-modernization-session-2026-06-09.md` — session summary,
+  sourced from pinba_extension#13 and pinba_engine#45.
+
+**Pages revised:**
+- `wiki/concepts/pinba-udp-protocol.md` — corrected a stale claim that the engine
+  "uses protobuf-c, not C++". The engine actually uses C++ protobuf with a shim.
+  Added a note on fields 22/23 and a cross-link.
+- `wiki/index.md` — added the new concept and source; counts 22→23 concepts,
+  12→13 sources.
+
+**Key findings documented:**
+- Principle: unify the contract (`pinba.proto`), not the runtime — each project's
+  protobuf runtime is idiomatic for its host (MySQL 8 plugin vs PHP C extension).
+- Fields `timer_ru_utime` (22) / `timer_ru_stime` (23) were added to the engine
+  on 2013-11-12 by Antony Dovgal ("add rusage to timers and timer reports").
+- The extension's checked-in `pinba.proto` had drifted (missing 22/23); a CI
+  drift guard now regenerates bindings and fails on mismatch.
 
 ---
 

@@ -7,8 +7,9 @@ sources:
 related:
   - wiki/concepts/pinba-data-flow.md
   - wiki/concepts/pinba-engine-internals.md
+  - wiki/concepts/protobuf-runtime-strategy.md
 confidence: high
-updated: 2026-05-23
+updated: 2026-06-09
 ---
 
 # Pinba UDP Protocol
@@ -57,7 +58,15 @@ The engine handles both old (pre-1.1) and new packets gracefully.
 ## Protocol Stability
 
 The `.proto` definition has been stable since 1.1.0 (2015). No breaking changes since then.
-Both the server (this engine) and the client (PHP extension) ship the same `pinba.proto`.
-The fork uses `pinba.pb-c.h` / `pinba.pb-c.cc` (protobuf-C, not C++) for performance.
+Both the server (this engine) and the client (PHP extension) ship the same `pinba.proto`
+(fields 1–23). They deliberately use **different protobuf runtimes**: the engine decodes
+with the C++ Protocol Buffers runtime and adapts the message into flat C-style structs via
+a shim (`src/pinba.pb-c.cc`), while the PHP extension uses the protobuf-c (C) runtime. The
+shared, stable artifact is the schema, not the generated code. See
+[[protobuf-runtime-strategy]].
 
-See: [[pinba-data-flow]], [[pinba-engine-internals]]
+Note: fields `timer_ru_utime` (22) and `timer_ru_stime` (23) carry per-timer CPU usage as
+`repeated float` arrays parallel to `timer_value`; they are decoded the same way as the
+other parallel timer arrays.
+
+See: [[pinba-data-flow]], [[pinba-engine-internals]], [[protobuf-runtime-strategy]]
