@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.1](https://github.com/XOlegator/pinba_engine/compare/v2.6.0...v2.6.1) (2026-06-10)
+
+
+### Bug Fixes
+
+* **ppa:** populate author and license metadata for all binary packages ([#46](https://github.com/XOlegator/pinba_engine/issues/46)) ([189b51e](https://github.com/XOlegator/pinba_engine/commit/189b51e3f6b4800b283b37be0a91c1d4cf47762e))
+
 ## [2.6.0](https://github.com/XOlegator/pinba_engine/compare/v2.5.0...v2.6.0) (2026-06-07)
 
 
