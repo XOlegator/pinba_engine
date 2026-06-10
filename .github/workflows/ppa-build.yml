@@ -123,6 +123,7 @@ jobs:
         run: |
           sudo apt-get update -q
           sudo apt-get install -y --no-install-recommends \
+            appstream \
             build-essential \
             cmake \
             debhelper \
@@ -177,6 +178,20 @@ jobs:
             --distribution "${{ matrix.distribution }}" \
             --newversion "${{ steps.version.outputs.full_version }}" \
             "Automated PPA build from GitHub Actions for Ubuntu ${{ matrix.ubuntu_version }}."
+
+      - name: Refresh AppStream release metadata
+        run: |
+          version="${{ steps.version.outputs.upstream_version }}"
+          # Prepend the version being packaged as the newest <release> of every
+          # component (common + per-MySQL plugins), unless it is already listed.
+          # Keeps Discover/GNOME Software showing the current version without a
+          # manual bump on every release.
+          for meta in debian/*.metainfo.xml; do
+            if ! grep -q "version=\"${version}\"" "$meta"; then
+              sed -i "s#<releases>#<releases>\n    <release version=\"${version}\" date=\"$(date +%F)\"/>#" "$meta"
+            fi
+            appstreamcli validate --no-net "$meta"
+          done
 
       - name: Create orig tarball
         run: |

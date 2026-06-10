@@ -80,5 +80,13 @@ else
 endif
 	install -D -m 644 debian/pinba-engine.metainfo.xml \
 		$(CURDIR)/debian/pinba-engine-common/usr/share/metainfo/io.github.xolegator.pinba-engine.metainfo.xml
+ifeq ($(ENABLE_MYSQL80),1)
+	install -D -m 644 debian/pinba-engine-mysql-8.0.metainfo.xml \
+		$(CURDIR)/debian/pinba-engine-mysql-8.0/usr/share/metainfo/io.github.xolegator.pinba-engine-mysql80.metainfo.xml
+endif
+ifeq ($(ENABLE_MYSQL84),1)
+	install -D -m 644 debian/pinba-engine-mysql-8.4.metainfo.xml \
+		$(CURDIR)/debian/pinba-engine-mysql-8.4/usr/share/metainfo/io.github.xolegator.pinba-engine-mysql84.metainfo.xml
+endif
 
 override_dh_auto_test: ;
