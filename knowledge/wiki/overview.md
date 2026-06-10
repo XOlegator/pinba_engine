@@ -14,7 +14,7 @@ related:
   - wiki/concepts/pinba-data-flow.md
   - wiki/concepts/mysql-plugin-abi.md
 confidence: high
-updated: 2026-06-07
+updated: 2026-06-10
 ---
 
 # Pinba Engine — Knowledge Base Overview
@@ -92,7 +92,7 @@ See [[github-actions-mysql-version-monitor]].
 
 ## Project Status
 
-Active modernization fork. Current release: **2.4.0**. Both MySQL 8.0 and 8.4 builds are
+Active modernization fork. Current release: **2.6.1**. Both MySQL 8.0 and 8.4 builds are
 tested via Docker and published to Docker Hub (`xolegator/pinba-engine`, tags `8.0`, `8.4-lts`).
 Launchpad PPA (`ppa:xolegator/packages`) is fully automated: packages for `noble` (MySQL 8.0)
 and `resolute` (MySQL 8.4) are published on every GitHub Release and on detected MySQL patch

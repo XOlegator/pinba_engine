@@ -4,14 +4,14 @@ type: index
 sources: []
 related: []
 confidence: high
-updated: 2026-06-09
+updated: 2026-06-10
 ---
 
 # Pinba Engine — Knowledge Base Index
 
 Master catalog. Maintained by LLM agents.
 
-## Concepts (23 articles)
+## Concepts (25 articles)
 
 | Article | Key Topic |
 |---------|-----------|
@@ -25,6 +25,7 @@ Master catalog. Maintained by LLM agents.
 | [[php-pinba-configuration]] | php.ini settings, deployment scenarios, silent failure |
 | [[php-extension-api]] | Complete PHP function reference: timer lifecycle, request tags, overrides |
 | [[php-extension-build]] | phpize build system, PHPT tests, multi-PHP CI matrix |
+| [[php-extension-test-infrastructure]] | Coverage (gcov→Codecov), JUnit, ASan/UBSan via instrumented PHP (RTLD_DEEPBIND), `tools/run-tests.sh`; bugs found |
 | [[php-extension-packaging]] | Debian packaging for PHP extensions: php-pinba source, php{X.Y}-pinba binaries |
 | [[php-version-monitoring]] | Automated PHP version discovery: weekly cron, php.net parsing, PR gate |
 | [[cmake-build-system]] | Presets, MySQL headers sourcing, Ubuntu 24.04 deps |
@@ -35,11 +36,12 @@ Master catalog. Maintained by LLM agents.
 | [[github-actions-mysql-version-monitor]] | Weekly MySQL version monitor: auto-PR with vendor header update and full release cycle trigger |
 | [[pinboard-architecture]] | Pinboard (Symfony 8) stack, aggregation logic, docker compose |
 | [[debian-ppa-packaging]] | Debian/PPA packaging: debian/ structure, rules, versioning, Build-Depends, rapidjson |
+| [[appstream-metainfo-packaging]] | Author/License in Discover/GNOME Software via AppStream metainfo `<pkgname>` binding; per-package metainfo; release auto-refresh |
 | [[mysql-postinst-patterns]] | postinst/prerm: auth cascade, plugin-load-add, MySQL 8.0 syntax pitfalls |
 | [[mysql-vendor-headers-minimal]] | Minimal vendor headers via .d file analysis (1317→162 files) |
 | [[launchpad-ppa-workflow]] | dput configuration, signing, versioning, GPGKeyTemporarilyNotFoundError |
 
-## Sources (13 documents)
+## Sources (14 documents)
 
 | Source | Raw File |
 |--------|---------|
@@ -56,6 +58,7 @@ Master catalog. Maintained by LLM agents.
 | [[ppa-packaging-session-2026-06-04]] | `raw/sessions/ppa-packaging-session-2026-06-04.md` |
 | [[ppa-upload-session-2026-06-06]] | `raw/sessions/ppa-upload-session-2026-06-06.md` |
 | [[protobuf-modernization-session-2026-06-09]] | PRs: pinba_extension#13, pinba_engine#45 |
+| [[test-infra-appstream-session-2026-06-10]] | PRs: pinba_engine#46/#47, pinba_extension#14/#15/#16 |
 
 ## Raw Documents
 
