@@ -5,12 +5,59 @@ sources: []
 related:
   - wiki/index.md
 confidence: high
-updated: 2026-06-09
+updated: 2026-06-10
 ---
 
 # Activity Log
 
 Chronological record of all ingest, query, lint, and revision operations.
+
+---
+
+## 2026-06-10 — Ingest: Test Infrastructure Modernization + AppStream Packaging
+
+**Action:** Recorded a working session spanning both repositories: AppStream packaging
+metadata for the engine, and a regression-test + test-infrastructure modernization for the
+PHP extension that uncovered and fixed two real bugs.
+
+**Source read:** merged PRs — `pinba_engine#46` (AppStream fix), `#47` (release 2.6.1);
+`pinba_extension#14` (per-timer rusage tests), `#15` (wire-format / replace / validation
+tests), `#16` (coverage, sanitizers, Valgrind, JUnit). Engine `debian/` metainfo and
+`debian/rules`; extension `pinba.c`, `tools/run-tests.sh`, `tools/build-php-asan.sh`,
+`.github/workflows/ci.yml`.
+
+**Source page created:**
+- `wiki/sources/test-infra-appstream-session-2026-06-10.md`
+
+**Concept pages created:**
+- `wiki/concepts/appstream-metainfo-packaging.md` — Discover/GNOME Software read Author and
+  License from an AppStream metainfo component bound to the package via `<pkgname>`, not from
+  `debian/control`/`debian/copyright`; one metainfo per binary package; rDNS-hyphen validate
+  gotcha; releases auto-refreshed by the PPA workflow.
+- `wiki/concepts/php-extension-test-infrastructure.md` — PHPT is the right harness (not
+  PHPUnit); `tools/run-tests.sh` modes; C coverage (gcov/gcovr → Codecov, ~83% of `pinba.c`);
+  JUnit; gating ASan/UBSan run against a purpose-built instrumented PHP because stock PHP uses
+  `RTLD_DEEPBIND`; gotchas (gcovr conftest, `vm.mmap_rnd_bits`, debug-build arginfo/zpp check).
+
+**Pages revised:**
+- `wiki/concepts/php-extension-build.md` — corrected the PHPT example/table: the suite uses
+  `--SKIPIF--`, not `--EXTENSIONS--` (the latter is not supported across the run-tests versions
+  in the 8.2–8.5 matrix). Added cross-links to the new test-infrastructure page.
+- `wiki/index.md` — concepts 23→25, sources 13→14; added the two concepts and the source.
+- `wiki/overview.md` — current release 2.4.0→2.6.1.
+
+**Key findings documented:**
+- Software centres bind Author/License to a package through the metainfo `<pkgname>` element;
+  without it the package card shows "Author unknown"/"license unknown" even though the
+  metainfo is installed and validates.
+- A real ASan gate for a PHP extension requires instrumenting PHP itself: a stock PHP loads
+  extensions with `RTLD_DEEPBIND`, which ASan rejects when only the extension is instrumented.
+- A debug PHP build enforces the "Arginfo / zpp mismatch" fatal; an instrumented PHP catches
+  memory-safety bugs invisible to functional tests.
+- Two pre-existing `pinba.c` bugs were found and fixed: `pinba_timers_get()` arginfo/zpp
+  mismatch (missing `flags` argument in arginfo), and a use-after-free of timer resources at
+  request shutdown (`PINBA_G(in_rshutdown)` set after the RSHUTDOWN flush, so the flush
+  deleted resources from `EG(regular_list)` that the executor then freed again).
 
 ---
 

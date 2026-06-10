@@ -6,9 +6,10 @@ sources:
 related:
   - wiki/sources/pinba-extension-fork.md
   - wiki/concepts/php-extension-api.md
+  - wiki/concepts/php-extension-test-infrastructure.md
   - wiki/concepts/cmake-build-system.md
 confidence: high
-updated: 2026-06-07
+updated: 2026-06-10
 ---
 
 # PHP Extension Build System
@@ -72,8 +73,8 @@ PHPT is PHP's native test format. Each `.phpt` file contains sections:
 ```
 --TEST--
 Short description of what is tested
---EXTENSIONS--
-pinba
+--SKIPIF--
+<?php if (!extension_loaded("pinba")) print "skip"; ?>
 --INI--
 pinba.enabled=0
 --FILE--
@@ -88,12 +89,16 @@ Sections relevant to this extension:
 
 | Section | Use |
 |---------|-----|
-| `--EXTENSIONS--` | Ensures `pinba` is loaded before the test runs |
+| `--SKIPIF--` | Skip condition; the suite uses it to require `pinba` to be loaded |
 | `--INI--` | Overrides `php.ini` settings for the test |
-| `--SKIPIF--` | Skip condition (e.g., extension not available) |
 | `--FILE--` | PHP code executed in a subprocess |
 | `--EXPECT--` | Exact expected stdout |
 | `--EXPECTF--` | Expected stdout with `%s`, `%d` printf-style wildcards |
+
+`run-tests.php` also has an `--EXTENSIONS--` section, but it is not supported by every
+`run-tests.php` version across the 8.2–8.5 matrix, so the portable `--SKIPIF--` is used
+instead. For coverage, sanitizer and JUnit tooling around the suite, see
+[[php-extension-test-infrastructure]].
 
 On failure, `make test` generates `.diff`, `.exp`, `.log`, and `.out` files in `tests/`
 which CI collects as artifacts.
@@ -163,4 +168,4 @@ extension=pinba.so
 
 Then: `sudo phpenmod -v 8.4 pinba`
 
-See: [[php-extension-api]], [[php-extension-packaging]], [[php-version-monitoring]]
+See: [[php-extension-api]], [[php-extension-test-infrastructure]], [[php-extension-packaging]], [[php-version-monitoring]]
