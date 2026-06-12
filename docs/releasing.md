@@ -15,13 +15,25 @@ This replaces the old manual NEWS-driven flow, which is now archived in `docs/le
 
 Configured via GitHub Actions + Release Please:
 
-- open/update a **Release PR** to `master`;
+- open/update a **Release PR** to `master` **when there is at least one release-triggering commit**;
 - calculate next SemVer version:
   - `major`: commit with `!` or `BREAKING CHANGE:`;
   - `minor`: at least one `feat`;
-  - `patch`: everything else (`fix`, `perf`, `refactor`, `docs`, `test`, `chore`);
+  - `patch`: `fix`, `perf`, `revert`, `deps`;
 - update `CHANGELOG.md`;
 - create a Git tag (`vX.Y.Z`) and GitHub Release after merge.
+
+### Commits that do not trigger a release
+
+With the current Release Please configuration only "user-facing" commit types trigger a release
+(`feat`, `fix`, `perf`, `revert`, `deps`, and any breaking change). The following types are
+**not** release-triggering on their own and will not open a Release PR by themselves:
+
+- `docs`, `style`, `refactor`, `test`, `build`, `ci`, `chore`.
+
+In particular, a documentation-only or CI-only change does **not** produce a new patch release.
+These commits are still valid and are folded into the changelog of the next release that *is*
+triggered by a release-triggering commit — they just do not start a release on their own.
 
 ## Commit and PR rules
 
@@ -54,7 +66,8 @@ Breaking changes:
 ## Release lifecycle
 
 1. Developers merge regular PRs into `master`.
-2. GitHub Action `release-please` opens/updates a Release PR.
+2. GitHub Action `release-please` opens/updates a Release PR once `master` contains at least one
+   release-triggering commit since the last release (see "Commits that do not trigger a release").
 3. Maintainer reviews and merges the Release PR.
 4. Release Please creates:
    - tag `vX.Y.Z`;
