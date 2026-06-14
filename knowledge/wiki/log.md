@@ -5,12 +5,40 @@ sources: []
 related:
   - wiki/index.md
 confidence: high
-updated: 2026-06-10
+updated: 2026-06-14
 ---
 
 # Activity Log
 
 Chronological record of all ingest, query, lint, and revision operations.
+
+---
+
+## 2026-06-14 — Ingest: RPM/COPR Packaging (PHP extension)
+
+**Action:** Recorded a live session that added RPM distribution for the PHP extension via
+Fedora COPR built against Remi, the RPM counterpart of the Debian/PPA track.
+
+**Source read:** merged PRs `pinba_extension#44` (spec + workflow), `#45` (copr-cli SRPM
+path + COPR_CONFIG validation), `#47`/`#49` (README install + badge), `#48` (matrix + Remi
+probe), `#51` (CodeQL cleanup); files `rpm/pinba.spec`, `rpm/build-srpm.sh`,
+`.github/workflows/rpm.yml`, `.github/rpm-matrix.json`, `.github/scripts/update-rpm-matrix.php`.
+
+**Pages created:**
+- `wiki/concepts/copr-rpm-packaging.md`
+- `wiki/sources/rpm-copr-session-2026-06-14.md`
+
+**Pages updated:** `wiki/index.md` (concept + source rows, counts 25→26 / 14→15).
+
+**Key findings documented:**
+- COPR is the RPM analog of a Launchpad PPA; `epel-9`/`epel-10` chroots cover the whole
+  RHEL family (AlmaLinux/Rocky/RHEL). One COPR project holds a whole stack, so a future
+  `pinba-engine` RPM belongs in the same `xolegator/pinba` project.
+- Remi must be configured **per chroot**, never project-wide: the other family's baseurl
+  404s (`fedora/9` on EL, `enterprise/44` on Fedora) and DNF fails the build hard.
+- `php<XY>-php-devel` is Remi-only; RPM `%{lua:}` output needs `rpm.expand()` for
+  `%{_libdir}`/`%{?_isa}`; debug subpackages must be disabled; Remi `primary.xml` is bzip2;
+  binaries live in repo `repodata`/`Packages/p/`, not the build-id dir.
 
 ---
 

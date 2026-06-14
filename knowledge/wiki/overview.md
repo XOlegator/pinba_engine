@@ -13,8 +13,9 @@ related:
   - wiki/index.md
   - wiki/concepts/pinba-data-flow.md
   - wiki/concepts/mysql-plugin-abi.md
+  - wiki/concepts/copr-rpm-packaging.md
 confidence: high
-updated: 2026-06-10
+updated: 2026-06-14
 ---
 
 # Pinba Engine — Knowledge Base Overview
@@ -79,6 +80,14 @@ A weekly GitHub Actions workflow detects new MySQL patch versions for the PPA ta
 auto-merge. When that PR lands, `ppa-build` and `docker` workflows fire automatically,
 publishing new packages to Launchpad and Docker Hub without manual intervention.
 See [[github-actions-mysql-version-monitor]].
+
+### 8. RPM Distribution via COPR + Remi
+Alongside the Debian/PPA track, the stack is packaged as `.rpm` through Fedora COPR, built
+against Remi's PHP collections. The PHP extension publishes `php<XY>-php-pinba` for Fedora
+and EPEL 9/10 (AlmaLinux/Rocky/RHEL); a release auto-publishes to both the PPA and COPR from
+one tag. The decisive gotcha: Remi must be configured **per chroot** in the COPR project, not
+project-wide, or the other distro family's baseurl 404s and DNF fails the build.
+See [[copr-rpm-packaging]].
 
 ## Key Configuration Points
 
