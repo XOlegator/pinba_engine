@@ -175,12 +175,11 @@ jobs:
 
       - name: SQL smoke test
         run: |
-          # smoke_test.sh drives the `mysql` CLI; the mariadb-client package usually
-          # provides it as a compat symlink, but fall back to `mariadb` if absent.
-          command -v mysql >/dev/null || sudo ln -sf "$(command -v mariadb)" /usr/local/bin/mysql
-          # Use host "localhost" so the client connects over the unix socket, where
-          # sudo authenticates root via unix_socket (fresh MariaDB has no TCP root).
-          sudo bash scripts/smoke_test.sh localhost 3306 root "" pinba
+          # mariadb-client may not ship the `mysql` compat symlink; drive the client
+          # by name via MYSQL_CLIENT (honoured by smoke_test.sh), passed through sudo
+          # inline so the sudoers policy does not strip it. Host "localhost" makes the
+          # client use the unix socket, where sudo authenticates root via unix_socket.
+          sudo MYSQL_CLIENT=mariadb bash scripts/smoke_test.sh localhost 3306 root "" pinba
 
   sanitize:
     name: Sanitize / MySQL ${{ matrix.mysql-series }}

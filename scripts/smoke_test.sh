@@ -13,7 +13,9 @@ USER="${3:-root}"
 PASS="${4:-}"
 DB="${5:-pinba}"
 
-MYSQL="mysql --host=${HOST} --port=${PORT} --user=${USER} ${PASS:+--password=${PASS}} --batch --skip-column-names"
+# Client binary is overridable (MariaDB hosts may ship only `mariadb`, not the
+# `mysql` compat symlink — especially under sudo's restricted PATH).
+MYSQL="${MYSQL_CLIENT:-mysql} --host=${HOST} --port=${PORT} --user=${USER} ${PASS:+--password=${PASS}} --batch --skip-column-names"
 
 pass() { printf '\033[32mPASS\033[0m %s\n' "$1"; }
 fail() { printf '\033[31mFAIL\033[0m %s\n' "$1"; exit 1; }
