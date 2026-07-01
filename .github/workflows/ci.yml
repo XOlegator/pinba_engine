@@ -141,7 +141,7 @@ jobs:
           key: mariadb-src-${{ steps.dbver.outputs.version }}
 
       - name: Prepare MariaDB headers
-        run: scripts/prepare-mariadb-headers.sh "${{ steps.dbver.outputs.version }}" mariadb-src
+        run: bash scripts/prepare-mariadb-headers.sh "${{ steps.dbver.outputs.version }}" mariadb-src
 
       - name: Configure
         run: |
