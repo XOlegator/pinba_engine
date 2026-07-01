@@ -464,6 +464,14 @@ if(PINBA_DB_FLAVOR STREQUAL "mariadb")
   # SYSTEM (-isystem) dirs are searched after every -I, so add the dedicated staging
   # dir as a plain BEFORE include that wins over the project's src/ include.
   target_include_directories(pinba_engine BEFORE PRIVATE ${PINBA_MARIADB_COMPAT_INC})
+
+  # Production MariaDB packages are built with DBUG disabled and do not export the
+  # dbug runtime symbols (_db_my_assert, _db_keyword_, ...). Without DBUG_OFF the
+  # plugin references them and fails to load ("undefined symbol: _db_my_assert"), so
+  # compile DBUG_ASSERT/DBUG_ENTER out to match the server (non-debug builds only).
+  if(NOT PINBA_DEBUG)
+    target_compile_definitions(pinba_engine PRIVATE DBUG_OFF)
+  endif()
 endif()
 
 if(PINBA_WITH_TESTS)
