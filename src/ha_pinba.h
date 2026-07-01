@@ -164,8 +164,12 @@ class ha_pinba : public handler {
 
   /* methods */
 
+#ifdef MARIADB_BASE_VERSION
+  int open(const char *name, int mode, uint test_if_locked);  // required
+#else
   int open(const char *name, int mode, uint test_if_locked,
-           const dd::Table *table_def);                 // required
+           const dd::Table *table_def);  // required
+#endif
   int close(void);                                      // required
   int rnd_init(bool scan);                              // required
   int rnd_next(unsigned char *buf);                     // required
@@ -187,8 +191,12 @@ class ha_pinba : public handler {
   void position(const unsigned char *record);  // required
   int info(uint);                              // required
 
+#ifdef MARIADB_BASE_VERSION
+  int create(const char *name, TABLE *form, HA_CREATE_INFO *create_info);  // required
+#else
   int create(const char *name, TABLE *form, HA_CREATE_INFO *create_info,
              dd::Table *table_def);  // required
+#endif
   int delete_all_rows();
 
   THR_LOCK_DATA **store_lock(THD *thd, THR_LOCK_DATA **to,

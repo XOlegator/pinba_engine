@@ -16,6 +16,15 @@
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
+/* MariaDB's server headers require my_global.h (and MYSQL_SERVER) to be seen
+   first. MySQL 8.x removed my_global.h, so __has_include keeps this inert there. */
+#if defined(__has_include)
+#if __has_include(<my_global.h>)
+#define MYSQL_SERVER 1
+#include <my_global.h>
+#endif
+#endif
+
 #include <sql/table.h>
 
 #include "pinba.h"
@@ -41,7 +50,11 @@
 #include <my_dir.h>
 #include <mysql.h>
 #include <mysql/plugin.h>
+#if defined(__has_include) && __has_include(<mysql/service_mysql_alloc.h>)
 #include <mysql/service_mysql_alloc.h>
+#else
+#include <my_sys.h> /* MariaDB: my_malloc/my_free live here, not in a service header */
+#endif
 
 #include <cstdint>
 #include <unordered_map>
@@ -49,6 +62,9 @@
 #include "ha_pinba.h"
 #include "pinba_lmap.h"
 #include "pinba_map.h"
+
+/* MySQL 8.x <-> MariaDB server-API shims; must follow the server headers above. */
+#include "pinba_maria_compat.h"
 
 #ifdef my_free
 #undef my_free
@@ -88,13 +104,21 @@ static inline unsigned char pinba_ptr_to_table_type(const void *value) {
 }
 
 /* prototypes */
+#ifdef MARIADB_BASE_VERSION
+static handler *pinba_create_handler(handlerton *hton, TABLE_SHARE *table, MEM_ROOT *mem_root);
+#else
 static handler *pinba_create_handler(handlerton *hton, TABLE_SHARE *table, bool partitioned,
                                      MEM_ROOT *mem_root);
+#endif
 static void pinba_share_destroy(PINBA_SHARE *share);
 
 #if defined(HAVE_PSI_INTERFACE)
 [[maybe_unused]] static PSI_memory_info all_pinba_memory[] = {
+#ifdef MARIADB_BASE_VERSION
+    {&pinba_key_memory_share, "pinba_share", 0}};
+#else
     {&pinba_key_memory_share, "pinba_share", 0, 0, nullptr}};
+#endif
 
 void init_pinba_psi_keys() {}
 #endif
@@ -146,9 +170,10 @@ const char *type_names[] = /* {{{ */
 
 /* <utilities> {{{ */
 
-static inline unsigned char pinba_get_table_type(char *str, size_t len, char *report_kind) /* {{{ */
+static inline unsigned char pinba_get_table_type(const char *str, size_t len,
+                                                 char *report_kind) /* {{{ */
 {
-  char *colon;
+  const char *colon;
   int histogram = 0, table_type = PINBA_TABLE_UNKNOWN;
 
   *report_kind = PINBA_BASE_REPORT_KIND;
@@ -631,7 +656,9 @@ static int pinba_engine_init(void *p) /* {{{ */
 
   pinba_open_tables.clear();
 
-  pinba_hton->state = SHOW_OPTION_YES;
+#ifndef MARIADB_BASE_VERSION
+  pinba_hton->state = SHOW_OPTION_YES; /* MariaDB's handlerton has no `state` field */
+#endif
   pinba_hton->create = pinba_create_handler;
 
   DBUG_RETURN(0);
@@ -650,7 +677,7 @@ static int pinba_engine_shutdown(void *) /* {{{ */
 }
 /* }}} */
 
-static int pinba_engine_check_uninstall(void *p) /* {{{ */
+[[maybe_unused]] static int pinba_engine_check_uninstall(void *p) /* {{{ */
 {
   (void)p;
   return 0;
@@ -2018,12 +2045,20 @@ static int free_share(PINBA_SHARE *share) /* {{{ */
 }
 /* }}} */
 
+#ifdef MARIADB_BASE_VERSION
+static handler *pinba_create_handler(handlerton *hton, TABLE_SHARE *table,
+                                     MEM_ROOT *mem_root) /* {{{ */
+{
+  return new (mem_root) ha_pinba(hton, table);
+}
+#else
 static handler *pinba_create_handler(handlerton *hton, TABLE_SHARE *table, bool partitioned,
                                      MEM_ROOT *mem_root) /* {{{ */
 {
   (void)partitioned;
   return new (mem_root) ha_pinba(hton, table);
 }
+#endif
 /* }}} */
 
 ha_pinba::ha_pinba(handlerton *hton, TABLE_SHARE *table_arg) /* {{{ */
@@ -2039,6 +2074,13 @@ static const char *ha_pinba_exts[] = {NullS};
 const char **ha_pinba::bas_ext() const { return ha_pinba_exts; }
 /* }}} */
 
+#ifdef MARIADB_BASE_VERSION
+int ha_pinba::open(const char *name, int mode, uint test_if_locked) /* {{{ */
+{
+  DBUG_ENTER("ha_pinba::open");
+  (void)mode;
+  (void)test_if_locked;
+#else
 int ha_pinba::open(const char *name, int mode, uint test_if_locked,
                    const dd::Table *table_def) /* {{{ */
 {
@@ -2046,6 +2088,7 @@ int ha_pinba::open(const char *name, int mode, uint test_if_locked,
   (void)mode;
   (void)test_if_locked;
   (void)table_def;
+#endif
   pinba_report_tables *report_tables;
   char *index_copy;
 
@@ -2695,9 +2738,9 @@ int ha_pinba::read_index_first(unsigned char *buf, uint active_index) /* {{{ */
 
 failure:
   if (ret) {
-    table->set_no_row();
+    PINBA_SET_NO_ROW(table);
   } else {
-    table->set_found_row();
+    PINBA_SET_FOUND_ROW(table);
   }
   DBUG_RETURN(ret);
 }
@@ -2863,9 +2906,9 @@ int ha_pinba::read_row_by_key(unsigned char *buf, uint active_index, const unsig
 
 failure:
   if (ret) {
-    table->set_no_row();
+    PINBA_SET_NO_ROW(table);
   } else {
-    table->set_found_row();
+    PINBA_SET_FOUND_ROW(table);
   }
   DBUG_RETURN(ret);
 }
@@ -2904,9 +2947,9 @@ int ha_pinba::read_row_by_pos(unsigned char *buf, my_off_t position) /* {{{ */
 
 failure:
   if (ret) {
-    table->set_no_row();
+    PINBA_SET_NO_ROW(table);
   } else {
-    table->set_found_row();
+    PINBA_SET_FOUND_ROW(table);
   }
   DBUG_RETURN(ret);
 }
@@ -3282,9 +3325,9 @@ int ha_pinba::read_next_row(unsigned char *buf, uint active_index, bool by_key) 
 
 failure:
   if (ret) {
-    table->set_no_row();
+    PINBA_SET_NO_ROW(table);
   } else {
-    table->set_found_row();
+    PINBA_SET_FOUND_ROW(table);
   }
   DBUG_RETURN(ret);
 }
@@ -3297,7 +3340,7 @@ inline int ha_pinba::requests_fetch_row(unsigned char *, size_t index, size_t *n
 {
   Field **field;
   pinba_pool *p = &D->request_pool;
-  my_bitmap_map *old_map;
+  pinba_saved_column_map_t old_map;
   pinba_stats_record record;
 
   DBUG_ENTER("ha_pinba::requests_fetch_row");
@@ -3335,11 +3378,11 @@ retry_again:
     }
   }
 
-  old_map = dbug_tmp_use_all_columns(table, table->write_set);
+  old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* index */
           (*field)->set_notnull();
           (*field)->store((long)index);
@@ -3432,7 +3475,7 @@ retry_again:
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
 
   if (new_index) {
     *new_index = index + 1;
@@ -3446,7 +3489,7 @@ inline int ha_pinba::timers_fetch_row(unsigned char *, size_t index, size_t *new
                                       int exact) /* {{{ */
 {
   Field **field;
-  my_bitmap_map *old_map;
+  pinba_saved_column_map_t old_map;
   pinba_pool *p = &D->request_pool;
   pinba_pool *timer_pool = &D->timer_pool;
   pinba_timer_record *timer;
@@ -3495,11 +3538,11 @@ try_next:
   }
   this_index[active_index].position++;
 
-  old_map = dbug_tmp_use_all_columns(table, table->write_set);
+  old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* index */
           (*field)->set_notnull();
           (*field)->store((long)index);
@@ -3522,7 +3565,7 @@ try_next:
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
 
   if (new_index) {
     *new_index = index + 1;
@@ -3536,7 +3579,7 @@ inline int ha_pinba::timers_fetch_row_by_request_id(unsigned char *, size_t inde
                                                     size_t *new_index) /* {{{ */
 {
   Field **field;
-  my_bitmap_map *old_map;
+  pinba_saved_column_map_t old_map;
   pinba_pool *p = &D->request_pool;
   pinba_timer_record *timer;
   pinba_stats_record *record;
@@ -3562,11 +3605,11 @@ inline int ha_pinba::timers_fetch_row_by_request_id(unsigned char *, size_t inde
   }
 
   timer = record_get_timer(&D->timer_pool, record, this_index[active_index].position);
-  old_map = dbug_tmp_use_all_columns(table, table->write_set);
+  old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* index */
           (*field)->set_notnull();
           (*field)->store(
@@ -3590,7 +3633,7 @@ inline int ha_pinba::timers_fetch_row_by_request_id(unsigned char *, size_t inde
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
 
   /* XXX this smells funny */
   if (new_index && (size_t)this_index[active_index].position == (size_t)(record->timers_cnt - 1)) {
@@ -3605,7 +3648,7 @@ inline int ha_pinba::timers_fetch_row_by_request_id(unsigned char *, size_t inde
 inline int ha_pinba::tags_fetch_row(unsigned char *, size_t index, size_t *new_index) /* {{{ */
 {
   Field **field;
-  my_bitmap_map *old_map;
+  pinba_saved_column_map_t old_map;
   pinba_tag *tag;
 
   DBUG_ENTER("ha_pinba::tags_fetch_row");
@@ -3622,11 +3665,11 @@ inline int ha_pinba::tags_fetch_row(unsigned char *, size_t index, size_t *new_i
     DBUG_RETURN(HA_ERR_END_OF_FILE);
   }
 
-  old_map = dbug_tmp_use_all_columns(table, table->write_set);
+  old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* id */
           (*field)->set_notnull();
           (*field)->store((long)index);
@@ -3641,7 +3684,7 @@ inline int ha_pinba::tags_fetch_row(unsigned char *, size_t index, size_t *new_i
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
 
   if (new_index) {
     *new_index = index + 1;
@@ -3654,7 +3697,7 @@ inline int ha_pinba::tags_fetch_row(unsigned char *, size_t index, size_t *new_i
 inline int ha_pinba::tags_fetch_row_by_name(unsigned char *, char *name) /* {{{ */
 {
   Field **field;
-  my_bitmap_map *old_map;
+  pinba_saved_column_map_t old_map;
   pinba_tag *tag;
 
   DBUG_ENTER("ha_pinba::tags_fetch_row_by_name");
@@ -3667,11 +3710,11 @@ inline int ha_pinba::tags_fetch_row_by_name(unsigned char *, char *name) /* {{{ 
     DBUG_RETURN(HA_ERR_KEY_NOT_FOUND);
   }
 
-  old_map = dbug_tmp_use_all_columns(table, table->write_set);
+  old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* id */
           (*field)->set_notnull();
           (*field)->store((long)tag->id);
@@ -3686,7 +3729,7 @@ inline int ha_pinba::tags_fetch_row_by_name(unsigned char *, char *name) /* {{{ 
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
 
   pthread_rwlock_unlock(&D->collector_lock);
   DBUG_RETURN(0);
@@ -3697,7 +3740,7 @@ inline int ha_pinba::tag_values_fetch_next(unsigned char *, size_t *index,
                                            size_t *position) /* {{{ */
 {
   Field **field;
-  my_bitmap_map *old_map;
+  pinba_saved_column_map_t old_map;
   pinba_pool *timer_pool = &D->timer_pool;
   pinba_timer_record *timer;
 
@@ -3733,11 +3776,11 @@ retry_next:
     goto retry_next;
   }
 
-  old_map = dbug_tmp_use_all_columns(table, table->write_set);
+  old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* timer_id */
           (*field)->set_notnull();
           (*field)->store((long)*index);
@@ -3757,7 +3800,7 @@ retry_next:
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
 
   pthread_rwlock_unlock(&D->collector_lock);
   DBUG_RETURN(0);
@@ -3767,7 +3810,7 @@ retry_next:
 inline int ha_pinba::tag_values_fetch_by_timer_id(unsigned char *) /* {{{ */
 {
   Field **field;
-  my_bitmap_map *old_map;
+  pinba_saved_column_map_t old_map;
   pinba_pool *timer_pool = &D->timer_pool;
   pinba_pool *p = &D->request_pool;
   pinba_timer_record *timer;
@@ -3801,11 +3844,11 @@ inline int ha_pinba::tag_values_fetch_by_timer_id(unsigned char *) /* {{{ */
     DBUG_RETURN(HA_ERR_KEY_NOT_FOUND);
   }
 
-  old_map = dbug_tmp_use_all_columns(table, table->write_set);
+  old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* timer_id */
           (*field)->set_notnull();
           (*field)->store((long)this_index[0].ival);
@@ -3825,7 +3868,7 @@ inline int ha_pinba::tag_values_fetch_by_timer_id(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
 
   pthread_rwlock_unlock(&D->collector_lock);
   DBUG_RETURN(0);
@@ -3833,9 +3876,9 @@ inline int ha_pinba::tag_values_fetch_by_timer_id(unsigned char *) /* {{{ */
 /* }}} */
 
 #define REPORT_PERCENTILE_FIELD(last_field_num, data, cnt)                                 \
-  if ((*field)->field_index() > (last_field_num) &&                                        \
-      (*field)->field_index() <= (last_field_num) + share->percentiles_num) {              \
-    int p_num = (*field)->field_index() - (last_field_num) - 1;                            \
+  if (PINBA_FIELD_INDEX(*field) > (last_field_num) &&                                      \
+      PINBA_FIELD_INDEX(*field) <= (last_field_num) + share->percentiles_num) {            \
+    int p_num = PINBA_FIELD_INDEX(*field) - (last_field_num) - 1;                          \
     (*field)->set_notnull();                                                               \
     (*field)->store(pinba_histogram_value((pinba_std_report *)report, data,                \
                                           cnt *((float)share->percentiles[p_num] / 100))); \
@@ -3845,7 +3888,7 @@ inline int ha_pinba::tag_values_fetch_by_timer_id(unsigned char *) /* {{{ */
 
 #define REPORT_FETCH_TOP_BLOCK(report_num)                                                    \
   Field **field;                                                                              \
-  my_bitmap_map *old_map;                                                                     \
+  pinba_saved_column_map_t old_map;                                                           \
   struct pinba_report##report_num##_data *data;                                               \
   char index[PINBA_MAX_LINE_LEN] = {0};                                                       \
   pinba_report *report;                                                                       \
@@ -3875,15 +3918,15 @@ inline int ha_pinba::tag_values_fetch_by_timer_id(unsigned char *) /* {{{ */
   this_index[0].str.val = strdup(index);                                                      \
   this_index[0].position++;                                                                   \
                                                                                               \
-  old_map = dbug_tmp_use_all_columns(table, table->write_set);
+  old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
 inline int ha_pinba::report1_fetch_row(unsigned char *) /* {{{ */
 {
   REPORT_FETCH_TOP_BLOCK(1);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* req_count */
           (*field)->set_notnull();
           (*field)->store((long)data->req_count);
@@ -3973,7 +4016,7 @@ inline int ha_pinba::report1_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -3984,8 +4027,8 @@ inline int ha_pinba::report2_fetch_row(unsigned char *) /* {{{ */
   REPORT_FETCH_TOP_BLOCK(2);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* req_count */
           (*field)->set_notnull();
           (*field)->store((long)data->req_count);
@@ -4075,7 +4118,7 @@ inline int ha_pinba::report2_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -4086,8 +4129,8 @@ inline int ha_pinba::report3_fetch_row(unsigned char *) /* {{{ */
   REPORT_FETCH_TOP_BLOCK(3);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* req_count */
           (*field)->set_notnull();
           (*field)->store((long)data->req_count);
@@ -4177,7 +4220,7 @@ inline int ha_pinba::report3_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -4188,8 +4231,8 @@ inline int ha_pinba::report4_fetch_row(unsigned char *) /* {{{ */
   REPORT_FETCH_TOP_BLOCK(4);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* req_count */
           (*field)->set_notnull();
           (*field)->store((long)data->req_count);
@@ -4285,7 +4328,7 @@ inline int ha_pinba::report4_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -4296,8 +4339,8 @@ inline int ha_pinba::report5_fetch_row(unsigned char *) /* {{{ */
   REPORT_FETCH_TOP_BLOCK(5);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* req_count */
           (*field)->set_notnull();
           (*field)->store((long)data->req_count);
@@ -4393,7 +4436,7 @@ inline int ha_pinba::report5_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -4404,8 +4447,8 @@ inline int ha_pinba::report6_fetch_row(unsigned char *) /* {{{ */
   REPORT_FETCH_TOP_BLOCK(6);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* req_count */
           (*field)->set_notnull();
           (*field)->store((long)data->req_count);
@@ -4501,7 +4544,7 @@ inline int ha_pinba::report6_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -4512,8 +4555,8 @@ inline int ha_pinba::report7_fetch_row(unsigned char *) /* {{{ */
   REPORT_FETCH_TOP_BLOCK(7);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* req_count */
           (*field)->set_notnull();
           (*field)->store((long)data->req_count);
@@ -4614,7 +4657,7 @@ inline int ha_pinba::report7_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -4625,8 +4668,8 @@ inline int ha_pinba::report8_fetch_row(unsigned char *) /* {{{ */
   REPORT_FETCH_TOP_BLOCK(8);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* req_count */
           (*field)->set_notnull();
           (*field)->store((long)data->req_count);
@@ -4716,7 +4759,7 @@ inline int ha_pinba::report8_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -4727,8 +4770,8 @@ inline int ha_pinba::report9_fetch_row(unsigned char *) /* {{{ */
   REPORT_FETCH_TOP_BLOCK(9);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* req_count */
           (*field)->set_notnull();
           (*field)->store((long)data->req_count);
@@ -4823,7 +4866,7 @@ inline int ha_pinba::report9_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -4834,8 +4877,8 @@ inline int ha_pinba::report10_fetch_row(unsigned char *) /* {{{ */
   REPORT_FETCH_TOP_BLOCK(10);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* req_count */
           (*field)->set_notnull();
           (*field)->store((long)data->req_count);
@@ -4930,7 +4973,7 @@ inline int ha_pinba::report10_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -4941,8 +4984,8 @@ inline int ha_pinba::report11_fetch_row(unsigned char *) /* {{{ */
   REPORT_FETCH_TOP_BLOCK(11);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* req_count */
           (*field)->set_notnull();
           (*field)->store((long)data->req_count);
@@ -5037,7 +5080,7 @@ inline int ha_pinba::report11_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -5048,8 +5091,8 @@ inline int ha_pinba::report12_fetch_row(unsigned char *) /* {{{ */
   REPORT_FETCH_TOP_BLOCK(12);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* req_count */
           (*field)->set_notnull();
           (*field)->store((long)data->req_count);
@@ -5149,7 +5192,7 @@ inline int ha_pinba::report12_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -5160,8 +5203,8 @@ inline int ha_pinba::report13_fetch_row(unsigned char *) /* {{{ */
   REPORT_FETCH_TOP_BLOCK(13);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* req_count */
           (*field)->set_notnull();
           (*field)->store((long)data->req_count);
@@ -5251,7 +5294,7 @@ inline int ha_pinba::report13_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -5262,8 +5305,8 @@ inline int ha_pinba::report14_fetch_row(unsigned char *) /* {{{ */
   REPORT_FETCH_TOP_BLOCK(14);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* req_count */
           (*field)->set_notnull();
           (*field)->store((long)data->req_count);
@@ -5358,7 +5401,7 @@ inline int ha_pinba::report14_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -5369,8 +5412,8 @@ inline int ha_pinba::report15_fetch_row(unsigned char *) /* {{{ */
   REPORT_FETCH_TOP_BLOCK(15);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* req_count */
           (*field)->set_notnull();
           (*field)->store((long)data->req_count);
@@ -5465,7 +5508,7 @@ inline int ha_pinba::report15_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -5476,8 +5519,8 @@ inline int ha_pinba::report16_fetch_row(unsigned char *) /* {{{ */
   REPORT_FETCH_TOP_BLOCK(16);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* req_count */
           (*field)->set_notnull();
           (*field)->store((long)data->req_count);
@@ -5572,7 +5615,7 @@ inline int ha_pinba::report16_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -5583,8 +5626,8 @@ inline int ha_pinba::report17_fetch_row(unsigned char *) /* {{{ */
   REPORT_FETCH_TOP_BLOCK(17);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* req_count */
           (*field)->set_notnull();
           (*field)->store((long)data->req_count);
@@ -5684,7 +5727,7 @@ inline int ha_pinba::report17_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -5695,8 +5738,8 @@ inline int ha_pinba::report18_fetch_row(unsigned char *) /* {{{ */
   REPORT_FETCH_TOP_BLOCK(18);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* req_count */
           (*field)->set_notnull();
           (*field)->store((long)data->req_count);
@@ -5795,7 +5838,7 @@ inline int ha_pinba::report18_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -5804,7 +5847,7 @@ inline int ha_pinba::report18_fetch_row(unsigned char *) /* {{{ */
 inline int ha_pinba::info_fetch_row(unsigned char *) /* {{{ */
 {
   Field **field;
-  my_bitmap_map *old_map;
+  pinba_saved_column_map_t old_map;
   pinba_report *report;
 
   DBUG_ENTER("ha_pinba::info_fetch_row");
@@ -5825,11 +5868,11 @@ inline int ha_pinba::info_fetch_row(unsigned char *) /* {{{ */
 
   this_index[0].position++;
 
-  old_map = dbug_tmp_use_all_columns(table, table->write_set);
+  old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* req_count */
           (*field)->set_notnull();
           (*field)->store((long)report->std.results_cnt);
@@ -5869,7 +5912,7 @@ inline int ha_pinba::info_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -5878,7 +5921,7 @@ inline int ha_pinba::info_fetch_row(unsigned char *) /* {{{ */
 inline int ha_pinba::status_fetch_row(unsigned char *) /* {{{ */
 {
   Field **field;
-  my_bitmap_map *old_map;
+  pinba_saved_column_map_t old_map;
 
   DBUG_ENTER("ha_pinba::status_fetch_row");
 
@@ -5888,11 +5931,11 @@ inline int ha_pinba::status_fetch_row(unsigned char *) /* {{{ */
 
   this_index[0].position++;
 
-  old_map = dbug_tmp_use_all_columns(table, table->write_set);
+  old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* current_temp_pool_size */
           (*field)->set_notnull();
           pthread_rwlock_rdlock(&D->data_lock);
@@ -5939,7 +5982,7 @@ inline int ha_pinba::status_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   DBUG_RETURN(0);
 }
 /* }}} */
@@ -5984,7 +6027,7 @@ inline void _pinba_flags_to_str(int flags, char *str, size_t str_size) /* {{{ */
 inline int ha_pinba::active_reports_fetch_row(unsigned char *) /* {{{ */
 {
   Field **field;
-  my_bitmap_map *old_map;
+  pinba_saved_column_map_t old_map;
   char index[PINBA_MAX_LINE_LEN] = {0};
   char index_sub[PINBA_MAX_LINE_LEN] = {0};
   char *tmp, flags_str[256] = {0};
@@ -6063,13 +6106,13 @@ inline int ha_pinba::active_reports_fetch_row(unsigned char *) /* {{{ */
   this_index[0].subindex.val = strdup(index_sub);
   this_index[0].position++;
 
-  old_map = dbug_tmp_use_all_columns(table, table->write_set);
+  old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
   pthread_rwlock_rdlock(&std->lock);
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
       (*field)->set_notnull();
-      switch ((*field)->field_index()) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* id */
           (*field)->store(index, strlen(index), &my_charset_bin);
           break;
@@ -6118,14 +6161,14 @@ inline int ha_pinba::active_reports_fetch_row(unsigned char *) /* {{{ */
   pthread_rwlock_unlock(&std->lock);
   pthread_mutex_unlock(&D->share_mutex);
 
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   DBUG_RETURN(0);
 }
 /* }}} */
 
 #define TAG_INFO_FETCH_TOP_BLOCK(report_name, kind)                                      \
   Field **field;                                                                         \
-  my_bitmap_map *old_map;                                                                \
+  pinba_saved_column_map_t old_map;                                                      \
   struct pinba_##report_name##_data *data = nullptr;                                     \
   pinba_##kind##_report *report;                                                         \
   char index[PINBA_MAX_LINE_LEN] = {0};                                                  \
@@ -6159,15 +6202,15 @@ inline int ha_pinba::active_reports_fetch_row(unsigned char *) /* {{{ */
   this_index[0].str.val = strdup(index);                                                 \
   this_index[0].position++;                                                              \
                                                                                          \
-  old_map = dbug_tmp_use_all_columns(table, table->write_set);
+  old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
 inline int ha_pinba::tag_info_fetch_row(unsigned char *) /* {{{ */
 {
   TAG_INFO_FETCH_TOP_BLOCK(tag_info, tag);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* tag_value */
           (*field)->set_notnull();
           (*field)->store((const char *)index, strlen(index), &my_charset_bin);
@@ -6215,7 +6258,7 @@ inline int ha_pinba::tag_info_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -6226,8 +6269,8 @@ inline int ha_pinba::tag2_info_fetch_row(unsigned char *) /* {{{ */
   TAG_INFO_FETCH_TOP_BLOCK(tag2_info, tag);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* tag1_value */
           (*field)->set_notnull();
           (*field)->store((const char *)data->tag1_value, strlen((const char *)data->tag1_value),
@@ -6281,7 +6324,7 @@ inline int ha_pinba::tag2_info_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -6289,7 +6332,7 @@ inline int ha_pinba::tag2_info_fetch_row(unsigned char *) /* {{{ */
 
 #define TAG_REPORT_TOP_BLOCK(report_name, kind, KEY_NAME)                                      \
   Field **field;                                                                               \
-  my_bitmap_map *old_map;                                                                      \
+  pinba_saved_column_map_t old_map;                                                            \
   struct pinba_##report_name##_data *data = nullptr;                                           \
   pinba_##kind##_report *report;                                                               \
   void *key_map;                                                                               \
@@ -6365,15 +6408,15 @@ inline int ha_pinba::tag2_info_fetch_row(unsigned char *) /* {{{ */
                                                                                                \
   this_index[0].subindex.val = strdup(index);                                                  \
                                                                                                \
-  old_map = dbug_tmp_use_all_columns(table, table->write_set);
+  old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
 inline int ha_pinba::tag_report_fetch_row(unsigned char *) /* {{{ */
 {
   TAG_REPORT_TOP_BLOCK(tag_report, tag, SCRIPT_NAME);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* script_name */
           (*field)->set_notnull();
           (*field)->store((const char *)data->script_name, strlen((const char *)data->script_name),
@@ -6427,7 +6470,7 @@ inline int ha_pinba::tag_report_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -6438,8 +6481,8 @@ inline int ha_pinba::tag2_report_fetch_row(unsigned char *) /* {{{ */
   TAG_REPORT_TOP_BLOCK(tag2_report, tag, SCRIPT_NAME);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* script_name */
           (*field)->set_notnull();
           (*field)->store((const char *)data->script_name, strlen((const char *)data->script_name),
@@ -6498,7 +6541,7 @@ inline int ha_pinba::tag2_report_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -6509,8 +6552,8 @@ inline int ha_pinba::tag_report2_fetch_row(unsigned char *) /* {{{ */
   TAG_REPORT_TOP_BLOCK(tag_report2, tag, SCRIPT_NAME);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* script_name */
           (*field)->set_notnull();
           (*field)->store((const char *)data->script_name, strlen((const char *)data->script_name),
@@ -6574,7 +6617,7 @@ inline int ha_pinba::tag_report2_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -6585,8 +6628,8 @@ inline int ha_pinba::tag2_report2_fetch_row(unsigned char *) /* {{{ */
   TAG_REPORT_TOP_BLOCK(tag2_report2, tag, SCRIPT_NAME);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* script_name */
           (*field)->set_notnull();
           (*field)->store((const char *)data->script_name, strlen((const char *)data->script_name),
@@ -6655,7 +6698,7 @@ inline int ha_pinba::tag2_report2_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -6663,7 +6706,7 @@ inline int ha_pinba::tag2_report2_fetch_row(unsigned char *) /* {{{ */
 
 #define TAG_REPORT_TOP_BLOCK_BY_KEY(report_name, kind, KEY_NAME)                               \
   Field **field;                                                                               \
-  my_bitmap_map *old_map;                                                                      \
+  pinba_saved_column_map_t old_map;                                                            \
   struct pinba_##report_name##_data *data;                                                     \
   pinba_##kind##_report *report;                                                               \
   void *key_map;                                                                               \
@@ -6715,15 +6758,15 @@ inline int ha_pinba::tag2_report2_fetch_row(unsigned char *) /* {{{ */
   this_index[0].subindex.val = strdup(index);                                                  \
   index_value_len = snprintf(index_value, sizeof(index_value) - 1, "%s|%s", index_key, index); \
                                                                                                \
-  old_map = dbug_tmp_use_all_columns(table, table->write_set);
+  old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
 inline int ha_pinba::tag_report_fetch_row_by_script(unsigned char *, const char *, uint) /* {{{ */
 {
   TAG_REPORT_TOP_BLOCK_BY_KEY(tag_report, tag, SCRIPT_NAME);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* script_name */
           (*field)->set_notnull();
           (*field)->store((const char *)data->script_name, strlen((const char *)data->script_name),
@@ -6777,7 +6820,7 @@ inline int ha_pinba::tag_report_fetch_row_by_script(unsigned char *, const char 
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -6788,8 +6831,8 @@ inline int ha_pinba::tag2_report_fetch_row_by_script(unsigned char *, const char
   TAG_REPORT_TOP_BLOCK_BY_KEY(tag2_report, tag, SCRIPT_NAME);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* script_name */
           (*field)->set_notnull();
           (*field)->store((const char *)data->script_name, strlen((const char *)data->script_name),
@@ -6848,7 +6891,7 @@ inline int ha_pinba::tag2_report_fetch_row_by_script(unsigned char *, const char
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -6859,8 +6902,8 @@ inline int ha_pinba::tag_report2_fetch_row_by_script(unsigned char *, const char
   TAG_REPORT_TOP_BLOCK_BY_KEY(tag_report2, tag, SCRIPT_NAME);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* script_name */
           (*field)->set_notnull();
           (*field)->store((const char *)data->script_name, strlen((const char *)data->script_name),
@@ -6924,7 +6967,7 @@ inline int ha_pinba::tag_report2_fetch_row_by_script(unsigned char *, const char
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -6935,8 +6978,8 @@ inline int ha_pinba::tag2_report2_fetch_row_by_script(unsigned char *, const cha
   TAG_REPORT_TOP_BLOCK_BY_KEY(tag2_report2, tag, SCRIPT_NAME);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* script_name */
           (*field)->set_notnull();
           (*field)->store((const char *)data->script_name, strlen((const char *)data->script_name),
@@ -7005,7 +7048,7 @@ inline int ha_pinba::tag2_report2_fetch_row_by_script(unsigned char *, const cha
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -7014,7 +7057,7 @@ inline int ha_pinba::tag2_report2_fetch_row_by_script(unsigned char *, const cha
 inline int ha_pinba::tagN_info_fetch_row(unsigned char *) /* {{{ */
 {
   Field **field;
-  my_bitmap_map *old_map;
+  pinba_saved_column_map_t old_map;
   struct pinba_tagN_info_data *data;
   pinba_tag_report *report;
   char *index;
@@ -7055,41 +7098,41 @@ inline int ha_pinba::tagN_info_fetch_row(unsigned char *) /* {{{ */
   this_index[0].str.val = strdup(index);
   this_index[0].position++;
 
-  old_map = dbug_tmp_use_all_columns(table, table->write_set);
+  old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      if ((*field)->field_index() < report->tags_cnt) { /* tagN_value */
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      if (PINBA_FIELD_INDEX(*field) < report->tags_cnt) { /* tagN_value */
         const char *tag_value =
-            (const char *)data->tag_value + ((*field)->field_index()) * PINBA_TAG_VALUE_SIZE;
+            (const char *)data->tag_value + (PINBA_FIELD_INDEX(*field)) * PINBA_TAG_VALUE_SIZE;
         (*field)->set_notnull();
         (*field)->store(tag_value, strlen(tag_value), &my_charset_bin);
-      } else if ((*field)->field_index() == report->tags_cnt) { /* req_count */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt) { /* req_count */
         (*field)->set_notnull();
         (*field)->store((long)data->req_count);
-      } else if ((*field)->field_index() == report->tags_cnt + 1) { /* req_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 1) { /* req_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)data->req_count / (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 2) { /* hit_count */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 2) { /* hit_count */
         (*field)->set_notnull();
         (*field)->store((long)data->hit_count);
-      } else if ((*field)->field_index() == report->tags_cnt + 3) { /* hit_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 3) { /* hit_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)data->hit_count / (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 4) { /* timer_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 4) { /* timer_value */
         (*field)->set_notnull();
         (*field)->store(timeval_to_float(data->timer_value));
-      } else if ((*field)->field_index() == report->tags_cnt + 5) { /* timer_median */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 5) { /* timer_median */
         (*field)->set_notnull();
         (*field)->store(pinba_histogram_value((pinba_std_report *)report, data->histogram_data,
                                               data->hit_count / 2));
-      } else if ((*field)->field_index() == report->tags_cnt + 6) { /* ru_utime_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 6) { /* ru_utime_value */
         (*field)->set_notnull();
         (*field)->store(pinba_round((float)timeval_to_float(data->ru_utime_value), 1000));
-      } else if ((*field)->field_index() == report->tags_cnt + 7) { /* ru_stime_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 7) { /* ru_stime_value */
         (*field)->set_notnull();
         (*field)->store(pinba_round((float)timeval_to_float(data->ru_stime_value), 1000));
-      } else if ((*field)->field_index() == report->tags_cnt + 8) { /* index_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 8) { /* index_value */
         (*field)->set_notnull();
         (*field)->store((const char *)index, strlen(index), &my_charset_bin);
       } else {
@@ -7097,7 +7140,7 @@ inline int ha_pinba::tagN_info_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   free(index);
   DBUG_RETURN(0);
@@ -7106,7 +7149,7 @@ inline int ha_pinba::tagN_info_fetch_row(unsigned char *) /* {{{ */
 
 #define TAGN_REPORT_TOP_BLOCK(report_name, kind, KEY_NAME)                           \
   Field **field;                                                                     \
-  my_bitmap_map *old_map;                                                            \
+  pinba_saved_column_map_t old_map;                                                  \
   struct pinba_##report_name##_data *data;                                           \
   pinba_##kind##_report *report;                                                     \
   void *key_map;                                                                     \
@@ -7186,50 +7229,50 @@ inline int ha_pinba::tagN_info_fetch_row(unsigned char *) /* {{{ */
                                                                                      \
   this_index[0].subindex.val = strdup(index);                                        \
                                                                                      \
-  old_map = dbug_tmp_use_all_columns(table, table->write_set);
+  old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
 inline int ha_pinba::tagN_report_fetch_row(unsigned char *) /* {{{ */
 {
   TAGN_REPORT_TOP_BLOCK(tagN_report, tag, SCRIPT_NAME);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      if ((*field)->field_index() == 0) { /* script_name */
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      if (PINBA_FIELD_INDEX(*field) == 0) { /* script_name */
         (*field)->set_notnull();
         (*field)->store((const char *)data->script_name, strlen((const char *)data->script_name),
                         &my_charset_bin);
-      } else if ((*field)->field_index() > 0 &&
-                 (*field)->field_index() <= report->tags_cnt) { /* tagN_value */
+      } else if (PINBA_FIELD_INDEX(*field) > 0 &&
+                 PINBA_FIELD_INDEX(*field) <= report->tags_cnt) { /* tagN_value */
         const char *tag_value =
-            (const char *)data->tag_value + ((*field)->field_index() - 1) * PINBA_TAG_VALUE_SIZE;
+            (const char *)data->tag_value + (PINBA_FIELD_INDEX(*field) - 1) * PINBA_TAG_VALUE_SIZE;
         (*field)->set_notnull();
         (*field)->store(tag_value, strlen(tag_value), &my_charset_bin);
-      } else if ((*field)->field_index() == report->tags_cnt + 1) { /* req_count */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 1) { /* req_count */
         (*field)->set_notnull();
         (*field)->store((long)data->req_count);
-      } else if ((*field)->field_index() == report->tags_cnt + 2) { /* req_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 2) { /* req_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)data->req_count / (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 3) { /* hit_count */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 3) { /* hit_count */
         (*field)->set_notnull();
         (*field)->store((long)data->hit_count);
-      } else if ((*field)->field_index() == report->tags_cnt + 4) { /* hit_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 4) { /* hit_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)data->hit_count / (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 5) { /* timer_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 5) { /* timer_value */
         (*field)->set_notnull();
         (*field)->store(timeval_to_float(data->timer_value));
-      } else if ((*field)->field_index() == report->tags_cnt + 6) { /* timer_median */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 6) { /* timer_median */
         (*field)->set_notnull();
         (*field)->store(pinba_histogram_value((pinba_std_report *)report, data->histogram_data,
                                               data->hit_count / 2));
-      } else if ((*field)->field_index() == report->tags_cnt + 7) { /* ru_utime_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 7) { /* ru_utime_value */
         (*field)->set_notnull();
         (*field)->store(pinba_round((float)timeval_to_float(data->ru_utime_value), 1000));
-      } else if ((*field)->field_index() == report->tags_cnt + 8) { /* ru_stime_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 8) { /* ru_stime_value */
         (*field)->set_notnull();
         (*field)->store(pinba_round((float)timeval_to_float(data->ru_stime_value), 1000));
-      } else if ((*field)->field_index() == report->tags_cnt + 9) { /* index_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 9) { /* index_value */
         uint8_t *index_value;
         int index_value_alloc_len =
             PINBA_SCRIPT_NAME_SIZE + 1 + (PINBA_TAG_VALUE_SIZE + 1) * report->tags_cnt;
@@ -7249,7 +7292,7 @@ inline int ha_pinba::tagN_report_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   free(index);
   DBUG_RETURN(0);
@@ -7261,51 +7304,51 @@ inline int ha_pinba::tagN_report2_fetch_row(unsigned char *) /* {{{ */
   TAGN_REPORT_TOP_BLOCK(tagN_report2, tag, SCRIPT_NAME);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      if ((*field)->field_index() == 0) { /* script_name */
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      if (PINBA_FIELD_INDEX(*field) == 0) { /* script_name */
         (*field)->set_notnull();
         (*field)->store((const char *)data->script_name, strlen((const char *)data->script_name),
                         &my_charset_bin);
-      } else if ((*field)->field_index() > 0 &&
-                 (*field)->field_index() <= report->tags_cnt) { /* tagN_value */
+      } else if (PINBA_FIELD_INDEX(*field) > 0 &&
+                 PINBA_FIELD_INDEX(*field) <= report->tags_cnt) { /* tagN_value */
         const char *tag_value =
-            (const char *)data->tag_value + ((*field)->field_index() - 1) * PINBA_TAG_VALUE_SIZE;
+            (const char *)data->tag_value + (PINBA_FIELD_INDEX(*field) - 1) * PINBA_TAG_VALUE_SIZE;
         (*field)->set_notnull();
         (*field)->store(tag_value, strlen(tag_value), &my_charset_bin);
-      } else if ((*field)->field_index() == report->tags_cnt + 1) { /* req_count */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 1) { /* req_count */
         (*field)->set_notnull();
         (*field)->store((long)data->req_count);
-      } else if ((*field)->field_index() == report->tags_cnt + 2) { /* req_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 2) { /* req_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)data->req_count / (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 3) { /* hit_count */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 3) { /* hit_count */
         (*field)->set_notnull();
         (*field)->store((long)data->hit_count);
-      } else if ((*field)->field_index() == report->tags_cnt + 4) { /* hit_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 4) { /* hit_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)data->hit_count / (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 5) { /* timer_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 5) { /* timer_value */
         (*field)->set_notnull();
         (*field)->store(timeval_to_float(data->timer_value));
-      } else if ((*field)->field_index() == report->tags_cnt + 6) { /* hostname */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 6) { /* hostname */
         (*field)->set_notnull();
         (*field)->store((const char *)data->hostname, strlen((const char *)data->hostname),
                         &my_charset_bin);
-      } else if ((*field)->field_index() == report->tags_cnt + 7) { /* server_name */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 7) { /* server_name */
         (*field)->set_notnull();
         (*field)->store((const char *)data->server_name, strlen((const char *)data->server_name),
                         &my_charset_bin);
-      } else if ((*field)->field_index() == report->tags_cnt + 8) { /* timer_median */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 8) { /* timer_median */
         (*field)->set_notnull();
         (*field)->store(pinba_histogram_value((pinba_std_report *)report, data->histogram_data,
                                               data->hit_count / 2));
-      } else if ((*field)->field_index() == report->tags_cnt + 9) { /* ru_utime_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 9) { /* ru_utime_value */
         (*field)->set_notnull();
         (*field)->store(pinba_round((float)timeval_to_float(data->ru_utime_value), 1000));
-      } else if ((*field)->field_index() == report->tags_cnt + 10) { /* ru_stime_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 10) { /* ru_stime_value */
         (*field)->set_notnull();
         (*field)->store(pinba_round((float)timeval_to_float(data->ru_stime_value), 1000));
-      } else if ((*field)->field_index() == report->tags_cnt + 11) { /* index_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 11) { /* index_value */
         uint8_t *index_value;
         int index_value_alloc_len =
             PINBA_SCRIPT_NAME_SIZE + 1 + (PINBA_TAG_VALUE_SIZE + 1) * report->tags_cnt;
@@ -7325,7 +7368,7 @@ inline int ha_pinba::tagN_report2_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   free(index);
   DBUG_RETURN(0);
@@ -7334,7 +7377,7 @@ inline int ha_pinba::tagN_report2_fetch_row(unsigned char *) /* {{{ */
 
 #define TAGN_REPORT_TOP_BLOCK_BY_KEY(report_name, kind, KEY_NAME)                  \
   Field **field;                                                                   \
-  my_bitmap_map *old_map;                                                          \
+  pinba_saved_column_map_t old_map;                                                \
   struct pinba_##report_name##_data *data;                                         \
   pinba_##kind##_report *report;                                                   \
   void *key_map;                                                                   \
@@ -7393,50 +7436,50 @@ inline int ha_pinba::tagN_report2_fetch_row(unsigned char *) /* {{{ */
   }                                                                                \
                                                                                    \
   this_index[0].subindex.val = strdup(index);                                      \
-  old_map = dbug_tmp_use_all_columns(table, table->write_set);
+  old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
 inline int ha_pinba::tagN_report_fetch_row_by_script(unsigned char *, const char *, uint) /* {{{ */
 {
   TAGN_REPORT_TOP_BLOCK_BY_KEY(tagN_report, tag, SCRIPT_NAME);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      if ((*field)->field_index() == 0) { /* script_name */
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      if (PINBA_FIELD_INDEX(*field) == 0) { /* script_name */
         (*field)->set_notnull();
         (*field)->store((const char *)data->script_name, strlen((const char *)data->script_name),
                         &my_charset_bin);
-      } else if ((*field)->field_index() > 0 &&
-                 (*field)->field_index() <= report->tags_cnt) { /* tagN_value */
+      } else if (PINBA_FIELD_INDEX(*field) > 0 &&
+                 PINBA_FIELD_INDEX(*field) <= report->tags_cnt) { /* tagN_value */
         const char *tag_value =
-            (const char *)data->tag_value + ((*field)->field_index() - 1) * PINBA_TAG_VALUE_SIZE;
+            (const char *)data->tag_value + (PINBA_FIELD_INDEX(*field) - 1) * PINBA_TAG_VALUE_SIZE;
         (*field)->set_notnull();
         (*field)->store(tag_value, strlen(tag_value), &my_charset_bin);
-      } else if ((*field)->field_index() == report->tags_cnt + 1) { /* req_count */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 1) { /* req_count */
         (*field)->set_notnull();
         (*field)->store((long)data->req_count);
-      } else if ((*field)->field_index() == report->tags_cnt + 2) { /* req_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 2) { /* req_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)data->req_count / (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 3) { /* hit_count */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 3) { /* hit_count */
         (*field)->set_notnull();
         (*field)->store((long)data->hit_count);
-      } else if ((*field)->field_index() == report->tags_cnt + 4) { /* hit_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 4) { /* hit_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)data->hit_count / (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 5) { /* timer_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 5) { /* timer_value */
         (*field)->set_notnull();
         (*field)->store(timeval_to_float(data->timer_value));
-      } else if ((*field)->field_index() == report->tags_cnt + 6) { /* timer_median */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 6) { /* timer_median */
         (*field)->set_notnull();
         (*field)->store(pinba_histogram_value((pinba_std_report *)report, data->histogram_data,
                                               data->hit_count / 2));
-      } else if ((*field)->field_index() == report->tags_cnt + 7) { /* ru_utime_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 7) { /* ru_utime_value */
         (*field)->set_notnull();
         (*field)->store(pinba_round((float)timeval_to_float(data->ru_utime_value), 1000));
-      } else if ((*field)->field_index() == report->tags_cnt + 8) { /* ru_stime_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 8) { /* ru_stime_value */
         (*field)->set_notnull();
         (*field)->store(pinba_round((float)timeval_to_float(data->ru_stime_value), 1000));
-      } else if ((*field)->field_index() == report->tags_cnt + 9) { /* index_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 9) { /* index_value */
         uint8_t *index_value;
         int index_value_alloc_len =
             PINBA_SCRIPT_NAME_SIZE + 1 + (PINBA_TAG_VALUE_SIZE + 1) * report->tags_cnt;
@@ -7456,7 +7499,7 @@ inline int ha_pinba::tagN_report_fetch_row_by_script(unsigned char *, const char
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   free(index);
   DBUG_RETURN(0);
@@ -7468,51 +7511,51 @@ inline int ha_pinba::tagN_report2_fetch_row_by_script(unsigned char *, const cha
   TAGN_REPORT_TOP_BLOCK_BY_KEY(tagN_report2, tag, SCRIPT_NAME);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      if ((*field)->field_index() == 0) { /* script_name */
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      if (PINBA_FIELD_INDEX(*field) == 0) { /* script_name */
         (*field)->set_notnull();
         (*field)->store((const char *)data->script_name, strlen((const char *)data->script_name),
                         &my_charset_bin);
-      } else if ((*field)->field_index() > 0 &&
-                 (*field)->field_index() <= report->tags_cnt) { /* tagN_value */
+      } else if (PINBA_FIELD_INDEX(*field) > 0 &&
+                 PINBA_FIELD_INDEX(*field) <= report->tags_cnt) { /* tagN_value */
         const char *tag_value =
-            (const char *)data->tag_value + ((*field)->field_index() - 1) * PINBA_TAG_VALUE_SIZE;
+            (const char *)data->tag_value + (PINBA_FIELD_INDEX(*field) - 1) * PINBA_TAG_VALUE_SIZE;
         (*field)->set_notnull();
         (*field)->store(tag_value, strlen(tag_value), &my_charset_bin);
-      } else if ((*field)->field_index() == report->tags_cnt + 1) { /* req_count */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 1) { /* req_count */
         (*field)->set_notnull();
         (*field)->store((long)data->req_count);
-      } else if ((*field)->field_index() == report->tags_cnt + 2) { /* req_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 2) { /* req_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)data->req_count / (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 3) { /* hit_count */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 3) { /* hit_count */
         (*field)->set_notnull();
         (*field)->store((long)data->hit_count);
-      } else if ((*field)->field_index() == report->tags_cnt + 4) { /* hit_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 4) { /* hit_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)data->hit_count / (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 5) { /* timer_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 5) { /* timer_value */
         (*field)->set_notnull();
         (*field)->store(timeval_to_float(data->timer_value));
-      } else if ((*field)->field_index() == report->tags_cnt + 6) { /* hostname */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 6) { /* hostname */
         (*field)->set_notnull();
         (*field)->store((const char *)data->hostname, strlen((const char *)data->hostname),
                         &my_charset_bin);
-      } else if ((*field)->field_index() == report->tags_cnt + 7) { /* server_name */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 7) { /* server_name */
         (*field)->set_notnull();
         (*field)->store((const char *)data->server_name, strlen((const char *)data->server_name),
                         &my_charset_bin);
-      } else if ((*field)->field_index() == report->tags_cnt + 8) { /* timer_median */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 8) { /* timer_median */
         (*field)->set_notnull();
         (*field)->store(pinba_histogram_value((pinba_std_report *)report, data->histogram_data,
                                               data->hit_count / 2));
-      } else if ((*field)->field_index() == report->tags_cnt + 9) { /* ru_utime_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 9) { /* ru_utime_value */
         (*field)->set_notnull();
         (*field)->store(pinba_round((float)timeval_to_float(data->ru_utime_value), 1000));
-      } else if ((*field)->field_index() == report->tags_cnt + 10) { /* ru_stime_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 10) { /* ru_stime_value */
         (*field)->set_notnull();
         (*field)->store(pinba_round((float)timeval_to_float(data->ru_stime_value), 1000));
-      } else if ((*field)->field_index() == report->tags_cnt + 11) { /* index_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 11) { /* index_value */
         uint8_t *index_value;
         int index_value_alloc_len =
             PINBA_SCRIPT_NAME_SIZE + 1 + (PINBA_TAG_VALUE_SIZE + 1) * report->tags_cnt;
@@ -7532,7 +7575,7 @@ inline int ha_pinba::tagN_report2_fetch_row_by_script(unsigned char *, const cha
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   free(index);
   DBUG_RETURN(0);
@@ -7542,7 +7585,7 @@ inline int ha_pinba::tagN_report2_fetch_row_by_script(unsigned char *, const cha
 inline int ha_pinba::histogram_fetch_row(unsigned char *) /* {{{ */
 {
   Field **field;
-  my_bitmap_map *old_map;
+  pinba_saved_column_map_t old_map;
   pinba_report *report;
   void *histogram_data;
   int position;
@@ -7579,11 +7622,11 @@ inline int ha_pinba::histogram_fetch_row(unsigned char *) /* {{{ */
     DBUG_RETURN(HA_ERR_END_OF_FILE);
   }
 
-  old_map = dbug_tmp_use_all_columns(table, table->write_set);
+  old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* index value */
           /* nullptr */
           break;
@@ -7614,7 +7657,7 @@ inline int ha_pinba::histogram_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
 
   this_index[0].position++;
 
@@ -7626,7 +7669,7 @@ inline int ha_pinba::histogram_fetch_row(unsigned char *) /* {{{ */
 inline int ha_pinba::histogram_fetch_row_by_key(unsigned char *, const char *, uint) /* {{{ */
 {
   Field **field;
-  my_bitmap_map *old_map;
+  pinba_saved_column_map_t old_map;
   pinba_report *report = nullptr;
   pinba_tag_report *tag_report = nullptr;
   void *histogram_data;
@@ -7756,11 +7799,11 @@ inline int ha_pinba::histogram_fetch_row_by_key(unsigned char *, const char *, u
     results_cnt = header->hit_count;
   }
 
-  old_map = dbug_tmp_use_all_columns(table, table->write_set);
+  old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* index value */
           (*field)->set_notnull();
           (*field)->store((const char *)this_index[0].str.val, this_index[0].str.len,
@@ -7793,7 +7836,7 @@ inline int ha_pinba::histogram_fetch_row_by_key(unsigned char *, const char *, u
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
 
   if (share->report_kind == PINBA_BASE_REPORT_KIND) {
     if (report) {
@@ -7811,8 +7854,8 @@ inline int ha_pinba::rtag_info_fetch_row(unsigned char *) /* {{{ */
   TAG_INFO_FETCH_TOP_BLOCK(rtag_info, rtag);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* tag_value */
           (*field)->set_notnull();
           (*field)->store((const char *)index, strlen(index), &my_charset_bin);
@@ -7902,7 +7945,7 @@ inline int ha_pinba::rtag_info_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -7913,8 +7956,8 @@ inline int ha_pinba::rtag2_info_fetch_row(unsigned char *) /* {{{ */
   TAG_INFO_FETCH_TOP_BLOCK(rtag2_info, rtag);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* tag1_value */
           (*field)->set_notnull();
           (*field)->store((const char *)data->tag1_value, strlen((const char *)data->tag1_value),
@@ -8010,7 +8053,7 @@ inline int ha_pinba::rtag2_info_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -8021,71 +8064,72 @@ inline int ha_pinba::rtagN_info_fetch_row(unsigned char *) /* {{{ */
   TAG_INFO_FETCH_TOP_BLOCK(rtagN_info, rtag);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      if ((*field)->field_index() < report->tags_cnt) { /* tagN_value */
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      if (PINBA_FIELD_INDEX(*field) < report->tags_cnt) { /* tagN_value */
         const char *tag_value =
-            (const char *)data->tag_value + (*field)->field_index() * PINBA_TAG_VALUE_SIZE;
+            (const char *)data->tag_value + PINBA_FIELD_INDEX(*field) * PINBA_TAG_VALUE_SIZE;
         (*field)->set_notnull();
         (*field)->store(tag_value, strlen(tag_value), &my_charset_bin);
-      } else if ((*field)->field_index() == report->tags_cnt) { /* req_count */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt) { /* req_count */
         (*field)->set_notnull();
         (*field)->store((long)data->req_count);
-      } else if ((*field)->field_index() == report->tags_cnt + 1) { /* req_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 1) { /* req_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)data->req_count / (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 2) { /* req_time_total */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 2) { /* req_time_total */
         (*field)->set_notnull();
         (*field)->store(timeval_to_float(data->req_time_total));
-      } else if ((*field)->field_index() == report->tags_cnt + 3) { /* req_time_percent */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 3) { /* req_time_percent */
         (*field)->set_notnull();
         (*field)->store(100.0 * (float)timeval_to_float(data->req_time_total) /
                         timeval_to_float(report->time_total));
-      } else if ((*field)->field_index() == report->tags_cnt + 4) { /* req_time_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 4) { /* req_time_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)timeval_to_float(data->req_time_total) /
                         (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 5) { /* ru_utime_total */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 5) { /* ru_utime_total */
         (*field)->set_notnull();
         (*field)->store(timeval_to_float(data->ru_utime_total));
-      } else if ((*field)->field_index() == report->tags_cnt + 6) { /* ru_utime_percent */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 6) { /* ru_utime_percent */
         (*field)->set_notnull();
         (*field)->store(100.0 * (float)timeval_to_float(data->ru_utime_total) /
                         (float)timeval_to_float(report->ru_utime_total));
-      } else if ((*field)->field_index() == report->tags_cnt + 7) { /* ru_utime_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 7) { /* ru_utime_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)timeval_to_float(data->ru_utime_total) /
                         (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 8) { /* ru_stime_total */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 8) { /* ru_stime_total */
         (*field)->set_notnull();
         (*field)->store((float)timeval_to_float(data->ru_stime_total) / (float)data->req_count);
-      } else if ((*field)->field_index() == report->tags_cnt + 9) { /* ru_stime_percent */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 9) { /* ru_stime_percent */
         (*field)->set_notnull();
         (*field)->store(100.0 * (float)timeval_to_float(data->ru_stime_total) /
                         (float)timeval_to_float(report->ru_stime_total));
-      } else if ((*field)->field_index() == report->tags_cnt + 10) { /* ru_stime_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 10) { /* ru_stime_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)timeval_to_float(data->ru_stime_total) /
                         (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 11) { /* traffic_total */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 11) { /* traffic_total */
         (*field)->set_notnull();
         (*field)->store(data->kbytes_total);
-      } else if ((*field)->field_index() == report->tags_cnt + 12) { /* traffic_percent */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 12) { /* traffic_percent */
         (*field)->set_notnull();
         (*field)->store(100.0 * (float)data->kbytes_total / report->kbytes_total);
-      } else if ((*field)->field_index() == report->tags_cnt + 13) { /* traffic_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 13) { /* traffic_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)data->kbytes_total / (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 14) { /* memory_footprint_total */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 14) { /* memory_footprint_total */
         (*field)->set_notnull();
         (*field)->store(data->memory_footprint);
-      } else if ((*field)->field_index() == report->tags_cnt + 15) { /* memory_footprint_percent */
+      } else if (PINBA_FIELD_INDEX(*field) ==
+                 report->tags_cnt + 15) { /* memory_footprint_percent */
         (*field)->set_notnull();
         (*field)->store(100.0 * (float)data->memory_footprint / report->memory_footprint);
-      } else if ((*field)->field_index() == report->tags_cnt + 16) { /* req_time_median */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 16) { /* req_time_median */
         (*field)->set_notnull();
         (*field)->store(pinba_histogram_value((pinba_std_report *)report, data->histogram_data,
                                               data->req_count / 2));
-      } else if ((*field)->field_index() == report->tags_cnt + 17) { /* index_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 17) { /* index_value */
         (*field)->set_notnull();
         (*field)->store((const char *)index, strlen((char *)index), &my_charset_bin);
       } else {
@@ -8093,7 +8137,7 @@ inline int ha_pinba::rtagN_info_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -8104,8 +8148,8 @@ inline int ha_pinba::rtag_report_fetch_row_by_host(unsigned char *, const char *
   TAG_REPORT_TOP_BLOCK_BY_KEY(rtag_report, rtag, HOSTNAME);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* hostname */
           (*field)->set_notnull();
           (*field)->store((const char *)data->hostname, strlen((const char *)data->hostname),
@@ -8201,7 +8245,7 @@ inline int ha_pinba::rtag_report_fetch_row_by_host(unsigned char *, const char *
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -8212,8 +8256,8 @@ inline int ha_pinba::rtag2_report_fetch_row_by_host(unsigned char *, const char 
   TAG_REPORT_TOP_BLOCK_BY_KEY(rtag2_report, rtag, HOSTNAME);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* hostname */
           (*field)->set_notnull();
           (*field)->store((const char *)data->hostname, strlen((const char *)data->hostname),
@@ -8314,7 +8358,7 @@ inline int ha_pinba::rtag2_report_fetch_row_by_host(unsigned char *, const char 
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -8325,76 +8369,77 @@ inline int ha_pinba::rtagN_report_fetch_row_by_host(unsigned char *, const char 
   TAGN_REPORT_TOP_BLOCK_BY_KEY(rtagN_report, rtag, HOSTNAME);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      if ((*field)->field_index() == 0) { /* hostname */
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      if (PINBA_FIELD_INDEX(*field) == 0) { /* hostname */
         (*field)->set_notnull();
         (*field)->store((const char *)data->hostname, strlen((const char *)data->hostname),
                         &my_charset_bin);
-      } else if ((*field)->field_index() > 0 &&
-                 (*field)->field_index() <= report->tags_cnt) { /* tagN_value */
+      } else if (PINBA_FIELD_INDEX(*field) > 0 &&
+                 PINBA_FIELD_INDEX(*field) <= report->tags_cnt) { /* tagN_value */
         const char *tag_value =
-            (const char *)data->tag_value + ((*field)->field_index() - 1) * PINBA_TAG_VALUE_SIZE;
+            (const char *)data->tag_value + (PINBA_FIELD_INDEX(*field) - 1) * PINBA_TAG_VALUE_SIZE;
         (*field)->set_notnull();
         (*field)->store(tag_value, strlen(tag_value), &my_charset_bin);
-      } else if ((*field)->field_index() == report->tags_cnt + 1) { /* req_count */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 1) { /* req_count */
         (*field)->set_notnull();
         (*field)->store((long)data->req_count);
-      } else if ((*field)->field_index() == report->tags_cnt + 2) { /* req_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 2) { /* req_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)data->req_count / (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 3) { /* req_time_total */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 3) { /* req_time_total */
         (*field)->set_notnull();
         (*field)->store(timeval_to_float(data->req_time_total));
-      } else if ((*field)->field_index() == report->tags_cnt + 4) { /* req_time_percent */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 4) { /* req_time_percent */
         (*field)->set_notnull();
         (*field)->store(100.0 * (float)timeval_to_float(data->req_time_total) /
                         timeval_to_float(report->time_total));
-      } else if ((*field)->field_index() == report->tags_cnt + 5) { /* req_time_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 5) { /* req_time_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)timeval_to_float(data->req_time_total) /
                         (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 6) { /* ru_utime_total */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 6) { /* ru_utime_total */
         (*field)->set_notnull();
         (*field)->store(timeval_to_float(data->ru_utime_total));
-      } else if ((*field)->field_index() == report->tags_cnt + 7) { /* ru_utime_percent */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 7) { /* ru_utime_percent */
         (*field)->set_notnull();
         (*field)->store(100.0 * (float)timeval_to_float(data->ru_utime_total) /
                         (float)timeval_to_float(report->ru_utime_total));
-      } else if ((*field)->field_index() == report->tags_cnt + 8) { /* ru_utime_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 8) { /* ru_utime_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)timeval_to_float(data->ru_utime_total) /
                         (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 9) { /* ru_stime_total */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 9) { /* ru_stime_total */
         (*field)->set_notnull();
         (*field)->store((float)timeval_to_float(data->ru_stime_total) / (float)data->req_count);
-      } else if ((*field)->field_index() == report->tags_cnt + 10) { /* ru_stime_percent */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 10) { /* ru_stime_percent */
         (*field)->set_notnull();
         (*field)->store(100.0 * (float)timeval_to_float(data->ru_stime_total) /
                         (float)timeval_to_float(report->ru_stime_total));
-      } else if ((*field)->field_index() == report->tags_cnt + 11) { /* ru_stime_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 11) { /* ru_stime_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)timeval_to_float(data->ru_stime_total) /
                         (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 12) { /* traffic_total */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 12) { /* traffic_total */
         (*field)->set_notnull();
         (*field)->store(data->kbytes_total);
-      } else if ((*field)->field_index() == report->tags_cnt + 13) { /* traffic_percent */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 13) { /* traffic_percent */
         (*field)->set_notnull();
         (*field)->store(100.0 * (float)data->kbytes_total / report->kbytes_total);
-      } else if ((*field)->field_index() == report->tags_cnt + 14) { /* traffic_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 14) { /* traffic_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)data->kbytes_total / (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 15) { /* memory_footprint_total */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 15) { /* memory_footprint_total */
         (*field)->set_notnull();
         (*field)->store(data->memory_footprint);
-      } else if ((*field)->field_index() == report->tags_cnt + 16) { /* memory_footprint_percent */
+      } else if (PINBA_FIELD_INDEX(*field) ==
+                 report->tags_cnt + 16) { /* memory_footprint_percent */
         (*field)->set_notnull();
         (*field)->store(100.0 * (float)data->memory_footprint / report->memory_footprint);
-      } else if ((*field)->field_index() == report->tags_cnt + 17) { /* req_time_median */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 17) { /* req_time_median */
         (*field)->set_notnull();
         (*field)->store(pinba_histogram_value((pinba_std_report *)report, data->histogram_data,
                                               data->req_count / 2));
-      } else if ((*field)->field_index() == report->tags_cnt + 18) { /* index_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 18) { /* index_value */
         (*field)->set_notnull();
         (*field)->store((const char *)index, strlen((char *)index), &my_charset_bin);
       } else {
@@ -8402,7 +8447,7 @@ inline int ha_pinba::rtagN_report_fetch_row_by_host(unsigned char *, const char 
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   free(index);
   DBUG_RETURN(0);
@@ -8414,8 +8459,8 @@ inline int ha_pinba::rtag_report_fetch_row(unsigned char *) /* {{{ */
   TAG_REPORT_TOP_BLOCK(rtag_report, rtag, HOSTNAME);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* hostname */
           (*field)->set_notnull();
           (*field)->store((const char *)data->hostname, strlen((const char *)data->hostname),
@@ -8511,7 +8556,7 @@ inline int ha_pinba::rtag_report_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -8522,8 +8567,8 @@ inline int ha_pinba::rtag2_report_fetch_row(unsigned char *) /* {{{ */
   TAG_REPORT_TOP_BLOCK(rtag2_report, rtag, HOSTNAME);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      switch ((*field)->field_index()) {
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* hostname */
           (*field)->set_notnull();
           (*field)->store((const char *)data->hostname, strlen((const char *)data->hostname),
@@ -8624,7 +8669,7 @@ inline int ha_pinba::rtag2_report_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   DBUG_RETURN(0);
 }
@@ -8635,76 +8680,77 @@ inline int ha_pinba::rtagN_report_fetch_row(unsigned char *) /* {{{ */
   TAGN_REPORT_TOP_BLOCK(rtagN_report, rtag, HOSTNAME);
 
   for (field = table->field; *field; field++) {
-    if (bitmap_is_set(table->read_set, (*field)->field_index())) {
-      if ((*field)->field_index() == 0) { /* hostname */
+    if (bitmap_is_set(table->read_set, PINBA_FIELD_INDEX(*field))) {
+      if (PINBA_FIELD_INDEX(*field) == 0) { /* hostname */
         (*field)->set_notnull();
         (*field)->store((const char *)data->hostname, strlen((const char *)data->hostname),
                         &my_charset_bin);
-      } else if ((*field)->field_index() > 0 &&
-                 (*field)->field_index() <= report->tags_cnt) { /* tagN_value */
+      } else if (PINBA_FIELD_INDEX(*field) > 0 &&
+                 PINBA_FIELD_INDEX(*field) <= report->tags_cnt) { /* tagN_value */
         const char *tag_value =
-            (const char *)data->tag_value + ((*field)->field_index() - 1) * PINBA_TAG_VALUE_SIZE;
+            (const char *)data->tag_value + (PINBA_FIELD_INDEX(*field) - 1) * PINBA_TAG_VALUE_SIZE;
         (*field)->set_notnull();
         (*field)->store(tag_value, strlen(tag_value), &my_charset_bin);
-      } else if ((*field)->field_index() == report->tags_cnt + 1) { /* req_count */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 1) { /* req_count */
         (*field)->set_notnull();
         (*field)->store((long)data->req_count);
-      } else if ((*field)->field_index() == report->tags_cnt + 2) { /* req_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 2) { /* req_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)data->req_count / (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 3) { /* req_time_total */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 3) { /* req_time_total */
         (*field)->set_notnull();
         (*field)->store(timeval_to_float(data->req_time_total));
-      } else if ((*field)->field_index() == report->tags_cnt + 4) { /* req_time_percent */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 4) { /* req_time_percent */
         (*field)->set_notnull();
         (*field)->store(100.0 * (float)timeval_to_float(data->req_time_total) /
                         timeval_to_float(report->time_total));
-      } else if ((*field)->field_index() == report->tags_cnt + 5) { /* req_time_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 5) { /* req_time_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)timeval_to_float(data->req_time_total) /
                         (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 6) { /* ru_utime_total */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 6) { /* ru_utime_total */
         (*field)->set_notnull();
         (*field)->store(timeval_to_float(data->ru_utime_total));
-      } else if ((*field)->field_index() == report->tags_cnt + 7) { /* ru_utime_percent */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 7) { /* ru_utime_percent */
         (*field)->set_notnull();
         (*field)->store(100.0 * (float)timeval_to_float(data->ru_utime_total) /
                         (float)timeval_to_float(report->ru_utime_total));
-      } else if ((*field)->field_index() == report->tags_cnt + 8) { /* ru_utime_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 8) { /* ru_utime_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)timeval_to_float(data->ru_utime_total) /
                         (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 9) { /* ru_stime_total */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 9) { /* ru_stime_total */
         (*field)->set_notnull();
         (*field)->store((float)timeval_to_float(data->ru_stime_total) / (float)data->req_count);
-      } else if ((*field)->field_index() == report->tags_cnt + 10) { /* ru_stime_percent */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 10) { /* ru_stime_percent */
         (*field)->set_notnull();
         (*field)->store(100.0 * (float)timeval_to_float(data->ru_stime_total) /
                         (float)timeval_to_float(report->ru_stime_total));
-      } else if ((*field)->field_index() == report->tags_cnt + 11) { /* ru_stime_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 11) { /* ru_stime_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)timeval_to_float(data->ru_stime_total) /
                         (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 12) { /* traffic_total */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 12) { /* traffic_total */
         (*field)->set_notnull();
         (*field)->store(data->kbytes_total);
-      } else if ((*field)->field_index() == report->tags_cnt + 13) { /* traffic_percent */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 13) { /* traffic_percent */
         (*field)->set_notnull();
         (*field)->store(100.0 * (float)data->kbytes_total / report->kbytes_total);
-      } else if ((*field)->field_index() == report->tags_cnt + 14) { /* traffic_per_sec */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 14) { /* traffic_per_sec */
         (*field)->set_notnull();
         (*field)->store((float)data->kbytes_total / (float)report->std.time_interval);
-      } else if ((*field)->field_index() == report->tags_cnt + 15) { /* memory_footprint_total */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 15) { /* memory_footprint_total */
         (*field)->set_notnull();
         (*field)->store(data->memory_footprint);
-      } else if ((*field)->field_index() == report->tags_cnt + 16) { /* memory_footprint_percent */
+      } else if (PINBA_FIELD_INDEX(*field) ==
+                 report->tags_cnt + 16) { /* memory_footprint_percent */
         (*field)->set_notnull();
         (*field)->store(100.0 * (float)data->memory_footprint / report->memory_footprint);
-      } else if ((*field)->field_index() == report->tags_cnt + 17) { /* req_time_median */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 17) { /* req_time_median */
         (*field)->set_notnull();
         (*field)->store(pinba_histogram_value((pinba_std_report *)report, data->histogram_data,
                                               data->req_count / 2));
-      } else if ((*field)->field_index() == report->tags_cnt + 18) { /* index_value */
+      } else if (PINBA_FIELD_INDEX(*field) == report->tags_cnt + 18) { /* index_value */
         (*field)->set_notnull();
         (*field)->store((const char *)index, strlen((char *)index), &my_charset_bin);
       } else {
@@ -8712,7 +8758,7 @@ inline int ha_pinba::rtagN_report_fetch_row(unsigned char *) /* {{{ */
       }
     }
   }
-  dbug_tmp_restore_column_map(table->write_set, old_map);
+  PINBA_TMP_RESTORE_COLUMN_MAP(table->write_set, old_map);
   pthread_rwlock_unlock(&report->std.lock);
   free(index);
   DBUG_RETURN(0);
@@ -8728,6 +8774,15 @@ void ha_pinba::position(const unsigned char *) /* {{{ */
 }
 /* }}} */
 
+#ifdef MARIADB_BASE_VERSION
+int ha_pinba::create(const char *name, TABLE *table_arg, HA_CREATE_INFO *create_info) /* {{{ */
+{
+  unsigned char type;
+  char kind;
+  DBUG_ENTER("ha_pinba::create");
+  (void)name;
+  (void)create_info;
+#else
 int ha_pinba::create(const char *name, TABLE *table_arg, HA_CREATE_INFO *create_info,
                      dd::Table *table_def) /* {{{ */
 {
@@ -8737,6 +8792,7 @@ int ha_pinba::create(const char *name, TABLE *table_arg, HA_CREATE_INFO *create_
   (void)name;
   (void)create_info;
   (void)table_def;
+#endif
 
   if (!table_arg->s) {
     DBUG_RETURN(HA_WRONG_CREATE_OPTION);
@@ -9112,9 +9168,31 @@ static SYS_VAR *system_variables[] = {MYSQL_SYSVAR(port),
 struct st_mysql_storage_engine pinba_storage_engine = {MYSQL_HANDLERTON_INTERFACE_VERSION};
 
 static SHOW_VAR pinba_status_vars[] = {
+#ifdef MARIADB_BASE_VERSION
+    {"Pinba_engine_version", (char *)PINBA_ENGINE_VERSION, SHOW_CHAR}, {NullS, NullS, SHOW_LONG}};
+#else
     {"Pinba_engine_version", (char *)PINBA_ENGINE_VERSION, SHOW_CHAR, SHOW_SCOPE_GLOBAL},
     {NullS, NullS, SHOW_LONG, SHOW_SCOPE_GLOBAL}};
+#endif
 
+#ifdef MARIADB_BASE_VERSION
+maria_declare_plugin(pinba) /* {{{ */
+    {
+        MYSQL_STORAGE_ENGINE_PLUGIN,
+        &pinba_storage_engine,
+        "PINBA",
+        "Antony Dovgal",
+        "Pinba engine",
+        PLUGIN_LICENSE_GPL,
+        pinba_engine_init,             /* Plugin Init */
+        pinba_engine_shutdown,         /* Plugin Deinit (no check_uninstall in MariaDB) */
+        0x0101,                        /* VERSION 1.1.0 */
+        pinba_status_vars,             /* status variables */
+        system_variables,              /* system variables */
+        PINBA_ENGINE_VERSION,          /* version as a string */
+        MariaDB_PLUGIN_MATURITY_STABLE /* maturity */
+    } maria_declare_plugin_end;
+#else
 mysql_declare_plugin(pinba) /* {{{ */
     {
         MYSQL_STORAGE_ENGINE_PLUGIN,
@@ -9132,6 +9210,7 @@ mysql_declare_plugin(pinba) /* {{{ */
         nullptr,                      /* config options                  */
         0                             /* flags                           */
     } mysql_declare_plugin_end;
+#endif
 /* }}} */
 
 /*
