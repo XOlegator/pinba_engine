@@ -4,14 +4,14 @@ type: index
 sources: []
 related: []
 confidence: high
-updated: 2026-06-10
+updated: 2026-06-14
 ---
 
 # Pinba Engine — Knowledge Base Index
 
 Master catalog. Maintained by LLM agents.
 
-## Concepts (25 articles)
+## Concepts (26 articles)
 
 | Article | Key Topic |
 |---------|-----------|
@@ -40,8 +40,9 @@ Master catalog. Maintained by LLM agents.
 | [[mysql-postinst-patterns]] | postinst/prerm: auth cascade, plugin-load-add, MySQL 8.0 syntax pitfalls |
 | [[mysql-vendor-headers-minimal]] | Minimal vendor headers via .d file analysis (1317→162 files) |
 | [[launchpad-ppa-workflow]] | dput configuration, signing, versioning, GPGKeyTemporarilyNotFoundError |
+| [[copr-rpm-packaging]] | RPM via Fedora COPR + Remi SCL (`php<XY>-php-pinba`); per-chroot Remi requirement; EPEL = AlmaLinux/Rocky/RHEL; `copr-cli` automation |
 
-## Sources (14 documents)
+## Sources (15 documents)
 
 | Source | Raw File |
 |--------|---------|
@@ -59,6 +60,7 @@ Master catalog. Maintained by LLM agents.
 | [[ppa-upload-session-2026-06-06]] | `raw/sessions/ppa-upload-session-2026-06-06.md` |
 | [[protobuf-modernization-session-2026-06-09]] | PRs: pinba_extension#13, pinba_engine#45 |
 | [[test-infra-appstream-session-2026-06-10]] | PRs: pinba_engine#46/#47, pinba_extension#14/#15/#16 |
+| [[rpm-copr-session-2026-06-14]] | PRs: pinba_extension#44/#45/#47/#48/#49/#51 |
 
 ## Raw Documents
 
