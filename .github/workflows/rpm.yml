@@ -65,11 +65,17 @@ jobs:
       - name: Mark checkout dir safe for git
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
-      - name: Build SRPM + RPMs
+      - name: Build SRPM + RPMs (MySQL flavor)
         run: |
           ver=$(awk '/^Version:/{print $2; exit}' rpm/pinba-engine.spec)
-          echo "Building pinba-engine $ver"
-          bash rpm/build-srpm.sh "$ver" --rpms
+          echo "Building pinba-engine $ver (mysql)"
+          bash rpm/build-srpm.sh "$ver" mysql --rpms
+
+      - name: Build SRPM + RPMs (MariaDB flavor)
+        run: |
+          ver=$(awk '/^Version:/{print $2; exit}' rpm/pinba-engine.spec)
+          echo "Building pinba-engine $ver (mariadb)"
+          bash rpm/build-srpm.sh "$ver" mariadb --rpms
 
       - name: rpmlint (informational)
         run: rpmlint rpm/pinba-engine.spec || true
@@ -108,25 +114,12 @@ jobs:
             exit 1
           fi
 
-      - name: Build SRPM
-        id: srpm
+      - name: Build SRPMs (both flavors) and submit to Copr
         run: |
           raw="${{ github.event.release.tag_name || inputs.tag }}"
           ver="${raw#v}"
           [ -n "$ver" ] || ver=$(awk '/^Version:/{print $2; exit}' rpm/pinba-engine.spec)
-          echo "Packaging pinba-engine $ver"
-          out=$(bash rpm/build-srpm.sh "$ver")
-          srpm=$(printf '%s\n' "$out" | grep -oE '/[^[:space:]]+\.src\.rpm' | head -1)
-          if [ -z "$srpm" ] || [ ! -f "$srpm" ]; then
-            echo "could not locate built SRPM in:" >&2
-            printf '%s\n' "$out" >&2
-            exit 1
-          fi
-          echo "Built SRPM: $srpm"
-          echo "srpm=$srpm" >> "$GITHUB_OUTPUT"
 
-      - name: Submit Copr build
-        run: |
           # Explicit chroots from dispatch input, else the supported target set
           # from rpm-matrix.json (so a release builds every target, not whatever
           # chroots happen to be enabled on the project).
@@ -137,5 +130,18 @@ jobs:
           args=()
           IFS=',' read -ra cs <<< "$chroots"
           for c in "${cs[@]}"; do args+=(--chroot "$c"); done
-          echo "Submitting build for chroots: ${cs[*]}"
-          copr-cli build "${args[@]}" xolegator/pinba "${{ steps.srpm.outputs.srpm }}"
+
+          # One SRPM per flavor (mysql / mariadb); each Copr build produces the
+          # matching pinba-engine-<flavor> package for every chroot.
+          for flavor in mariadb mysql; do
+            echo "== Packaging pinba-engine $ver ($flavor) =="
+            out=$(bash rpm/build-srpm.sh "$ver" "$flavor")
+            srpm=$(printf '%s\n' "$out" | grep -oE '/[^[:space:]]+\.src\.rpm' | head -1)
+            if [ -z "$srpm" ] || [ ! -f "$srpm" ]; then
+              echo "could not locate built $flavor SRPM in:" >&2
+              printf '%s\n' "$out" >&2
+              exit 1
+            fi
+            echo "Submitting $flavor build for chroots: ${cs[*]}"
+            copr-cli build "${args[@]}" xolegator/pinba "$srpm"
+          done

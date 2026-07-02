@@ -85,6 +85,12 @@ vendor/*.tar.gz
 # CMake-generated files inside vendor/mysql-headers-* (written to
 # PINBA_MYSQL_SOURCE_DIR/builddir/ during cmake configure; reproducible)
 vendor/*/builddir/
+# Exception: the MariaDB vendored trees MUST ship their generated headers
+# (my_config.h, mysql_version.h with MARIADB_BASE_VERSION, mysqld_error.h, ...).
+# Unlike MySQL, pinba's CMake never synthesises these for MariaDB, so an offline
+# mock/Copr build needs them committed. They are stable on x86_64 Linux.
+!vendor/mariadb-headers-*/builddir/
+!vendor/mariadb-headers-*/builddir/**
 
 # OS files
 .DS_Store
