@@ -11,7 +11,7 @@ updated: 2026-06-14
 
 Master catalog. Maintained by LLM agents.
 
-## Concepts (26 articles)
+## Concepts (27 articles)
 
 | Article | Key Topic |
 |---------|-----------|
@@ -41,8 +41,9 @@ Master catalog. Maintained by LLM agents.
 | [[mysql-vendor-headers-minimal]] | Minimal vendor headers via .d file analysis (1317→162 files) |
 | [[launchpad-ppa-workflow]] | dput configuration, signing, versioning, GPGKeyTemporarilyNotFoundError |
 | [[copr-rpm-packaging]] | RPM via Fedora COPR: distro-native `php-pinba` only (no Remi); Remi ships this fork for module/SCL streams since v1.4.0 (issue #58); EPEL = AlmaLinux/Rocky/RHEL; `copr-cli` automation |
+| [[engine-rpm-packaging]] | Engine RPM via Copr: offline build against vendored server headers; mysql/mariadb flavors (Conflicts); ABI series per chroot; MariaDB header vendoring; aarch64 (byte_order_generic.h) |
 
-## Sources (15 documents)
+## Sources (16 documents)
 
 | Source | Raw File |
 |--------|---------|
@@ -61,6 +62,7 @@ Master catalog. Maintained by LLM agents.
 | [[protobuf-modernization-session-2026-06-09]] | PRs: pinba_extension#13, pinba_engine#45 |
 | [[test-infra-appstream-session-2026-06-10]] | PRs: pinba_engine#46/#47, pinba_extension#14/#15/#16 |
 | [[rpm-copr-session-2026-06-14]] | PRs: pinba_extension#44/#45/#47/#48/#49/#51 |
+| [[engine-rpm-session-2026-07-02]] | Engine RPM via Copr; PRs: pinba_engine#58/#60/#62/#65 |
 
 ## Raw Documents
 

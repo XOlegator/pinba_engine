@@ -14,8 +14,9 @@ related:
   - wiki/concepts/pinba-data-flow.md
   - wiki/concepts/mysql-plugin-abi.md
   - wiki/concepts/copr-rpm-packaging.md
+  - wiki/concepts/engine-rpm-packaging.md
 confidence: high
-updated: 2026-06-14
+updated: 2026-07-02
 ---
 
 # Pinba Engine — Knowledge Base Overview
@@ -81,13 +82,21 @@ auto-merge. When that PR lands, `ppa-build` and `docker` workflows fire automati
 publishing new packages to Launchpad and Docker Hub without manual intervention.
 See [[github-actions-mysql-version-monitor]].
 
-### 8. RPM Distribution via COPR + Remi
-Alongside the Debian/PPA track, the stack is packaged as `.rpm` through Fedora COPR, built
-against Remi's PHP collections. The PHP extension publishes `php<XY>-php-pinba` for Fedora
-and EPEL 9/10 (AlmaLinux/Rocky/RHEL); a release auto-publishes to both the PPA and COPR from
-one tag. The decisive gotcha: Remi must be configured **per chroot** in the COPR project, not
-project-wide, or the other distro family's baseurl 404s and DNF fails the build.
-See [[copr-rpm-packaging]].
+### 8. RPM Distribution via COPR
+Alongside the Debian/PPA track, the stack is packaged as `.rpm` through Fedora COPR
+(`xolegator/pinba`), for Fedora 43/44 and EPEL 9/10 (AlmaLinux/Rocky/RHEL); a release
+auto-publishes to both the PPA and COPR from one tag. The **extension** builds `php-pinba`
+against each chroot's distro-native PHP (no Remi at build/run time — Remi's own repo now owns
+the multi-version story since fork adoption, issue #58). See [[copr-rpm-packaging]].
+
+### 9. Engine RPM: Offline Build Against Vendored Server Headers
+The **engine** RPM (`pinba-engine-mysql` / `pinba-engine-mariadb`) is the counterpart, but
+fundamentally different from the extension: a storage-engine plugin compiles against the DB
+server's *source* headers (`sql/handler.h`), which no `-devel` ships — so the minimal header
+subset is **vendored in-tree and travels in the tarball**, making the mock build fully offline.
+One flavor per SRPM (they share `ha_pinba.so` and `Conflicts`); the vendored series is pinned
+**per chroot** to match its runtime server (ABI — e.g. Fedora 43 = MariaDB 10.11, Fedora 44 =
+11.8). Builds for `x86_64` and `aarch64`. See [[engine-rpm-packaging]].
 
 ## Key Configuration Points
 
