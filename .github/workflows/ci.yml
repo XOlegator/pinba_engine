@@ -172,16 +172,20 @@ jobs:
           # SOURCE is an interactive client builtin, so feed the schema via stdin.
           sudo mariadb pinba < default_tables.sql
           sudo mariadb -e "SELECT PLUGIN_NAME, PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS WHERE PLUGIN_NAME='PINBA';"
+          # The fresh root account authenticates via unix_socket only, so the smoke test
+          # (a normal client, not sudo) cannot use it. Create a password user reachable
+          # over TCP for the smoke run.
+          sudo mariadb -e "CREATE USER IF NOT EXISTS 'pinba'@'127.0.0.1' IDENTIFIED BY 'pinba';
+                           GRANT ALL PRIVILEGES ON *.* TO 'pinba'@'127.0.0.1' WITH GRANT OPTION;
+                           FLUSH PRIVILEGES;"
 
       - name: SQL smoke test
         run: |
           # mariadb-client (11.x) may not ship the `mysql` compat symlink, so drive the
-          # client by name via MYSQL_CLIENT (honoured by smoke_test.sh). Pass it with
-          # `sudo env VAR=val` — a bare `sudo VAR=val …` is dropped by the default
-          # env_reset sudoers policy, which previously left the script falling back to a
-          # non-existent `mysql` binary. Host "localhost" uses the unix socket, where
-          # root authenticates via unix_socket under sudo.
-          sudo env MYSQL_CLIENT=mariadb bash scripts/smoke_test.sh localhost 3306 root "" pinba
+          # client by name via MYSQL_CLIENT (honoured by smoke_test.sh). Connect over TCP
+          # (127.0.0.1) with the password user created above — the default root account is
+          # unix_socket-only and cannot be reached by a normal (non-sudo) client.
+          MYSQL_CLIENT=mariadb bash scripts/smoke_test.sh 127.0.0.1 3306 pinba pinba pinba
 
   sanitize:
     name: Sanitize / MySQL ${{ matrix.mysql-series }}
