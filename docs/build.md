@@ -1,10 +1,19 @@
 # Build and Development Guide
 
-This project builds a MySQL 8.0+ storage engine plugin with CMake and C++23.
-Supported target series:
+This project builds a storage engine plugin with CMake and C++23. It targets both
+MySQL and MariaDB from a single source tree, selected at configure time with
+`PINBA_DB_FLAVOR` (`mysql` — the default — or `mariadb`). Supported target series:
 
 - MySQL 8.0 (current stable compatibility line)
 - MySQL 8.4 LTS
+- MariaDB 10.11 LTS and 11.8 LTS (CI-validated)
+- MariaDB 10.5 (source-compatible; targeted for the AlmaLinux/RHEL 9 module stream
+  and validated during RPM packaging rather than in the Ubuntu-based CI)
+
+A plugin is ABI-bound to the server it is built against: a `.so` built for MySQL will
+not load into MariaDB and vice versa, and the source-header version must match the
+runtime server's minor version. See [Building for MariaDB](#building-for-mariadb) below
+for the MariaDB-specific steps; the rest of this guide covers the default MySQL flavor.
 
 ## Requirements
 
@@ -85,6 +94,65 @@ Set `PINBA_MYSQL_SERIES` for LTS 8.4 builds:
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPINBA_MYSQL_SERIES=8.4
 cmake --build build -j"$(nproc)"
+```
+
+## Building for MariaDB
+
+MariaDB is a separate server with its own internal C++ handler API, so the plugin is
+built from the same sources but against MariaDB's server headers, guarded internally by
+`#ifdef MARIADB_BASE_VERSION`. Select it with `-DPINBA_DB_FLAVOR=mariadb` and pick the
+series with `PINBA_MYSQL_SERIES` (`10.5`, `10.11`, or `11.8`).
+
+### MariaDB server headers
+
+Like MySQL, a plugin build needs the server *source* headers (`sql/handler.h` and the
+generated `my_config.h`, `mysql_version.h`, `mysqld_error.h`, …), not just the client
+dev package. The MariaDB source tarball ships only `*.in` templates for the generated
+ones, so a short run of MariaDB's own CMake is needed to produce them — a full server
+build is **not** required. `scripts/prepare-mariadb-headers.sh` automates this:
+
+```bash
+# Downloads the matching source tarball and generates the headers under mariadb-src/.
+# The <version> must match your runtime server's minor version (ABI).
+scripts/prepare-mariadb-headers.sh 11.8.6 mariadb-src
+```
+
+Requires `curl`, `tar`, `cmake`, a C/C++ compiler, and OpenSSL headers
+(`libssl-dev` / `openssl-devel`); `WITH_SSL=system` uses OpenSSL, so GnuTLS is not needed.
+
+### Configure and build
+
+```bash
+cmake -B build-mariadb \
+  -DPINBA_DB_FLAVOR=mariadb \
+  -DPINBA_MYSQL_SERIES=11.8 \
+  -DPINBA_MYSQL_SOURCE_DIR="$PWD/mariadb-src" \
+  -DPINBA_MYSQL_SOURCE_VERSION=11.8.6 \
+  -DMYSQL_INCLUDE_DIR="$PWD/mariadb-src/include"
+cmake --build build-mariadb --parallel "$(nproc)" --target pinba_engine
+```
+
+Expected output: `build-mariadb/ha_pinba.so`, exporting `_maria_plugin_declarations_`
+(verify with `nm -D build-mariadb/ha_pinba.so | grep _maria_plugin_declarations_`).
+
+### Install and validate
+
+Install into the server's plugin directory and load it exactly as for MySQL, using the
+`mariadb` client:
+
+```bash
+plugin_dir=$(sudo mariadb -N -B -e "SELECT @@plugin_dir")
+sudo install -m 0644 build-mariadb/ha_pinba.so "$plugin_dir/ha_pinba.so"
+sudo mariadb -e "INSTALL PLUGIN pinba SONAME 'ha_pinba.so';"
+sudo mariadb -e "CREATE DATABASE IF NOT EXISTS pinba;"
+sudo mariadb pinba < default_tables.sql
+```
+
+An end-to-end SQL smoke test (plugin active, all report tables, dynamic tag/percentile
+reports) is available and is what CI runs:
+
+```bash
+MYSQL_CLIENT=mariadb scripts/smoke_test.sh 127.0.0.1 3306 <user> <password> pinba
 ```
 
 ## Build

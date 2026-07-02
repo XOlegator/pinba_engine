@@ -91,6 +91,114 @@ jobs:
             | sort -u \
             | xargs clang-tidy --quiet -p build
 
+  build-test-mariadb:
+    name: Build & load (MariaDB ${{ matrix.mariadb-series }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mariadb-series: "10.11"
+          - mariadb-series: "11.8"
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -q
+          # build-essential/cmake/bison/libssl-dev/libncurses-dev cover both the
+          # pinba plugin build and MariaDB's own CMake header-generation step
+          # (WITH_SSL=system -> OpenSSL, so GnuTLS is not required).
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake bison \
+            libprotobuf-dev protobuf-compiler \
+            rapidjson-dev \
+            libssl-dev libncurses-dev pkg-config
+
+      - name: Install MariaDB ${{ matrix.mariadb-series }} server
+        run: |
+          curl -fsSL https://r.mariadb.com/downloads/mariadb_repo_setup \
+            | sudo bash -s -- --mariadb-server-version="mariadb-${{ matrix.mariadb-series }}"
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends mariadb-server mariadb-client
+          sudo systemctl start mariadb || sudo service mariadb start
+
+      - name: Resolve exact server version
+        id: dbver
+        run: |
+          # The plugin ABI must match the running server, so build headers for the
+          # server's exact patch version rather than a hard-coded one.
+          ver=$(mariadbd --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          [ -n "$ver" ] || { echo "could not resolve MariaDB version" >&2; exit 1; }
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          echo "MariaDB server version: $ver"
+
+      - name: Cache MariaDB source tarball
+        uses: actions/cache@v5
+        with:
+          path: mariadb-src/.cache
+          key: mariadb-src-${{ steps.dbver.outputs.version }}
+
+      - name: Prepare MariaDB headers
+        run: bash scripts/prepare-mariadb-headers.sh "${{ steps.dbver.outputs.version }}" mariadb-src
+
+      - name: Configure
+        run: |
+          cmake -B build-mariadb \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPINBA_DB_FLAVOR=mariadb \
+            -DPINBA_MYSQL_SERIES=${{ matrix.mariadb-series }} \
+            -DPINBA_MYSQL_SOURCE_DIR="$PWD/mariadb-src" \
+            -DPINBA_MYSQL_SOURCE_VERSION="${{ steps.dbver.outputs.version }}" \
+            -DMYSQL_INCLUDE_DIR="$PWD/mariadb-src/include" \
+            -DPINBA_WITH_TESTS=OFF -DPINBA_FETCH_DEPENDENCIES=OFF
+
+      - name: Build
+        run: cmake --build build-mariadb --parallel "$(nproc)" --target pinba_engine
+
+      - name: Verify plugin exports the MariaDB plugin symbols
+        run: |
+          nm -D build-mariadb/ha_pinba.so | grep -q _maria_plugin_declarations_ \
+            || { echo "ha_pinba.so is missing _maria_plugin_declarations_" >&2; exit 1; }
+
+      - name: Install plugin into the running server
+        run: |
+          plugin_dir=$(sudo mariadb -N -B -e "SELECT @@plugin_dir")
+          echo "plugin_dir=$plugin_dir"
+          sudo install -m 0644 build-mariadb/ha_pinba.so "$plugin_dir/ha_pinba.so"
+          sudo mariadb -e "INSTALL PLUGIN pinba SONAME 'ha_pinba.so';"
+          sudo mariadb -e "CREATE DATABASE IF NOT EXISTS pinba;"
+          # SOURCE is an interactive client builtin, so feed the schema via stdin.
+          sudo mariadb pinba < default_tables.sql
+          sudo mariadb -e "SELECT PLUGIN_NAME, PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS WHERE PLUGIN_NAME='PINBA';"
+          # The fresh root account authenticates via unix_socket only, so the smoke test
+          # (a normal client, not sudo) cannot use it. Create a password user reachable
+          # over TCP for the smoke run.
+          sudo mariadb -e "CREATE USER IF NOT EXISTS 'pinba'@'127.0.0.1' IDENTIFIED BY 'pinba';
+                           GRANT ALL PRIVILEGES ON *.* TO 'pinba'@'127.0.0.1' WITH GRANT OPTION;
+                           FLUSH PRIVILEGES;"
+
+      - name: SQL smoke test
+        run: |
+          # mariadb-client (11.x) may not ship the `mysql` compat symlink, so drive the
+          # client by name via MYSQL_CLIENT (honoured by smoke_test.sh). Connect over TCP
+          # (127.0.0.1) with the password user created above — the default root account is
+          # unix_socket-only and cannot be reached by a normal (non-sudo) client.
+          MYSQL_CLIENT=mariadb bash scripts/smoke_test.sh 127.0.0.1 3306 pinba pinba pinba
+
+      - name: Dump MariaDB error log on failure
+        if: failure()
+        run: |
+          echo "=== server alive? ==="
+          sudo mariadb -e "SELECT VERSION();" || echo "server not answering"
+          echo "=== error log (journal) ==="
+          sudo journalctl -u mariadb --no-pager -n 200 2>/dev/null || true
+          echo "=== error log files ==="
+          for f in /var/log/mysql/error.log /var/lib/mysql/*.err; do
+            [ -f "$f" ] && { echo "--- $f ---"; sudo tail -n 200 "$f"; }
+          done
+
   sanitize:
     name: Sanitize / MySQL ${{ matrix.mysql-series }}
     runs-on: ubuntu-latest

@@ -26,18 +26,44 @@ option(PINBA_FETCH_DEPENDENCIES "Download test/benchmark dependencies when not i
 option(PINBA_DOWNLOAD_MYSQL_SOURCE "Download MySQL source headers when no local source tree is found" OFF)
 option(PINBA_ENABLE_SANITIZERS "Enable ASan/UBSan for debug hardening" OFF)
 
-set(PINBA_MYSQL_SERIES "8.0" CACHE STRING "Target MySQL server series for source headers (8.0 or 8.4)")
-set_property(CACHE PINBA_MYSQL_SERIES PROPERTY STRINGS 8.0 8.4)
-if(NOT PINBA_MYSQL_SERIES STREQUAL "8.0" AND NOT PINBA_MYSQL_SERIES STREQUAL "8.4")
-  message(FATAL_ERROR "PINBA_MYSQL_SERIES must be 8.0 or 8.4. Got: ${PINBA_MYSQL_SERIES}")
+set(PINBA_DB_FLAVOR "mysql" CACHE STRING "Target server flavor for source headers (mysql or mariadb)")
+set_property(CACHE PINBA_DB_FLAVOR PROPERTY STRINGS mysql mariadb)
+if(NOT PINBA_DB_FLAVOR STREQUAL "mysql" AND NOT PINBA_DB_FLAVOR STREQUAL "mariadb")
+  message(FATAL_ERROR "PINBA_DB_FLAVOR must be mysql or mariadb. Got: ${PINBA_DB_FLAVOR}")
 endif()
 
-if(PINBA_MYSQL_SERIES STREQUAL "8.4")
-  set(PINBA_DEFAULT_MYSQL_SOURCE_VERSION "8.4.9")
-  set(PINBA_DEFAULT_MYSQL_SOURCE_HASH "MD5=7b2591fa0b5388f604cc9b8273eab331")
+if(PINBA_DB_FLAVOR STREQUAL "mariadb")
+  set(PINBA_MYSQL_SERIES "11.8" CACHE STRING "Target MariaDB server series for source headers (10.5, 10.11 or 11.8)")
+  set_property(CACHE PINBA_MYSQL_SERIES PROPERTY STRINGS 10.5 10.11 11.8)
+  if(NOT PINBA_MYSQL_SERIES MATCHES "^(10\\.5|10\\.11|11\\.8)$")
+    message(FATAL_ERROR "For MariaDB, PINBA_MYSQL_SERIES must be 10.5, 10.11 or 11.8. Got: ${PINBA_MYSQL_SERIES}")
+  endif()
+  # MariaDB source headers are downloaded from https://archive.mariadb.org; the
+  # exact patch version is pinned per target by the packaging matrix (ABI must
+  # match the runtime server). Hashes are left empty here — packaging vendors a
+  # verified tree rather than downloading at configure time.
+  if(PINBA_MYSQL_SERIES STREQUAL "11.8")
+    set(PINBA_DEFAULT_MYSQL_SOURCE_VERSION "11.8.6")
+  elseif(PINBA_MYSQL_SERIES STREQUAL "10.11")
+    set(PINBA_DEFAULT_MYSQL_SOURCE_VERSION "10.11.14")
+  else()
+    set(PINBA_DEFAULT_MYSQL_SOURCE_VERSION "10.5.30")
+  endif()
+  set(PINBA_DEFAULT_MYSQL_SOURCE_HASH "")
 else()
-  set(PINBA_DEFAULT_MYSQL_SOURCE_VERSION "8.0.46")
-  set(PINBA_DEFAULT_MYSQL_SOURCE_HASH "MD5=6707beb0d46a9e08a19aa596329ca79d")
+  set(PINBA_MYSQL_SERIES "8.0" CACHE STRING "Target MySQL server series for source headers (8.0 or 8.4)")
+  set_property(CACHE PINBA_MYSQL_SERIES PROPERTY STRINGS 8.0 8.4)
+  if(NOT PINBA_MYSQL_SERIES STREQUAL "8.0" AND NOT PINBA_MYSQL_SERIES STREQUAL "8.4")
+    message(FATAL_ERROR "PINBA_MYSQL_SERIES must be 8.0 or 8.4. Got: ${PINBA_MYSQL_SERIES}")
+  endif()
+
+  if(PINBA_MYSQL_SERIES STREQUAL "8.4")
+    set(PINBA_DEFAULT_MYSQL_SOURCE_VERSION "8.4.9")
+    set(PINBA_DEFAULT_MYSQL_SOURCE_HASH "MD5=7b2591fa0b5388f604cc9b8273eab331")
+  else()
+    set(PINBA_DEFAULT_MYSQL_SOURCE_VERSION "8.0.46")
+    set(PINBA_DEFAULT_MYSQL_SOURCE_HASH "MD5=6707beb0d46a9e08a19aa596329ca79d")
+  endif()
 endif()
 
 set(PINBA_MYSQL_SOURCE_DIR "" CACHE PATH "Path to an extracted MySQL source tree containing sql/handler.h")
@@ -167,16 +193,33 @@ if(NOT MYSQL_SQL_INCLUDE_DIR)
 endif()
 message(STATUS "Found MySQL SQL headers: ${MYSQL_SQL_INCLUDE_DIR}")
 
+if(PINBA_DB_FLAVOR STREQUAL "mariadb")
+  # Deliberately excludes mysqlclient: linking MySQL's client into a MariaDB plugin
+  # would add a wrong libmysqlclient NEEDED. If no MariaDB client is present the
+  # MODULE links without one (the server resolves the symbols at load time).
+  set(PINBA_CLIENT_LIB_NAMES mariadbclient mariadb)
+else()
+  set(PINBA_CLIENT_LIB_NAMES mysqlclient)
+endif()
 find_library(
   MYSQL_LIBRARY
-  NAMES mysqlclient
+  NAMES ${PINBA_CLIENT_LIB_NAMES}
   HINTS ${PINBA_MYSQL_CONFIG_LIBDIR}
   PATHS /usr/lib/x86_64-linux-gnu /usr/lib /usr/local/lib /usr/local/mysql/lib
-        /opt/mysql/lib
-  PATH_SUFFIXES mysql)
+        /usr/lib/x86_64-linux-gnu/mariadb19 /opt/mysql/lib
+  PATH_SUFFIXES mysql mariadb)
 
-if(NOT MYSQL_LIBRARY)
+# The plugin is a MODULE loaded by the server, which supplies these symbols at
+# load time, so the client library is only needed for standalone linking. Require
+# it for MySQL (matches the historical behaviour); make it optional for MariaDB,
+# where the -devel client package is often absent on build hosts.
+if(NOT MYSQL_LIBRARY AND NOT PINBA_DB_FLAVOR STREQUAL "mariadb")
   message(FATAL_ERROR "MySQL client library not found. Install libmysqlclient development files or set MYSQL_LIBRARY.")
+endif()
+if(NOT MYSQL_LIBRARY)
+  set(MYSQL_LIBRARY "")
+  message(STATUS "MariaDB client library not found; linking the plugin without it "
+                 "(the server resolves the symbols at load time).")
 endif()
 
 # Derive MYSQL_VERSION_ID from the pinned source version when available — this is the
@@ -241,7 +284,7 @@ message(STATUS "MySQL version ID: ${MYSQL_VERSION_ID}")
 # Without this, ha_pinba.cc's explicit #include <mysql/mysql_version.h> picks up the
 # MariaDB MYSQL_VERSION_ID, making MYSQL_HANDLERTON_INTERFACE_VERSION wrong and causing
 # "API version for STORAGE ENGINE plugin is too different" at plugin load time.
-if(PINBA_MYSQL_SOURCE_DIR)
+if(PINBA_MYSQL_SOURCE_DIR AND PINBA_DB_FLAVOR STREQUAL "mysql")
   set(_pinba_version_h_content
     "/* Generated by pinba_engine CMakeLists.txt — DO NOT EDIT */\n"
     "#ifndef _mysql_version_h\n"
@@ -271,6 +314,52 @@ if(PINBA_MYSQL_SOURCE_DIR)
   file(MAKE_DIRECTORY "${PINBA_MYSQL_BUILDDIR_INCLUDE}/mysql")
   file(WRITE "${PINBA_MYSQL_BUILDDIR_INCLUDE}/mysql/mysql_version.h" ${_pinba_version_h_content})
   message(STATUS "Generated mysql_version.h: MYSQL_VERSION_ID=${MYSQL_VERSION_ID}")
+elseif(PINBA_MYSQL_SOURCE_DIR AND PINBA_DB_FLAVOR STREQUAL "mariadb")
+  # MariaDB ships a real generated mysql_version.h that defines MARIADB_BASE_VERSION
+  # (our compile-time switch) and the correct MYSQL_VERSION_ID. Never synthesise one —
+  # a MySQL-style header would drop MARIADB_BASE_VERSION and disable every compat guard.
+  # ha_pinba.cc includes <mysql/mysql_version.h> (MySQL layout), while MariaDB installs
+  # it as <mysql_version.h>, so mirror the real header into a mysql/ subdir on the path.
+  set(_pinba_mariadb_version_h "")
+  foreach(_pinba_cand
+      "${PINBA_MYSQL_BUILDDIR_INCLUDE}/mysql_version.h"
+      "${MYSQL_SQL_INCLUDE_DIR}/include/mysql_version.h"
+      "${MYSQL_INCLUDE_DIR}/mysql_version.h")
+    if(EXISTS "${_pinba_cand}")
+      set(_pinba_mariadb_version_h "${_pinba_cand}")
+      break()
+    endif()
+  endforeach()
+  if(NOT _pinba_mariadb_version_h)
+    message(FATAL_ERROR
+      "MariaDB build: could not find a generated mysql_version.h. Provide a MariaDB "
+      "source tree whose headers were generated (cmake configure + GenError), exposing "
+      "mysql_version.h under <source>/builddir/include/ or <source>/include/.")
+  endif()
+  # Locate MariaDB's generated my_config.h (defines STACK_DIRECTION, HAVE_*, sizes).
+  set(_pinba_mariadb_my_config_h "")
+  foreach(_pinba_cand
+      "${PINBA_MYSQL_BUILDDIR_INCLUDE}/my_config.h"
+      "${MYSQL_SQL_INCLUDE_DIR}/include/my_config.h"
+      "${MYSQL_INCLUDE_DIR}/my_config.h")
+    if(EXISTS "${_pinba_cand}")
+      set(_pinba_mariadb_my_config_h "${_pinba_cand}")
+      break()
+    endif()
+  endforeach()
+  if(NOT _pinba_mariadb_my_config_h)
+    message(FATAL_ERROR "MariaDB build: could not find a generated my_config.h in the source tree.")
+  endif()
+  # Stage MariaDB's my_config.h and mysql_version.h in a DEDICATED dir that is added
+  # as a plain -I ahead of the project's src/ (which ships MySQL's my_config.h). It
+  # must be a distinct path from the SYSTEM include dirs, otherwise CMake de-dups it
+  # into the -isystem group, which the compiler searches only after every -I.
+  set(PINBA_MARIADB_COMPAT_INC "${CMAKE_BINARY_DIR}/pinba-maria-headers")
+  file(MAKE_DIRECTORY "${PINBA_MARIADB_COMPAT_INC}/mysql")
+  configure_file("${_pinba_mariadb_my_config_h}" "${PINBA_MARIADB_COMPAT_INC}/my_config.h" COPYONLY)
+  configure_file("${_pinba_mariadb_version_h}" "${PINBA_MARIADB_COMPAT_INC}/mysql_version.h" COPYONLY)
+  configure_file("${_pinba_mariadb_version_h}" "${PINBA_MARIADB_COMPAT_INC}/mysql/mysql_version.h" COPYONLY)
+  message(STATUS "MariaDB headers staged in ${PINBA_MARIADB_COMPAT_INC} (my_config.h, mysql_version.h)")
 endif()
 
 find_library(M_LIBRARY m)
@@ -340,6 +429,20 @@ set(PINBA_SOURCES
     src/pinba_lmap.cc)
 
 add_library(pinba_engine MODULE ${PINBA_SOURCES})
+
+# MySQL's plugin macros tag the exported symbols with visibility("default"), so the
+# plugin loads even with hidden global visibility. MariaDB's MYSQL_PLUGIN_EXPORT is
+# empty on ELF, so hidden visibility would strip _maria_plugin_* and the server would
+# not recognise the module as a plugin — build the MariaDB flavor with default
+# visibility (how MariaDB's own storage-engine plugins are built).
+if(PINBA_DB_FLAVOR STREQUAL "mariadb")
+  set(PINBA_VISIBILITY_PRESET default)
+  set(PINBA_VISIBILITY_INLINES_HIDDEN OFF)
+else()
+  set(PINBA_VISIBILITY_PRESET hidden)
+  set(PINBA_VISIBILITY_INLINES_HIDDEN ON)
+endif()
+
 set_target_properties(
   pinba_engine
   PROPERTIES OUTPUT_NAME "ha_pinba"
@@ -347,13 +450,29 @@ set_target_properties(
              SUFFIX ".so"
              VERSION ${PROJECT_VERSION}
              SOVERSION ${PROJECT_VERSION_MAJOR}
-             CXX_VISIBILITY_PRESET hidden
-             VISIBILITY_INLINES_HIDDEN ON)
+             CXX_VISIBILITY_PRESET ${PINBA_VISIBILITY_PRESET}
+             VISIBILITY_INLINES_HIDDEN ${PINBA_VISIBILITY_INLINES_HIDDEN})
 target_link_libraries(
   pinba_engine
   PRIVATE pinba_project_options pinba_includes ${MYSQL_LIBRARY} ${M_LIBRARY}
           Threads::Threads ${Protobuf_LIBRARIES})
 target_include_directories(pinba_engine PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+
+if(PINBA_DB_FLAVOR STREQUAL "mariadb")
+  # src/ ships MySQL's my_config.h; MariaDB's my_global.h pulls <my_config.h> and
+  # <mysql_version.h>, which must resolve to MariaDB's generated copies instead.
+  # SYSTEM (-isystem) dirs are searched after every -I, so add the dedicated staging
+  # dir as a plain BEFORE include that wins over the project's src/ include.
+  target_include_directories(pinba_engine BEFORE PRIVATE ${PINBA_MARIADB_COMPAT_INC})
+
+  # Production MariaDB packages are built with DBUG disabled and do not export the
+  # dbug runtime symbols (_db_my_assert, _db_keyword_, ...). Without DBUG_OFF the
+  # plugin references them and fails to load ("undefined symbol: _db_my_assert"), so
+  # compile DBUG_ASSERT/DBUG_ENTER out to match the server (non-debug builds only).
+  if(NOT PINBA_DEBUG)
+    target_compile_definitions(pinba_engine PRIVATE DBUG_OFF)
+  endif()
+endif()
 
 if(PINBA_WITH_TESTS)
   add_executable(pinba_test tests/test_simple.cc)
