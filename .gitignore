@@ -47,6 +47,7 @@ coverage-*.info
 !.release-please-manifest.json
 !release-please-config.json
 !.github/mysql-versions.json
+!.github/rpm-matrix.json
 
 # Generated documentation
 docs/api/

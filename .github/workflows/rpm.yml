@@ -1,0 +1,141 @@
+name: rpm
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'rpm/**'
+      - 'src/**'
+      - 'CMakeLists.txt'
+      - 'vendor/**'
+      - 'default_tables.sql'
+      - '.github/rpm-matrix.json'
+      - '.github/workflows/rpm.yml'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'rpm/**'
+      - 'src/**'
+      - 'CMakeLists.txt'
+      - 'vendor/**'
+      - 'default_tables.sql'
+      - '.github/rpm-matrix.json'
+      - '.github/workflows/rpm.yml'
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Git tag/version to package (empty = use the spec's version)
+        required: false
+        default: ''
+      chroots:
+        description: Comma-separated Copr chroots to build (empty = all project chroots)
+        required: false
+        default: ''
+
+concurrency:
+  group: rpm-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # Gate: build the SRPM and the binary RPMs in a stock Fedora image and confirm
+  # rpmbuild's %check finds the plugin's MySQL declaration symbol. Catches spec,
+  # CMake, and compile breakage on every relevant change. The build is offline:
+  # the MySQL *server* headers are vendored in-tree (vendor/mysql-headers-8.x), so
+  # no database package or network is needed at build time.
+  build-rpm:
+    name: Build RPM (Fedora)
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    container: fedora:41
+    steps:
+      - name: Install tooling
+        run: dnf -y install dnf-plugins-core rpm-build rpmlint git-core tar gzip
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Mark checkout dir safe for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Build SRPM + RPMs
+        run: |
+          ver=$(awk '/^Version:/{print $2; exit}' rpm/pinba-engine.spec)
+          echo "Building pinba-engine $ver"
+          bash rpm/build-srpm.sh "$ver" --rpms
+
+      - name: rpmlint (informational)
+        run: rpmlint rpm/pinba-engine.spec || true
+
+  # Publish: build the SRPM and submit it to Copr, which builds the binaries for
+  # the project's chroots. Auto-runs on a published release (like the PPA track).
+  publish-copr:
+    name: Publish to Copr
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    container: fedora:41
+    steps:
+      - name: Install tooling
+        run: dnf -y install rpm-build copr-cli git-core tar gzip jq
+
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag || github.ref }}
+
+      - name: Mark checkout dir safe for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Configure copr-cli
+        env:
+          COPR_CONFIG: ${{ secrets.COPR_CONFIG }}
+        run: |
+          if [ -z "$COPR_CONFIG" ]; then
+            echo "COPR_CONFIG secret is not set" >&2
+            exit 1
+          fi
+          mkdir -p ~/.config
+          printf '%s\n' "$COPR_CONFIG" | sed 's/\r$//' > ~/.config/copr
+          if ! grep -q '^\[copr-cli\]' ~/.config/copr; then
+            echo "COPR_CONFIG must be the full block from https://copr.fedorainfracloud.org/api/ (starting with [copr-cli])" >&2
+            exit 1
+          fi
+
+      - name: Build SRPM
+        id: srpm
+        run: |
+          raw="${{ github.event.release.tag_name || inputs.tag }}"
+          ver="${raw#v}"
+          [ -n "$ver" ] || ver=$(awk '/^Version:/{print $2; exit}' rpm/pinba-engine.spec)
+          echo "Packaging pinba-engine $ver"
+          out=$(bash rpm/build-srpm.sh "$ver")
+          srpm=$(printf '%s\n' "$out" | grep -oE '/[^[:space:]]+\.src\.rpm' | head -1)
+          if [ -z "$srpm" ] || [ ! -f "$srpm" ]; then
+            echo "could not locate built SRPM in:" >&2
+            printf '%s\n' "$out" >&2
+            exit 1
+          fi
+          echo "Built SRPM: $srpm"
+          echo "srpm=$srpm" >> "$GITHUB_OUTPUT"
+
+      - name: Submit Copr build
+        run: |
+          # Explicit chroots from dispatch input, else the supported target set
+          # from rpm-matrix.json (so a release builds every target, not whatever
+          # chroots happen to be enabled on the project).
+          chroots="${{ inputs.chroots }}"
+          if [ -z "$chroots" ]; then
+            chroots=$(jq -r '.targets | keys | join(",")' .github/rpm-matrix.json)
+          fi
+          args=()
+          IFS=',' read -ra cs <<< "$chroots"
+          for c in "${cs[@]}"; do args+=(--chroot "$c"); done
+          echo "Submitting build for chroots: ${cs[*]}"
+          copr-cli build "${args[@]}" xolegator/pinba "${{ steps.srpm.outputs.srpm }}"
