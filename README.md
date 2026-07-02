@@ -1,8 +1,8 @@
 # Pinba Engine
 
-Pinba Engine is a MySQL storage engine that collects and analyzes PHP runtime statistics sent over UDP by the [Pinba PHP extension](https://github.com/tony2001/pinba2).
+Pinba Engine is a MySQL/MariaDB storage engine that collects and analyzes PHP runtime statistics sent over UDP by the [Pinba PHP extension](https://github.com/tony2001/pinba2).
 
-This is an actively maintained fork of [tony2001/pinba_engine](https://github.com/tony2001/pinba_engine) with full support for MySQL 8.0 and MySQL 8.4 LTS.
+This is an actively maintained fork of [tony2001/pinba_engine](https://github.com/tony2001/pinba_engine) with full support for MySQL 8.0 and MySQL 8.4 LTS. It also builds for MariaDB 10.11 and 11.8 LTS from the same source tree — see [docs/build.md](docs/build.md#building-for-mariadb). The pre-built Docker images and PPA packages below currently target MySQL; for MariaDB, build the plugin from source.
 
 ## Install
 
