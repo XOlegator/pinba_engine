@@ -24,6 +24,18 @@ echo "=== Pinba Engine SQL smoke test ==="
 echo "Target: ${USER}@${HOST}:${PORT}/${DB}"
 echo
 
+# ── 0. Preflight: client binary + connectivity ──────────────────────────────
+# Fail loudly here instead of dying silently later: the per-query pipelines below
+# route client stderr to /dev/null, so a missing client binary or a connection
+# error would otherwise abort the script under `set -e` with no diagnostic.
+CLIENT_BIN="${MYSQL_CLIENT:-mysql}"
+command -v "${CLIENT_BIN}" >/dev/null 2>&1 \
+    || fail "client binary '${CLIENT_BIN}' not found in PATH (set MYSQL_CLIENT to the right client, e.g. mariadb)"
+if ! ${MYSQL} -e "SELECT 1;" >/dev/null; then
+    fail "cannot connect to ${USER}@${HOST}:${PORT} using '${CLIENT_BIN}' (see client error above)"
+fi
+pass "connected via '${CLIENT_BIN}'"
+
 # ── 1. Plugin active ────────────────────────────────────────────────────────
 status=$(${MYSQL} -e "SELECT PLUGIN_STATUS FROM INFORMATION_SCHEMA.PLUGINS WHERE PLUGIN_NAME='PINBA';" 2>/dev/null | head -1)
 [[ "${status}" == "ACTIVE" ]] || fail "PINBA plugin not ACTIVE (got: '${status}')"
