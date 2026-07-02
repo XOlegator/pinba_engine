@@ -5,12 +5,38 @@ sources: []
 related:
   - wiki/index.md
 confidence: high
-updated: 2026-06-14
+updated: 2026-07-02
 ---
 
 # Activity Log
 
 Chronological record of all ingest, query, lint, and revision operations.
+
+---
+
+## 2026-07-02 — Revision: Remi adopts the fork; Copr drops SCL subpackages
+
+**Action:** Recorded that Remi Collet switched his RPM spec to build from the
+`XOlegator/pinba_extension` fork (issue #58), so the extension is now packaged in Remi's own
+repository for PHP 8.2+ (module + SCL streams). The fork's Copr `xolegator/pinba` was simplified
+to build **only** the distro-native `php-pinba` (no Remi at build or run time); the
+`php<XY>-php-pinba` SCL subpackages, per-chroot Remi config, and `update-rpm-matrix.php` probe were
+removed as redundant with Remi's official packages.
+
+**Source read:** issue [XOlegator/pinba_extension#58](https://github.com/XOlegator/pinba_extension/issues/58);
+Remi status page (`blog.remirepo.net/pages/PECL-extensions-RPM-status`, pinba 1.4.0 for 8.2–8.5);
+repo files `rpm/pinba.spec`, `rpm/build-srpm.sh`, `.github/workflows/rpm.yml`,
+`.github/workflows/discover-php-versions.yml`, `.github/rpm-matrix.json`.
+
+**Pages updated:**
+- `wiki/concepts/copr-rpm-packaging.md` — current model reframed (distro-native only; Remi owns
+  multi-version); the SCL/Remi-per-chroot lessons kept under a "Historical" section.
+- `wiki/sources/rpm-copr-session-2026-06-14.md` — "Superseded in part" note added.
+- `wiki/index.md` — concept one-liner updated.
+
+**Why it matters:** avoids duplicating Remi's official packages and drops the Remi maintenance
+burden (per-chroot external repos, bzip2 metadata probe) from the fork's CI, while keeping the
+one thing Remi doesn't offer — a zero-third-party-repo build against the distro's own PHP.
 
 ---
 
