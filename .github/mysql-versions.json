@@ -8,7 +8,7 @@
   "resolute": {
     "ubuntu_version": "26.04",
     "mysql80": null,
-    "mysql84": "8.4.9",
-    "debian_revision": 1
+    "mysql84": "8.4.10",
+    "debian_revision": 2
   }
 }

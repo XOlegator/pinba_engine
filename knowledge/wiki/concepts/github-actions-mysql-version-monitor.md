@@ -51,6 +51,16 @@ change is detected, ensuring each new PPA upload gets a fresh revision number.
    - Opens a PR on `chore/mysql-version-update` branch via `peter-evans/create-pull-request`.
    - Enables auto-merge (squash) on the PR so it lands without manual intervention
      if branch protection checks pass.
+
+Both the PR creation and the auto-merge step authenticate with a **PAT**
+(`secrets.RELEASE_PLEASE_TOKEN`), not the default `GITHUB_TOKEN`. This is essential:
+GitHub deliberately does not spawn new workflow runs for events raised by
+`GITHUB_TOKEN` (a recursion guard). A PR opened with `GITHUB_TOKEN` therefore never
+runs the required `Build & test (MySQL 8.0/8.4)` checks, sits `BLOCKED`, and deadlocks
+auto-merge forever. Using a PAT makes the `pull_request` event trigger CI normally and
+makes the eventual merge push to `master` trigger the downstream `ppa-build` / `docker`
+workflows. (Historical note: PR #52, the first live monitor PR, hit exactly this
+deadlock and had to be unblocked by a human close/reopen.)
 4. If no versions changed: exits cleanly with a log message.
 
 ## Downstream automation triggered by the PR merge
