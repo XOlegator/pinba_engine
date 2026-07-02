@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0](https://github.com/XOlegator/pinba_engine/compare/v2.6.2...v2.7.0) (2026-07-02)
+
+
+### Features
+
+* add MariaDB 10.5+/11.x build support and CI ([#53](https://github.com/XOlegator/pinba_engine/issues/53)) ([dae5619](https://github.com/XOlegator/pinba_engine/commit/dae561983bf13cfce273833618e6e4a3d387cb64))
+
 ## [2.6.2](https://github.com/XOlegator/pinba_engine/compare/v2.6.1...v2.6.2) (2026-07-02)
 
 
