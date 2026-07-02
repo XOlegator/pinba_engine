@@ -17,6 +17,13 @@ A live implementation session that added RPM distribution for the PHP extension
 track. The full concept is in [[copr-rpm-packaging]]; this page records the session's
 findings and the work that produced them.
 
+> **Superseded in part (2026-07-02, issue #58).** Remi Collet switched his spec to build
+> from this fork, so the extension is now packaged in Remi's own repository for PHP 8.2+
+> (modules + SCL). The `php<XY>-php-pinba` SCL subpackages, the per-chroot Remi config, and
+> `update-rpm-matrix.php` described below were subsequently **removed** — Copr now builds only
+> the distro-native `php-pinba`, and Remi owns the multi-version story. See [[copr-rpm-packaging]]
+> for the current model. This page is retained as the record of the original SCL implementation.
+
 ## What was built
 
 - `rpm/pinba.spec` (one `php-pinba` SRPM → `php82/83/84/85-php-pinba` SCL subpackages),

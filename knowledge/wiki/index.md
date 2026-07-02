@@ -40,7 +40,7 @@ Master catalog. Maintained by LLM agents.
 | [[mysql-postinst-patterns]] | postinst/prerm: auth cascade, plugin-load-add, MySQL 8.0 syntax pitfalls |
 | [[mysql-vendor-headers-minimal]] | Minimal vendor headers via .d file analysis (1317→162 files) |
 | [[launchpad-ppa-workflow]] | dput configuration, signing, versioning, GPGKeyTemporarilyNotFoundError |
-| [[copr-rpm-packaging]] | RPM via Fedora COPR + Remi SCL (`php<XY>-php-pinba`); per-chroot Remi requirement; EPEL = AlmaLinux/Rocky/RHEL; `copr-cli` automation |
+| [[copr-rpm-packaging]] | RPM via Fedora COPR: distro-native `php-pinba` only (no Remi); Remi ships this fork for module/SCL streams since v1.4.0 (issue #58); EPEL = AlmaLinux/Rocky/RHEL; `copr-cli` automation |
 
 ## Sources (15 documents)
 
