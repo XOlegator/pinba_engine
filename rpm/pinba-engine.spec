@@ -22,13 +22,13 @@
 
 %if "%{flavor}" == "mariadb"
 # MariaDB flavor. Series pinned to each chroot's native MariaDB (ABI must match):
-# Fedora ships 11.8; EL9/EL10 ship 10.11 (module / AppStream).
-%if 0%{?rhel}
-%global db_series 10.11
-%global db_version 10.11.14
-%else
+# Fedora 44+ ships 11.8; Fedora 43 and EL9/EL10 ship 10.11 (module / AppStream).
+%if 0%{?fedora} >= 44
 %global db_series 11.8
 %global db_version 11.8.6
+%else
+%global db_series 10.11
+%global db_version 10.11.14
 %endif
 %global db_source_dir vendor/mariadb-headers-%{db_series}
 %global cmake_flavor mariadb
@@ -49,7 +49,9 @@
 %endif
 
 Name:           pinba-engine
-Version:        2.7.0
+# x-release-please-start-version
+Version:        2.8.1
+# x-release-please-end-version
 Release:        1%{?dist}
 Summary:        Pinba storage engine plugin for %{cmake_flavor}
 
@@ -142,5 +144,6 @@ nm -D "%{buildroot}%{_libdir}/mysql/plugin/ha_pinba.so" | grep -q %{plugin_symbo
 %{_libdir}/mysql/plugin/ha_pinba.so
 
 %changelog
-* Thu Jul 02 2026 Oleg Ekhlakov <o.ekhlakov@protonmail.com> - 2.7.0-1
-- Initial RPM packaging (MySQL and MariaDB flavors) for Fedora/EL via Copr.
+* Thu Jul 02 2026 Oleg Ekhlakov <o.ekhlakov@protonmail.com> - 2.8.1-1
+- MySQL and MariaDB flavors for Fedora/EL via Copr. See CHANGELOG.md for
+  per-release notes (the Version tag above is maintained by release-please).
