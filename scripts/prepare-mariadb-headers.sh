@@ -42,11 +42,17 @@ fi
 genbuild="${dest}/_gen"
 if [ ! -f "${genbuild}/include/mysqld_error.h" ]; then
     echo ">> configuring MariaDB (header generation only)" >&2
+    # CMAKE_POLICY_VERSION_MINIMUM=3.5: CMake 4.x (Fedora 44+) rejects the
+    # cmake_minimum_required(<3.5) in some bundled MariaDB storage engines
+    # (e.g. columnstore in 10.11); this lets the old sub-projects configure.
+    # PLUGIN_COLUMNSTORE=NO skips that engine entirely — we only need GenError.
     cmake -S "$dest" -B "$genbuild" \
+        -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
         -DCMAKE_BUILD_TYPE=Release \
         -DWITH_SSL=system \
         -DPLUGIN_INNOBASE=NO -DPLUGIN_ROCKSDB=NO \
         -DPLUGIN_MROONGA=NO -DPLUGIN_SPIDER=NO \
+        -DPLUGIN_COLUMNSTORE=NO \
         -DWITH_UNIT_TESTS=OFF -DWITH_ZLIB=bundled >&2
     echo ">> generating error headers (comp_err)" >&2
     cmake --build "$genbuild" --target GenError --parallel "$(nproc)" >&2

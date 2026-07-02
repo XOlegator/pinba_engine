@@ -96,7 +96,7 @@
 #define HAVE_TERM_H 1
 /* #undef HAVE_TERMBITS_H */
 #define HAVE_TERMIOS_H 1
-#define HAVE_TERMIO_H 1
+/* #undef HAVE_TERMIO_H */
 #define HAVE_TERMCAP_H 1
 #define HAVE_TIME_H 1
 #define HAVE_UNISTD_H 1

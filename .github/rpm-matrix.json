@@ -10,7 +10,19 @@
       "mariadb_series": "10.11",
       "mysql_series": "8.4"
     },
+    "fedora-43-aarch64": {
+      "family": "fedora",
+      "flavors": ["mariadb", "mysql"],
+      "mariadb_series": "10.11",
+      "mysql_series": "8.4"
+    },
     "fedora-44-x86_64": {
+      "family": "fedora",
+      "flavors": ["mariadb", "mysql"],
+      "mariadb_series": "11.8",
+      "mysql_series": "8.4"
+    },
+    "fedora-44-aarch64": {
       "family": "fedora",
       "flavors": ["mariadb", "mysql"],
       "mariadb_series": "11.8",
@@ -21,7 +33,17 @@
       "flavors": ["mariadb"],
       "mariadb_series": "10.11"
     },
+    "epel-9-aarch64": {
+      "family": "enterprise",
+      "flavors": ["mariadb"],
+      "mariadb_series": "10.11"
+    },
     "epel-10-x86_64": {
+      "family": "enterprise",
+      "flavors": ["mariadb"],
+      "mariadb_series": "10.11"
+    },
+    "epel-10-aarch64": {
       "family": "enterprise",
       "flavors": ["mariadb"],
       "mariadb_series": "10.11"
@@ -31,6 +53,6 @@
     "Per-flavor chroots: publish submits each flavor only to the chroots listing it in 'flavors'. The MariaDB flavor is the primary RPM target (MariaDB is the default DB on Fedora/EL) and builds offline from vendored headers on every chroot. The MySQL flavor is built on Fedora only for now: on EL9 'mysql' is a module (mysql:8.4, not 8.0) and mysql-devel lives behind it, so MySQL-on-EL needs extra chroot setup and is deferred.",
     "The engine plugin is ABI-bound to the server's minor version. The spec builds against the vendored source headers whose series matches the chroot's native server: Fedora 44 -> MariaDB 11.8; Fedora 43 and EL9/EL10 -> MariaDB 10.11; MySQL is 8.4 everywhere. The spec selects the MariaDB series from %{?fedora} (>=44 -> 11.8, else 10.11). Verify each chroot's actual server minor before a release (ABI).",
     "No module_enable is required on the epel chroots for these builds: the MariaDB flavor pulls no DB packages at build time (vendored headers), and we do not build the MySQL flavor on EL. Enabling a non-existent module (e.g. mysql:8.0 on EL9) aborts every build in the chroot.",
-    "aarch64 chroots are intentionally not targeted: the vendored MariaDB my_config.h is x86_64-specific (type sizes / stack direction / endianness). aarch64 support needs its own generated headers."
+    "Both x86_64 and aarch64 are supported. The vendored MariaDB my_config.h is arch-independent for our targets (64-bit little-endian: identical SIZEOF_*, STACK_DIRECTION, endianness; the only x86-ism is the cosmetic MACHINE_TYPE string). The one arch-conditional header, byte_order_generic.h (my_byteorder.h's non-x86 branch), is force-included in the vendored subset so the MariaDB flavor builds on aarch64; MySQL uses a portable byteorder and needs no extra header."
   ]
 }

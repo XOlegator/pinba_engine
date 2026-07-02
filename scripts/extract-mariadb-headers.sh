@@ -55,6 +55,11 @@ forced=(
     builddir/include/mysqld_ername.h
     builddir/include/probes_mysql_nodtrace.h
     builddir/include/probes_mysql.h
+    # Arch-conditional byte-order header: my_byteorder.h picks
+    # byte_order_generic_x86_64.h on x86_64 (captured by the x86_64 .d harvest
+    # above) but byte_order_generic.h on every other arch (aarch64, ...). Force
+    # the generic variant so the vendored subset builds on non-x86_64 too.
+    include/byte_order_generic.h
 )
 
 # 4. Stage the minimal subset, preserving the tree layout.
