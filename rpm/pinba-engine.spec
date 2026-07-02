@@ -50,7 +50,7 @@
 
 Name:           pinba-engine
 # x-release-please-start-version
-Version:        2.9.0
+Version:        2.10.0
 # x-release-please-end-version
 Release:        1%{?dist}
 Summary:        Pinba storage engine plugin for %{cmake_flavor}
