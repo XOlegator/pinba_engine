@@ -14,6 +14,32 @@ Chronological record of all ingest, query, lint, and revision operations.
 
 ---
 
+## 2026-07-02 — Ingest: Engine RPM Packaging (Copr)
+
+**Action:** Recorded the live session that added `.rpm` distribution for `pinba_engine` via
+Copr `xolegator/pinba` (second package alongside `php-pinba`), across releases v2.7.0–v2.10.0.
+
+**Source read:** live implementation session; repo files `rpm/pinba-engine.spec`,
+`rpm/build-srpm.sh`, `.github/workflows/rpm.yml`, `.github/rpm-matrix.json`,
+`scripts/{prepare,extract}-mariadb-headers.sh`, `vendor/mariadb-headers-*`; Copr build results.
+PRs pinba_engine #58/#60/#62/#65.
+
+**Pages created:**
+- `wiki/concepts/engine-rpm-packaging.md` — the engine RPM model (offline vendored-header build,
+  mysql/mariadb flavors with Conflicts, ABI series per chroot, MariaDB header vendoring, aarch64).
+- `wiki/sources/engine-rpm-session-2026-07-02.md` — session summary + key findings.
+
+**Pages updated:** `wiki/concepts/copr-rpm-packaging.md` (the `pinba-engine` package now exists
+and cross-links), `wiki/index.md` (concept + source rows, counts 26→27 / 15→16).
+
+**Why it matters:** captures the non-obvious engine-specific gotchas — server *source* headers
+(not `-devel`) vendored for offline mock builds; one-flavor-per-SRPM; ABI series pinned per
+chroot (Fedora 43 = MariaDB 10.11, not 11.8); EPEL chroots must not `module_enable` a
+non-existent module; MariaDB generated headers must be committed; and aarch64's real gap was a
+missing `byte_order_generic.h`, not `my_config.h`.
+
+---
+
 ## 2026-07-02 — Revision: Remi adopts the fork; Copr drops SCL subpackages
 
 **Action:** Recorded that Remi Collet switched his RPM spec to build from the

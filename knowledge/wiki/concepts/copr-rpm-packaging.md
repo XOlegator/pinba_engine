@@ -4,6 +4,7 @@ type: concept
 sources:
   - wiki/sources/rpm-copr-session-2026-06-14.md
 related:
+  - wiki/concepts/engine-rpm-packaging.md
   - wiki/concepts/debian-ppa-packaging.md
   - wiki/concepts/github-actions-ppa.md
   - wiki/concepts/launchpad-ppa-workflow.md
@@ -51,8 +52,8 @@ per-project key). It is the direct counterpart to a Launchpad PPA.
   Rocky, RHEL and CentOS Stream 9/10**. COPR's UI explicitly recommends the generic
   `epel-N` chroot over distro-specific `almalinux-N` ones.
 - **One project hosts many packages.** A single COPR project (e.g. `xolegator/pinba`)
-  can hold the whole stack — the `php-pinba` extension package and a future
-  `pinba-engine` package — so users enable one repo. This mirrors keeping the whole
+  holds the whole stack — the `php-pinba` extension package and the `pinba-engine` package
+  (see [[engine-rpm-packaging]]) — so users enable one repo. This mirrors keeping the whole
   stack in one Launchpad PPA. Group by product/stack, not one project per git repo, and
   not one universal bucket (chroots and external repos are project-wide settings, so an
   unrelated package would inherit them).
