@@ -86,7 +86,7 @@ CREATE TABLE \`_smoke_tag_report\` (
   \`ru_stime_value\` float      DEFAULT NULL,
   \`index_value\`  varchar(256) DEFAULT NULL
 ) ENGINE=PINBA DEFAULT CHARSET=latin1 COMMENT='tag_report:${SMOKE_TAG}';
-" 2>/dev/null
+"
 row=$(${MYSQL} "${DB}" -e "SELECT COUNT(*) FROM \`_smoke_tag_report\`;" 2>/dev/null | head -1)
 [[ "${row}" =~ ^[0-9]+$ ]] || fail "tag_report: SELECT COUNT(*) returned '${row}'"
 ${MYSQL} "${DB}" -e "DROP TABLE IF EXISTS \`_smoke_tag_report\`;" 2>/dev/null
@@ -107,7 +107,7 @@ CREATE TABLE \`_smoke_tagN_info\` (
   \`ru_stime_value\` float       DEFAULT NULL,
   \`index_value\`   varchar(256) DEFAULT NULL
 ) ENGINE=PINBA DEFAULT CHARSET=latin1 COMMENT='tagN_info:${SMOKE_TAG},__server_name::';
-" 2>/dev/null
+"
 row=$(${MYSQL} "${DB}" -e "SELECT COUNT(*) FROM \`_smoke_tagN_info\`;" 2>/dev/null | head -1)
 [[ "${row}" =~ ^[0-9]+$ ]] || fail "tagN_info: SELECT COUNT(*) returned '${row}'"
 ${MYSQL} "${DB}" -e "DROP TABLE IF EXISTS \`_smoke_tagN_info\`;" 2>/dev/null
@@ -140,7 +140,7 @@ CREATE TABLE \`_smoke_report_pct\` (
   \`p95\`                    float DEFAULT NULL,
   \`p99\`                    float DEFAULT NULL
 ) ENGINE=PINBA DEFAULT CHARSET=latin1 COMMENT='report1:::90,95,99';
-" 2>/dev/null
+"
 row=$(${MYSQL} "${DB}" -e "SELECT COUNT(*) FROM \`_smoke_report_pct\`;" 2>/dev/null | head -1)
 [[ "${row}" =~ ^[0-9]+$ ]] || fail "report1 with percentiles: SELECT COUNT(*) returned '${row}'"
 ${MYSQL} "${DB}" -e "DROP TABLE IF EXISTS \`_smoke_report_pct\`;" 2>/dev/null
