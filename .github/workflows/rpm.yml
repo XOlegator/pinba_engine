@@ -54,7 +54,7 @@ jobs:
     name: Build RPM (Fedora)
     if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    container: fedora:41
+    container: fedora:44
     steps:
       - name: Install tooling
         run: dnf -y install dnf-plugins-core rpm-build rpmlint git-core tar gzip
@@ -86,7 +86,7 @@ jobs:
     name: Publish to Copr
     if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    container: fedora:41
+    container: fedora:44
     steps:
       - name: Install tooling
         run: dnf -y install rpm-build copr-cli git-core tar gzip jq
