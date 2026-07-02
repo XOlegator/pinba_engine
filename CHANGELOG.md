@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0](https://github.com/XOlegator/pinba_engine/compare/v2.7.0...v2.8.0) (2026-07-02)
+
+
+### Features
+
+* **rpm:** add RPM packaging for the MySQL flavor (Fedora/EL via Copr) ([#58](https://github.com/XOlegator/pinba_engine/issues/58)) ([9319555](https://github.com/XOlegator/pinba_engine/commit/93195558835a518c739aa7715df645ba6d49e791))
+
 ## [2.7.0](https://github.com/XOlegator/pinba_engine/compare/v2.6.2...v2.7.0) (2026-07-02)
 
 
