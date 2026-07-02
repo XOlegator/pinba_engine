@@ -66,10 +66,19 @@
 /* MySQL 8.x <-> MariaDB server-API shims; must follow the server headers above. */
 #include "pinba_maria_compat.h"
 
+/* The PINBA_SHARE is allocated with my_multi_malloc() (the server allocator) and
+   released via pinba_free() below. It must therefore be freed with the matching
+   my_free(). The historical MySQL code redefines my_free to plain free(), which
+   MySQL happens to tolerate; on MariaDB the server allocator prepends bookkeeping
+   to each block, so a plain free() is an invalid free that aborts the server on
+   table teardown (ha_pinba::close -> free_share). Keep the legacy MySQL behaviour,
+   but on MariaDB use the real my_free() that pairs with my_multi_malloc(). */
+#ifndef MARIADB_BASE_VERSION
 #ifdef my_free
 #undef my_free
 #endif
 #define my_free free
+#endif
 
 static PSI_memory_key pinba_key_memory_share;
 #define pinba_free(a, b) my_free(a)
