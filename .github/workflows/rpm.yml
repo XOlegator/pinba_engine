@@ -51,10 +51,17 @@ jobs:
   # the MySQL *server* headers are vendored in-tree (vendor/mysql-headers-8.x), so
   # no database package or network is needed at build time.
   build-rpm:
-    name: Build RPM (Fedora)
+    name: Build RPM (${{ matrix.image }})
     if: github.event_name == 'push' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    container: fedora:44
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both Fedora targets: fedora:44 exercises the MariaDB 11.8 header set,
+        # fedora:43 the MariaDB 10.11 set (also used by the EL chroots), so a break
+        # in either vendored series is caught here.
+        image: [fedora:43, fedora:44]
+    container: ${{ matrix.image }}
     steps:
       - name: Install tooling
         run: dnf -y install dnf-plugins-core rpm-build rpmlint git-core tar gzip
