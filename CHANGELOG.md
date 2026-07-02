@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.1](https://github.com/XOlegator/pinba_engine/compare/v2.8.0...v2.8.1) (2026-07-02)
+
+
+### Bug Fixes
+
+* **rpm:** route flavors to per-chroot targets; MySQL on Fedora only ([#60](https://github.com/XOlegator/pinba_engine/issues/60)) ([5ec519e](https://github.com/XOlegator/pinba_engine/commit/5ec519ec17d762bce17208cd064e23b667c7ee61))
+
 ## [2.8.0](https://github.com/XOlegator/pinba_engine/compare/v2.7.0...v2.8.0) (2026-07-02)
 
 
