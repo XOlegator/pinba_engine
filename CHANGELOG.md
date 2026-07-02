@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.0](https://github.com/XOlegator/pinba_engine/compare/v2.9.0...v2.10.0) (2026-07-02)
+
+
+### Features
+
+* **rpm:** support aarch64 builds ([#65](https://github.com/XOlegator/pinba_engine/issues/65)) ([91de364](https://github.com/XOlegator/pinba_engine/commit/91de364e36593f490bfffb18f7b642c61e10305e))
+
 ## [2.9.0](https://github.com/XOlegator/pinba_engine/compare/v2.8.1...v2.9.0) (2026-07-02)
 
 
