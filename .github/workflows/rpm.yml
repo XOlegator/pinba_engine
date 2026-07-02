@@ -114,27 +114,31 @@ jobs:
             exit 1
           fi
 
-      - name: Build SRPMs (both flavors) and submit to Copr
+      - name: Build SRPMs and submit to Copr (per-flavor chroots)
         run: |
           raw="${{ github.event.release.tag_name || inputs.tag }}"
           ver="${raw#v}"
           [ -n "$ver" ] || ver=$(awk '/^Version:/{print $2; exit}' rpm/pinba-engine.spec)
 
-          # Explicit chroots from dispatch input, else the supported target set
-          # from rpm-matrix.json (so a release builds every target, not whatever
-          # chroots happen to be enabled on the project).
-          chroots="${{ inputs.chroots }}"
-          if [ -z "$chroots" ]; then
-            chroots=$(jq -r '.targets | keys | join(",")' .github/rpm-matrix.json)
-          fi
-          args=()
-          IFS=',' read -ra cs <<< "$chroots"
-          for c in "${cs[@]}"; do args+=(--chroot "$c"); done
+          # A dispatch may pin an explicit chroot set (applied to every flavor);
+          # otherwise each flavor goes to the chroots that list it in rpm-matrix.json.
+          override="${{ inputs.chroots }}"
 
-          # One SRPM per flavor (mysql / mariadb); each Copr build produces the
-          # matching pinba-engine-<flavor> package for every chroot.
+          failed=""
           for flavor in mariadb mysql; do
-            echo "== Packaging pinba-engine $ver ($flavor) =="
+            if [ -n "$override" ]; then
+              chroots="$override"
+            else
+              chroots=$(jq -r --arg f "$flavor" \
+                '.targets | to_entries[] | select(.value.flavors | index($f)) | .key' \
+                .github/rpm-matrix.json | paste -sd, -)
+            fi
+            if [ -z "$chroots" ]; then
+              echo "== $flavor: no chroots configured, skipping =="
+              continue
+            fi
+
+            echo "== Packaging pinba-engine $ver ($flavor) for: $chroots =="
             out=$(bash rpm/build-srpm.sh "$ver" "$flavor")
             srpm=$(printf '%s\n' "$out" | grep -oE '/[^[:space:]]+\.src\.rpm' | head -1)
             if [ -z "$srpm" ] || [ ! -f "$srpm" ]; then
@@ -142,6 +146,18 @@ jobs:
               printf '%s\n' "$out" >&2
               exit 1
             fi
-            echo "Submitting $flavor build for chroots: ${cs[*]}"
-            copr-cli build "${args[@]}" xolegator/pinba "$srpm"
+
+            args=()
+            IFS=',' read -ra cs <<< "$chroots"
+            for c in "${cs[@]}"; do args+=(--chroot "$c"); done
+            # Don't let one flavor's failure skip the other; report at the end.
+            if ! copr-cli build "${args[@]}" xolegator/pinba "$srpm"; then
+              echo "::error::Copr build failed for flavor $flavor"
+              failed="$failed $flavor"
+            fi
           done
+
+          if [ -n "$failed" ]; then
+            echo "Copr builds failed for:$failed" >&2
+            exit 1
+          fi

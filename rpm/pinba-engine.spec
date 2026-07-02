@@ -36,14 +36,11 @@
 %global server_req mariadb-server
 %global other_flavor mysql
 %else
-# MySQL flavor. EL9's default MySQL module is 8.0; Fedora and EL10 ship 8.4.
-%if 0%{?rhel} == 9
-%global db_series 8.0
-%global db_version 8.0.46
-%else
+# MySQL flavor. Fedora and current EL9/EL10 all ship MySQL 8.4 (EL9's mysql
+# module default stream moved from 8.0 to 8.4). Built on Fedora for now; the
+# MySQL-on-EL path (module mysql:8.4) is deferred — see rpm-matrix.json.
 %global db_series 8.4
 %global db_version 8.4.9
-%endif
 %global db_source_dir vendor/mysql-headers-%{db_series}
 %global cmake_flavor mysql
 %global plugin_symbol _mysql_plugin_declarations_
