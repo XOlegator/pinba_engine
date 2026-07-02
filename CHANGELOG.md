@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.0](https://github.com/XOlegator/pinba_engine/compare/v2.8.1...v2.9.0) (2026-07-02)
+
+
+### Features
+
+* **rpm:** add Fedora 43 target; release-please-managed spec Version ([#62](https://github.com/XOlegator/pinba_engine/issues/62)) ([bae331b](https://github.com/XOlegator/pinba_engine/commit/bae331b01bcf2bfed8f4d8c3870cd7917b2822cb))
+
 ## [2.8.1](https://github.com/XOlegator/pinba_engine/compare/v2.8.0...v2.8.1) (2026-07-02)
 
 
