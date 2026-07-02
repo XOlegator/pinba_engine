@@ -2,7 +2,7 @@
 
 Pinba Engine is a MySQL/MariaDB storage engine that collects and analyzes PHP runtime statistics sent over UDP by the [Pinba PHP extension](https://github.com/tony2001/pinba2).
 
-This is an actively maintained fork of [tony2001/pinba_engine](https://github.com/tony2001/pinba_engine) with full support for MySQL 8.0 and MySQL 8.4 LTS. It also builds for MariaDB 10.11 and 11.8 LTS from the same source tree — see [docs/build.md](docs/build.md#building-for-mariadb). The pre-built Docker images and PPA packages below currently target MySQL; for MariaDB, build the plugin from source.
+This is an actively maintained fork of [tony2001/pinba_engine](https://github.com/tony2001/pinba_engine) with full support for MySQL 8.0 and MySQL 8.4 LTS, and for MariaDB 10.11 and 11.8 LTS from the same source tree. Pre-built packages are available for both databases: **Docker images** and an **Ubuntu PPA** (MySQL), and **Fedora/Enterprise-Linux RPMs** via Copr (MariaDB, plus MySQL on Fedora).
 
 ## Install
 
@@ -60,6 +60,32 @@ mysql -u root -p -e "INSTALL PLUGIN pinba SONAME 'ha_pinba.so';"
 mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS pinba;"
 mysql -u root -p pinba < /usr/share/pinba_engine/default_tables.sql
 ```
+
+### Fedora / Enterprise Linux package (Copr RPM)
+
+RPM packages are published to the [`xolegator/pinba`](https://copr.fedorainfracloud.org/coprs/xolegator/pinba/) Copr repository, in two mutually-exclusive flavors — install the one matching your database server (`x86_64`):
+
+| Distribution | Database | Package |
+|---|---|---|
+| Fedora 43 / 44 | MariaDB | `pinba-engine-mariadb` |
+| Fedora 43 / 44 | MySQL | `pinba-engine-mysql` |
+| AlmaLinux / Rocky / RHEL 9 / 10 | MariaDB | `pinba-engine-mariadb` |
+
+```bash
+sudo dnf install dnf-plugins-core
+sudo dnf copr enable xolegator/pinba
+sudo dnf install pinba-engine-mariadb   # or pinba-engine-mysql (Fedora only)
+```
+
+The plugin (`ha_pinba.so`) and the shared schema (`pinba-engine-common`) are installed into the server's plugin and data dirs. After install, load the plugin and initialize the schema — use the `mariadb` client (or `mysql` for the MySQL flavor):
+
+```bash
+sudo mariadb -e "INSTALL PLUGIN pinba SONAME 'ha_pinba.so';"
+sudo mariadb -e "CREATE DATABASE IF NOT EXISTS pinba;"
+sudo mariadb pinba < /usr/share/pinba_engine/default_tables.sql
+```
+
+> On Enterprise Linux the native database is MariaDB, so only the MariaDB flavor is published there; the MySQL flavor is built for Fedora. The plugin is ABI-matched to each distribution's server version.
 
 ### Build from source
 
