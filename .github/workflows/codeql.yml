@@ -1,0 +1,68 @@
+name: codeql
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  schedule:
+    # Weekly, offset from the other Monday crons.
+    - cron: "47 5 * * 1"
+
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: CodeQL (C/C++)
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake \
+            libprotobuf-dev protobuf-compiler \
+            rapidjson-dev \
+            libssl-dev pkg-config
+
+      # The preset downloads MySQL 8.0 source headers into build/_deps; cache
+      # them so CodeQL runs don't re-download on every analysis.
+      - name: Cache MySQL source headers
+        uses: actions/cache@v5
+        with:
+          path: build/_deps
+          key: codeql-deps-mysql8.0.46
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: c-cpp
+          config-file: ./.github/codeql/codeql-config.yml
+
+      # Manual build (not autobuild) so CodeQL traces the exact CMake recipe the
+      # plugin uses, matching ci.yml. Tests are skipped — CodeQL only needs the
+      # compilation to be traced.
+      - name: Build plugin
+        run: |
+          cmake --preset release-download-mysql-source
+          cmake --build build --parallel "$(nproc)"
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:c-cpp"

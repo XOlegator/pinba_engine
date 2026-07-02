@@ -1,0 +1,22 @@
+version: 2
+updates:
+  # Keep GitHub Actions current. CI pins actions to mutable major tags (@v6,
+  # @v5, ...), so weekly PRs surface upstream releases and security fixes for
+  # the third-party actions the pipeline depends on. The plugin's own build
+  # dependencies are system packages (apt) / vendored sources and are not
+  # covered by Dependabot.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+    labels:
+      - dependencies
+      - github-actions
+    groups:
+      github-actions:
+        patterns:
+          - "*"

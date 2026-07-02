@@ -1,0 +1,18 @@
+name: pinba-engine CodeQL config
+
+# Vendored / generated sources: xxhash is a third-party hashing library and
+# pinba.pb-c.* is generated from pinba.proto by protoc-c. They are not part of
+# the engine's own code, so exclude them to keep alerts focused and actionable
+# (mirrors the clang-tidy/cppcheck exclusions in ci.yml).
+paths-ignore:
+  - "src/xxhash.c"
+  - "src/xxhash.h"
+  - "src/pinba.pb-c.cc"
+  - "src/pinba.pb-c.h"
+
+# security-extended is the deeper security-focused suite (taint tracking, memory
+# safety) without the maintainability/style queries of security-and-quality —
+# a better signal-to-noise fit for a large C++ codebase whose primary attack
+# surface is parsing untrusted UDP protobuf packets.
+queries:
+  - uses: security-extended
