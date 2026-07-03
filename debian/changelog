@@ -1,3 +1,10 @@
+pinba-engine (2.11.0-1) noble; urgency=medium
+
+  * packaging: AppStream metainfo, CHANGELOG-sourced release notes, and
+    action updates
+
+ -- Oleg Ekhlakov <o.ekhlakov@protonmail.com>  Fri, 03 Jul 2026 12:30:49 +0000
+
 pinba-engine (2.1.2-2~noble1) noble; urgency=medium
 
   * Add rapidjson-dev to Build-Depends; MySQL 8.0/8.4 headers reference
