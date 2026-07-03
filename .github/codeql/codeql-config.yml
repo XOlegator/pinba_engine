@@ -4,11 +4,18 @@ name: pinba-engine CodeQL config
 # pinba.pb-c.* is generated from pinba.proto by protoc-c. They are not part of
 # the engine's own code, so exclude them to keep alerts focused and actionable
 # (mirrors the clang-tidy/cppcheck exclusions in ci.yml).
+#
+# build/** holds third-party sources pulled in only to compile the plugin:
+# the MySQL 8.0 server headers and the GoogleTest framework fetched into
+# build/_deps by CMake FetchContent. They are neither our code nor shipped in
+# the product, so alerts located there (e.g. GoogleTest's own path/process
+# handling) are noise — exclude the whole build tree from analysis.
 paths-ignore:
   - "src/xxhash.c"
   - "src/xxhash.h"
   - "src/pinba.pb-c.cc"
   - "src/pinba.pb-c.h"
+  - "build/**"
 
 # security-extended is the deeper security-focused suite (taint tracking, memory
 # safety) without the maintainability/style queries of security-and-quality —
