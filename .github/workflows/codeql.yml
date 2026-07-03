@@ -29,7 +29,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install build dependencies
         run: |
@@ -43,13 +43,13 @@ jobs:
       # The preset downloads MySQL 8.0 source headers into build/_deps; cache
       # them so CodeQL runs don't re-download on every analysis.
       - name: Cache MySQL source headers
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: build/_deps
           key: codeql-deps-mysql8.0.46
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: c-cpp
           config-file: ./.github/codeql/codeql-config.yml
@@ -63,6 +63,6 @@ jobs:
           cmake --build build --parallel "$(nproc)"
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: "/language:c-cpp"

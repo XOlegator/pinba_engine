@@ -67,7 +67,7 @@ jobs:
         run: dnf -y install dnf-plugins-core rpm-build rpmlint git-core tar gzip
 
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Mark checkout dir safe for git
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -99,7 +99,7 @@ jobs:
         run: dnf -y install rpm-build copr-cli git-core tar gzip jq
 
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.release.tag_name || inputs.tag || github.ref }}
 
