@@ -57,7 +57,7 @@ Name:           pinba-engine
 # Version is kept in sync with the release tag by the sync-rpm-spec job in
 # .github/workflows/release-please.yml (which also prepends the %changelog
 # entry), so it is not managed by release-please's extra-files updater.
-Version:        2.10.1
+Version:        2.11.0
 Release:        1%{?dist}
 Summary:        Pinba storage engine plugin for %{cmake_flavor}
 
@@ -198,6 +198,9 @@ nm -D "%{buildroot}%{_libdir}/mysql/plugin/ha_pinba.so" | grep -q %{plugin_symbo
 %{_metainfodir}/io.github.xolegator.pinba-engine-%{cmake_flavor}.metainfo.xml
 
 %changelog
+* Fri Jul 03 2026 Oleg Ekhlakov <o.ekhlakov@protonmail.com> - 2.11.0-1
+- packaging: AppStream metainfo, CHANGELOG-sourced release notes, and action updates
+
 * Fri Jul 03 2026 Oleg Ekhlakov <o.ekhlakov@protonmail.com> - 2.10.1-1
 - security: resolve CodeQL code-scanning alerts
 
