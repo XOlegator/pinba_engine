@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.1](https://github.com/XOlegator/pinba_engine/compare/v2.11.0...v2.11.1) (2026-07-03)
+
+
+### Bug Fixes
+
+* **threadpool:** initialize sentinel node's next pointer in queue_create ([#75](https://github.com/XOlegator/pinba_engine/issues/75)) ([61e2c7c](https://github.com/XOlegator/pinba_engine/commit/61e2c7c8658376307b469b9fd0d3639dfdd03b5b))
+
 ## [2.11.0](https://github.com/XOlegator/pinba_engine/compare/v2.10.1...v2.11.0) (2026-07-03)
 
 
