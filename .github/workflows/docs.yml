@@ -9,6 +9,15 @@ on:
 permissions:
   contents: read
 
+# Serialize GitHub Pages deployments. Two pushes to master in quick succession
+# (e.g. a fix merge followed immediately by its release PR) otherwise trigger
+# overlapping deployments to the same `github-pages` environment, which the
+# Pages backend rejects with "Deployment failed, try again later". Queue runs
+# instead of cancelling so an in-flight deployment always finishes.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
 jobs:
   build:
     name: Build API docs
