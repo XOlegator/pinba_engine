@@ -130,6 +130,15 @@ Allowed common types:
 
 Optional scopes are allowed, for example `fix(build): ...` or `docs: ...`. For breaking changes, use `!` after the type/scope or add a `BREAKING CHANGE:` footer.
 
+Choose the type by what the change affects, so the version only moves for real plugin changes.
+Plugin code and build definition (`src/**`, `pinba.proto`, `CMakeLists.txt`, `cmake/**`, and
+vendored server headers that add a supported MySQL/MariaDB version) use `feat:`/`fix:` and cut a
+new version and tag; distro packaging, CI, scripts, docs, tests and benchmarks (`debian/`, `rpm/`,
+`docker/`, `.github/`, `scripts/`, `tools/`, `docs/`, `tests/`, `benchmarks/`, `*.md`) use
+`ci:`/`build:`/`chore:`/`docs:`/`test:` and do not. Prefer `fix` over `feat` for behaviour
+corrections. See `docs/releasing.md` → "Version discipline: what warrants a release" for the full
+rule and the reasoning.
+
 ## Release Notes
 
 Release automation watches `master`, opens release PRs, updates `CHANGELOG.md`, and creates `vX.Y.Z` tags after the release PR is merged. Do not manually edit release output unless the task is specifically about release maintenance.

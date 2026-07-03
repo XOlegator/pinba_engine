@@ -35,6 +35,43 @@ In particular, a documentation-only or CI-only change does **not** produce a new
 These commits are still valid and are folded into the changelog of the next release that *is*
 triggered by a release-triggering commit — they just do not start a release on their own.
 
+## Version discipline: what warrants a release
+
+The upstream version — the `vX.Y.Z` tag and the `VERSION` in `CMakeLists.txt` — tracks the
+**shipped plugin** (`ha_pinba.so`) only. Pick a commit type by *what the change actually
+affects*, not by how big it feels:
+
+- **Plugin code and build definition** — anything that changes the compiled `ha_pinba.so`, its
+  behaviour, or the set of database servers it supports: `src/**`, `pinba.proto`, `CMakeLists.txt`
+  and `cmake/**`, and the vendored server headers under `vendor/**` when they add or change a
+  supported MySQL/MariaDB version. Use `feat:` (a new capability or a newly supported server
+  version → `minor`) or `fix:` (a bug or behaviour correction → `patch`). These cut a new version
+  and tag.
+- **Everything else** — distro packaging (`debian/`, `rpm/`, `docker/`), CI and workflows
+  (`.github/`), helper scripts and tools (`scripts/`, `tools/`), documentation (`docs/`,
+  `knowledge/`, `README.md`, `*.md`) and tests or benchmarks (`tests/`, `benchmarks/`). Use
+  `ci:`, `build:`, `chore:`, `docs:` or `test:`. These do **not** bump the version: the released
+  `ha_pinba.so` is unchanged, so no one repackaging our source (Debian/Ubuntu, Fedora/RPM/Copr)
+  has any reason to see a new release.
+
+Why it matters: a new tag forces every downstream repackager to rebuild an identical artefact.
+Packaging or CI churn must never inflate the plugin's version.
+
+Two rules of thumb:
+
+- **Prefer `fix` over `feat` for corrections.** `feat` is for new capability only; making
+  previously surprising or incorrect behaviour correct is a `fix` (a `patch`).
+- **Publish packaging-only changes without a release.** Because they do not cut a version, ship
+  them by re-running the packaging workflows manually (`workflow_dispatch` on `ppa-build.yml` or
+  `rpm.yml`). For an RPM, a rebuild only needs a `Release` bump — never a new upstream `Version`.
+
+Examples:
+
+- Add an aarch64 RPM target → `ci(rpm): ...` (no release).
+- Add support for a new MySQL/MariaDB version → `feat: ...` (`minor`).
+- Fix a crash in the report pool → `fix: ...` (`patch`).
+- Reword the README or a metainfo description → `docs: ...` (no release).
+
 ## Commit and PR rules
 
 Use Conventional Commits in PR titles:
