@@ -16,11 +16,6 @@
       performance monitoring and profiling, queried through ordinary SQL,
       without any additional infrastructure.
     </p>
-    <p>
-      This fork modernises Pinba for current database servers — adding support
-      for MySQL 8.0 and 8.4 and building against MariaDB — continuing the
-      original project by Antony Dovgal.
-    </p>
   </description>
 
   <developer id="io.github.xolegator">
@@ -36,14 +31,12 @@
   </categories>
 
   <!--
-    The topmost release is refreshed automatically by the PPA build workflow
-    (.github/workflows/ppa-build.yml) from the version being packaged, so this
-    list does not need to be bumped by hand on every release.
+    The build injects this release's notes (from CHANGELOG.md) as the newest
+    <release> during rpmbuild %install; this seed keeps the file valid for local
+    builds of a version the changelog does not list.
   -->
   <releases>
-    <release version="2.6.0" date="2026-06-07"/>
-    <release version="2.2.1" date="2026-06-06"/>
-    <release version="2.1.2" date="2026-06-06"/>
+    <release version="2.10.1" date="2026-07-03"/>
   </releases>
 
   <content_rating type="oars-1.1"/>

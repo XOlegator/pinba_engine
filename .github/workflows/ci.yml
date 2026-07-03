@@ -15,7 +15,7 @@ jobs:
     name: clang-format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install clang-format
         run: sudo apt-get install -y --no-install-recommends clang-format
@@ -42,7 +42,7 @@ jobs:
             mysql-version: "8.4.9"
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install build dependencies
         run: |
@@ -55,7 +55,7 @@ jobs:
             cppcheck clang-tidy
 
       - name: Cache MySQL source tarball and GoogleTest
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: build/_deps
           key: deps-mysql${{ matrix.mysql-version }}-gtest1.15.2
@@ -102,7 +102,7 @@ jobs:
           - mariadb-series: "11.8"
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install build dependencies
         run: |
@@ -135,7 +135,7 @@ jobs:
           echo "MariaDB server version: $ver"
 
       - name: Cache MariaDB source tarball
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: mariadb-src/.cache
           key: mariadb-src-${{ steps.dbver.outputs.version }}
@@ -214,7 +214,7 @@ jobs:
             mysql-version: "8.4.9"
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install build dependencies
         run: |
@@ -226,7 +226,7 @@ jobs:
             libssl-dev pkg-config
 
       - name: Cache MySQL source tarball and GoogleTest
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: build-debug/_deps
           key: deps-debug-mysql${{ matrix.mysql-version }}-gtest1.15.2
@@ -259,7 +259,7 @@ jobs:
             artifact-name: coverage-mysql84
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install build dependencies
         run: |
@@ -272,7 +272,7 @@ jobs:
             lcov
 
       - name: Cache MySQL source tarball and GoogleTest
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ${{ matrix.build-dir }}/_deps
           key: deps-coverage-mysql${{ matrix.mysql-version }}-gtest1.15.2
@@ -316,7 +316,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install build dependencies
         run: |
@@ -328,7 +328,7 @@ jobs:
             libssl-dev pkg-config
 
       - name: Cache MySQL source tarball and GoogleTest/Benchmark
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: build-benchmark/_deps
           key: deps-benchmark-mysql8.4.9-gbench1.9.1-h32131c

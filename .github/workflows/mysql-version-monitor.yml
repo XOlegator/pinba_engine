@@ -62,7 +62,7 @@ jobs:
       RESOLUTE_80: ${{ needs.detect-versions.outputs.resolute_80 }}
       RESOLUTE_84: ${{ needs.detect-versions.outputs.resolute_84 }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Compare with tracked versions
         id: compare

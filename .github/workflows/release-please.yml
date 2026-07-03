@@ -14,6 +14,9 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - name: Run release-please
         id: release
@@ -23,4 +26,115 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           target-branch: master
+
+  # release-please owns CHANGELOG.md, but not debian/changelog. Keep the source
+  # package's changelog in sync so a local dpkg-buildpackage and Debian
+  # reviewers see the real version and its changes. The PPA build still derives
+  # its own per-suite version with dch from the release tag (which predates this
+  # commit), so this never collides with packaging.
+  sync-debian-changelog:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.release-please.outputs.tag_name }}
+      DEBEMAIL: o.ekhlakov@protonmail.com
+      DEBFULLNAME: Oleg Ekhlakov
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v7
+        with:
+          ref: master
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          fetch-depth: 0
+
+      - name: Install devscripts
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends devscripts
+
+      - name: Add debian/changelog entry and push
+        run: |
+          set -euo pipefail
+          version="${VERSION#v}"
+          current="$(dpkg-parsechangelog -S Version)"
+          if [ "${current%%-*}" = "$version" ]; then
+            echo "debian/changelog already at $version; nothing to do"
+            exit 0
+          fi
+          # Pull this release's real bullets from CHANGELOG.md (release-please
+          # already wrote them there); fall back to a stub if extraction fails.
+          notes="$(python3 scripts/changelog-release-notes.py deb "$version" 2>/dev/null || true)"
+          [ -n "$notes" ] || notes="Release ${version}; see CHANGELOG.md for details."
+          # lintian on Ubuntu rejects "unstable"; use the current Ubuntu suite.
+          # The PPA publish overrides this per-suite anyway.
+          first=1
+          while IFS= read -r line; do
+            [ -n "$line" ] || continue
+            if [ "$first" = 1 ]; then
+              dch --newversion "${version}-1" --distribution noble --force-distribution "$line"
+              first=0
+            else
+              dch --append "$line"
+            fi
+          done <<< "$notes"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add debian/changelog
+          git commit -m "chore(deb): update debian/changelog for ${version} [skip ci]"
+          git push origin HEAD:master
+
+  # release-please owns CHANGELOG.md and CMakeLists.txt, but not the RPM spec.
+  # Keep the spec's Version + %changelog in sync so local/Copr SRPM builds and
+  # Fedora reviewers see the real release and its changes. Runs after
+  # sync-debian-changelog so the two never push to master concurrently. The Copr
+  # publish still stamps the version from the release tag, so this only fixes the
+  # committed spec, never the built package.
+  sync-rpm-spec:
+    needs: [release-please, sync-debian-changelog]
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.release-please.outputs.tag_name }}
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v7
+        with:
+          ref: master
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          fetch-depth: 0
+
+      - name: Bump pinba-engine.spec version and changelog, then push
+        run: |
+          set -euo pipefail
+          version="${VERSION#v}"
+          spec="rpm/pinba-engine.spec"
+          current="$(awk '/^Version:/{print $2; exit}' "$spec")"
+          if [ "$current" = "$version" ]; then
+            echo "$spec already at $version; nothing to do"
+            exit 0
+          fi
+          sed -i -E "s/^(Version:[[:space:]]+).*/\1${version}/" "$spec"
+          # Prepend a new %changelog entry right after the %changelog header,
+          # using this release's real bullets from CHANGELOG.md (release-please
+          # already wrote them there); fall back to a stub if extraction fails.
+          notes="$(python3 scripts/changelog-release-notes.py deb "$version" 2>/dev/null || true)"
+          [ -n "$notes" ] || notes="Release ${version}; see CHANGELOG.md for details."
+          entry_date="$(LC_ALL=C date -u '+%a %b %d %Y')"
+          {
+            printf '* %s Oleg Ekhlakov <o.ekhlakov@protonmail.com> - %s-1\n' "$entry_date" "$version"
+            while IFS= read -r line; do
+              [ -n "$line" ] || continue
+              printf -- '- %s\n' "$line"
+            done <<< "$notes"
+            printf '\n'
+          } > /tmp/rpm-changelog-entry.txt
+          awk 'NR==FNR{e=e $0 ORS; next} {print} /^%changelog$/ && !done{printf "%s", e; done=1}' \
+            /tmp/rpm-changelog-entry.txt "$spec" > "${spec}.new"
+          mv "${spec}.new" "$spec"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$spec"
+          git commit -m "chore(rpm): update pinba-engine.spec for ${version} [skip ci]"
+          git push origin HEAD:master
 

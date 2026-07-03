@@ -10,10 +10,6 @@
         {
           "type": "generic",
           "path": "CMakeLists.txt"
-        },
-        {
-          "type": "generic",
-          "path": "rpm/pinba-engine.spec"
         }
       ]
     }

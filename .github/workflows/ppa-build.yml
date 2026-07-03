@@ -55,7 +55,7 @@ jobs:
       include: ${{ steps.matrix.outputs.include }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.source_ref || github.sha }}
 
@@ -115,7 +115,7 @@ jobs:
           fi
 
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.source_ref || github.sha }}
 
@@ -182,14 +182,19 @@ jobs:
       - name: Refresh AppStream release metadata
         run: |
           version="${{ steps.version.outputs.upstream_version }}"
-          # Prepend the version being packaged as the newest <release> of every
-          # component (common + per-MySQL plugins), unless it is already listed.
-          # Keeps Discover/GNOME Software showing the current version without a
-          # manual bump on every release.
+          # Inject this release's notes (from CHANGELOG.md) as the newest
+          # <release><description> of every component (common + per-MySQL
+          # plugins), so Discover / GNOME Software show "What's New". Idempotent;
+          # falls back to a version-only entry if the changelog has no section
+          # for this version.
+          if ! python3 scripts/changelog-release-notes.py appstream-inject \
+                 "$version" debian/*.metainfo.xml; then
+            for meta in debian/*.metainfo.xml; do
+              grep -q "version=\"${version}\"" "$meta" || \
+                sed -i "s#<releases>#<releases>\n    <release version=\"${version}\" date=\"$(date +%F)\"/>#" "$meta"
+            done
+          fi
           for meta in debian/*.metainfo.xml; do
-            if ! grep -q "version=\"${version}\"" "$meta"; then
-              sed -i "s#<releases>#<releases>\n    <release version=\"${version}\" date=\"$(date +%F)\"/>#" "$meta"
-            fi
             appstreamcli validate --no-net "$meta"
           done
 
