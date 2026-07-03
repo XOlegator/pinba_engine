@@ -58,6 +58,14 @@ static inline queue_head_t *queue_create(int initial_cap) /* {{{ */
     free(theQueue);
     return nullptr;
   }
+  // This sentinel node is the tail of the free list: terminate it explicitly.
+  // Without this, its `next` stays uninitialized, and if the queue is never
+  // used (no jobs posted), queue_destroy() walks the free list past this node
+  // into garbage and crashes. It only appeared to work when malloc happened to
+  // hand back zeroed memory (common under glibc for fresh pages, not guaranteed
+  // — e.g. it faults under MariaDB's server startup allocation pattern).
+  theQueue->freeHead->next = nullptr;
+  theQueue->freeHead->prev = nullptr;
   theQueue->freeTail = theQueue->freeHead;
 
   for (int i = 0; i < initial_cap; i++) {
