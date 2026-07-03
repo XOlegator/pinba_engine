@@ -874,15 +874,33 @@ static inline void pinba_get_tag_report_id(PINBA_SHARE *share) /* {{{ */
   }
 
   len = snprintf((char *)share->index, sizeof(share->index), "%d", type);
-  for (i = 0; i < share->params_num; i++) {
-    len +=
-        snprintf((char *)share->index + len, sizeof(share->index) - len, "|%s", share->params[i]);
+  if (len < 0 || (size_t)len >= sizeof(share->index)) {
+    len = sizeof(share->index) - 1;
+  }
+  for (i = 0; i < share->params_num && (size_t)len < sizeof(share->index) - 1; i++) {
+    int n = snprintf((char *)share->index + len, sizeof(share->index) - len, "|%s", share->params[i]);
+    if (n < 0) {
+      break;
+    }
+    len += n;
+    if ((size_t)len >= sizeof(share->index)) {
+      len = sizeof(share->index) - 1;
+      break;
+    }
   }
 
   if (share->cond_num) {
-    for (i = 0; i < share->cond_num; i++) {
-      len += snprintf((char *)share->index + len, sizeof(share->index) - len, "|%s=%s",
-                      share->cond_names[i], share->cond_values[i]);
+    for (i = 0; i < share->cond_num && (size_t)len < sizeof(share->index) - 1; i++) {
+      int n = snprintf((char *)share->index + len, sizeof(share->index) - len, "|%s=%s",
+                       share->cond_names[i], share->cond_values[i]);
+      if (n < 0) {
+        break;
+      }
+      len += n;
+      if ((size_t)len >= sizeof(share->index)) {
+        len = sizeof(share->index) - 1;
+        break;
+      }
     }
   }
 }
@@ -900,11 +918,22 @@ static inline void pinba_get_report_id(PINBA_SHARE *share) /* {{{ */
   }
 
   len = snprintf((char *)share->index, sizeof(share->index), "%d", type);
+  if (len < 0 || (size_t)len >= sizeof(share->index)) {
+    len = sizeof(share->index) - 1;
+  }
 
   if (share->cond_num) {
-    for (i = 0; i < share->cond_num; i++) {
-      len += snprintf((char *)share->index + len, sizeof(share->index) - len, "|%s=%s",
-                      share->cond_names[i], share->cond_values[i]);
+    for (i = 0; i < share->cond_num && (size_t)len < sizeof(share->index) - 1; i++) {
+      int n = snprintf((char *)share->index + len, sizeof(share->index) - len, "|%s=%s",
+                       share->cond_names[i], share->cond_values[i]);
+      if (n < 0) {
+        break;
+      }
+      len += n;
+      if ((size_t)len >= sizeof(share->index)) {
+        len = sizeof(share->index) - 1;
+        break;
+      }
     }
   }
 }
@@ -7645,7 +7674,7 @@ inline int ha_pinba::histogram_fetch_row(unsigned char *) /* {{{ */
           break;
         case 2: /* time_value */
           (*field)->set_notnull();
-          (*field)->store((float)std->histogram_segment * position);
+          (*field)->store((double)std->histogram_segment * position);
           break;
         case 3: /* count */
           (*field)->set_notnull();
@@ -7824,7 +7853,7 @@ inline int ha_pinba::histogram_fetch_row_by_key(unsigned char *, const char *, u
           break;
         case 2: /* time_value */
           (*field)->set_notnull();
-          (*field)->store((float)std->histogram_segment * position);
+          (*field)->store((double)std->histogram_segment * position);
           break;
         case 3: /* count */
           (*field)->set_notnull();

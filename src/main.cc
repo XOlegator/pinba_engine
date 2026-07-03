@@ -1610,6 +1610,7 @@ char *pinba_error_ex(int return_error, int type, const char *file, int line, con
     } else {
       // Fallback to legacy synchronous logging
       time_t t;
+      struct tm tm_buf;
       struct tm *tmp;
       char timebuf[256] = {0};
       char file_line[PINBA_ERR_BUFFER] = "\0";
@@ -1626,7 +1627,7 @@ char *pinba_error_ex(int return_error, int type, const char *file, int line, con
       snprintf(last_file_line, sizeof(last_file_line), "%s:%d", file, line);
       snprintf(last_errormsg, sizeof(last_errormsg), "%s", errormsg);
 
-      tmp = localtime(&t);
+      tmp = localtime_r(&t, &tm_buf);
 
       if (tmp) {
         strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M:%S", tmp);
