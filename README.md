@@ -8,18 +8,16 @@ This is an actively maintained fork of [tony2001/pinba_engine](https://github.co
 
 ### Docker
 
-Pre-built images are published to Docker Hub for MySQL 8.0 and MySQL 8.4 LTS:
+Pre-built images are published to Docker Hub for both databases — MySQL 8.0 / 8.4 LTS and MariaDB 10.11 / 11.8 LTS:
+
+| Database | Tag |
+|---|---|
+| MySQL 8.0 | `xolegator/pinba-engine:8.0` |
+| MySQL 8.4 LTS | `xolegator/pinba-engine:8.4` |
+| MariaDB 10.11 LTS | `xolegator/pinba-engine:mariadb-10.11` |
+| MariaDB 11.8 LTS | `xolegator/pinba-engine:mariadb-11.8` |
 
 ```bash
-# MySQL 8.0
-docker run -d \
-  --name pinba \
-  -e MYSQL_ROOT_PASSWORD=secret \
-  -e MYSQL_DATABASE=pinba \
-  -p 3306:3306 \
-  -p 30002:30002/udp \
-  xolegator/pinba-engine:8.0
-
 # MySQL 8.4 LTS
 docker run -d \
   --name pinba \
@@ -27,13 +25,25 @@ docker run -d \
   -e MYSQL_DATABASE=pinba \
   -p 3306:3306 \
   -p 30002:30002/udp \
-  xolegator/pinba-engine:8.4-lts
+  xolegator/pinba-engine:8.4
+
+# MariaDB 11.8 LTS
+docker run -d \
+  --name pinba \
+  -e MARIADB_ROOT_PASSWORD=secret \
+  -e MARIADB_DATABASE=pinba \
+  -p 3306:3306 \
+  -p 30002:30002/udp \
+  xolegator/pinba-engine:mariadb-11.8
 ```
 
 Validate that the plugin is active:
 
 ```bash
+# MySQL
 docker exec pinba mysql -uroot -psecret -e "SHOW PLUGINS LIKE 'pinba';"
+# MariaDB
+docker exec pinba mariadb -uroot -psecret -e "SHOW PLUGINS LIKE 'pinba';"
 ```
 
 See [docs/docker.md](docs/docker.md) for full Docker usage including tagging, validation, and troubleshooting.

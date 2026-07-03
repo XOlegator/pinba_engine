@@ -1,0 +1,5 @@
+[mysqld]
+# loose_ prefix is required: MariaDB reads this file during --bootstrap before the
+# Pinba plugin is registered in mysql.plugin. Without loose_, the server aborts
+# on an unknown variable at that stage.
+loose_pinba-temp-pool-size-limit=1000

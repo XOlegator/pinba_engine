@@ -1,0 +1,88 @@
+# syntax=docker/dockerfile:1.7
+
+ARG MARIADB_IMAGE=mariadb:11.8
+ARG PINBA_MARIADB_SERIES=11.8
+
+# Build on the same MariaDB base as the runtime so the libc / libstdc++ /
+# libprotobuf ABI matches exactly (the official mariadb images are Ubuntu-based).
+FROM ${MARIADB_IMAGE} AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+ARG CMAKE_BUILD_TYPE=Release
+ARG PINBA_MARIADB_SERIES
+
+# bison + curl + libssl-dev + libncurses-dev are needed by
+# scripts/prepare-mariadb-headers.sh to generate the server headers
+# (comp_err/gen_lex_hash) for the exact runtime version — mirrors the ci.yml
+# MariaDB job's build deps.
+#
+# pinba's CMakeLists requires cmake >= 3.24, but the mariadb:10.11 base is
+# Ubuntu 22.04, which ships 3.22. Pull a current cmake from Kitware's APT repo
+# so both bases (jammy for 10.11, noble for 11.8) build identically.
+# hadolint ignore=DL3008,DL3009
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates gpg wget && \
+    wget -qO- https://apt.kitware.com/keys/kitware-archive-latest.asc \
+      | gpg --dearmor - > /usr/share/keyrings/kitware-archive-keyring.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ $(. /etc/os-release && echo "$VERSION_CODENAME") main" \
+      > /etc/apt/sources.list.d/kitware.list && \
+    apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    g++ \
+    cmake \
+    bison \
+    curl \
+    libprotobuf-dev \
+    protobuf-compiler \
+    rapidjson-dev \
+    pkg-config \
+    libncurses-dev \
+    # Keep this unpinned: strict pin may conflict with libssl3 from the base image.
+    libssl-dev && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build/pinba_engine
+COPY . .
+
+# Build the MariaDB flavor against headers generated for the base image's EXACT
+# server version. The storage-engine plugin ABI drifts across patch releases
+# within a minor series (e.g. handler::column_bitmaps_signal() became inline
+# between 11.8.6 and 11.8.8, so a plugin built against 11.8.6 fails to load in
+# 11.8.8 with an undefined symbol). Resolving the running server's version and
+# regenerating headers for it — exactly what the ci.yml MariaDB job does —
+# guarantees the plugin matches whatever the mariadb:<series> tag currently is.
+RUN set -eux; \
+    server_ver="$(mariadbd --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"; \
+    echo "Building Pinba against MariaDB server ${server_ver}"; \
+    bash scripts/prepare-mariadb-headers.sh "${server_ver}" /build/mariadb-src; \
+    cmake -S . -B build \
+      -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
+      -DCMAKE_INSTALL_PREFIX=/usr/local \
+      -DPINBA_WITH_TESTS=OFF \
+      -DPINBA_WITH_BENCHMARKS=OFF \
+      -DPINBA_DB_FLAVOR=mariadb \
+      -DPINBA_MYSQL_SERIES=${PINBA_MARIADB_SERIES} \
+      -DPINBA_MYSQL_SOURCE_DIR=/build/mariadb-src \
+      -DPINBA_MYSQL_SOURCE_VERSION="${server_ver}" \
+      -DMYSQL_INCLUDE_DIR=/build/mariadb-src/include \
+      -DPINBA_FETCH_DEPENDENCIES=OFF; \
+    cmake --build build -j"$(nproc)"; \
+    cmake --install build
+
+FROM ${MARIADB_IMAGE}
+
+# The mariadb image loads plugins from /usr/lib/mysql/plugin/.
+RUN mkdir -p /usr/lib/mysql/plugin
+
+COPY --from=builder /usr/local/lib/mysql/plugin/ha_pinba.so /usr/lib/mysql/plugin/libpinba_engine.so
+COPY --from=builder /usr/lib/x86_64-linux-gnu/libprotobuf.so.* /usr/lib/x86_64-linux-gnu/
+COPY --from=builder /build/pinba_engine/default_tables.sql /usr/share/pinba_engine/default_tables.sql
+COPY docker/mariadb/conf.d/zz-pinba.cnf /etc/mysql/conf.d/zz-pinba.cnf
+COPY docker/mariadb/initdb.d/ /docker-entrypoint-initdb.d/
+
+RUN chmod 755 /usr/lib/mysql/plugin/libpinba_engine.so && \
+    chmod 644 /usr/share/pinba_engine/default_tables.sql && \
+    chmod 644 /etc/mysql/conf.d/zz-pinba.cnf && \
+    ldconfig
+
+EXPOSE 3306 30002/udp
