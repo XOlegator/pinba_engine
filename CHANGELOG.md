@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.10.1](https://github.com/XOlegator/pinba_engine/compare/v2.10.0...v2.10.1) (2026-07-03)
+
+
+### Bug Fixes
+
+* **security:** resolve CodeQL code-scanning alerts ([#69](https://github.com/XOlegator/pinba_engine/issues/69)) ([cd5f2db](https://github.com/XOlegator/pinba_engine/commit/cd5f2db64f7470f4277be22d9761026556f35fac))
+
 ## [2.10.0](https://github.com/XOlegator/pinba_engine/compare/v2.9.0...v2.10.0) (2026-07-02)
 
 
