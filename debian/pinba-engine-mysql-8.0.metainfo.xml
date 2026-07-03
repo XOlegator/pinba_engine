@@ -12,8 +12,9 @@
   <description>
     <p>
       This package provides ha_pinba.so compiled against MySQL 8.0 server
-      headers. Pinba is a MySQL storage engine that collects and processes PHP
-      runtime statistics sent over UDP by the Pinba PHP extension.
+      headers. Pinba collects and processes application runtime statistics sent
+      over UDP by Pinba clients, most commonly the Pinba PHP extension, and
+      exposes them through ordinary SQL as real-time reports.
     </p>
   </description>
 

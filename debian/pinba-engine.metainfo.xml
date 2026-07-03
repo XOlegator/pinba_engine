@@ -6,17 +6,19 @@
   <project_license>GPL-2.0-only</project_license>
 
   <name>Pinba Engine</name>
-  <summary>MySQL storage engine for PHP runtime statistics</summary>
+  <summary>Real-time statistics storage engine for MySQL and MariaDB</summary>
 
   <description>
     <p>
-      Pinba is a MySQL storage engine that collects and processes PHP runtime
-      statistics sent over UDP by the Pinba PHP extension. It provides
-      real-time per-script performance monitoring without any additional
-      infrastructure.
+      Pinba is a storage engine for MySQL and MariaDB that collects and
+      processes application runtime statistics sent over UDP by Pinba clients,
+      most commonly the Pinba PHP extension. It provides real-time, per-request
+      performance monitoring and profiling, queried through ordinary SQL,
+      without any additional infrastructure.
     </p>
     <p>
-      This fork adds support for MySQL 8.0 and MySQL 8.4, continuing the
+      This fork modernises Pinba for current database servers — adding support
+      for MySQL 8.0 and 8.4 and building against MariaDB — continuing the
       original project by Antony Dovgal.
     </p>
   </description>

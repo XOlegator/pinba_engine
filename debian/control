@@ -20,20 +20,24 @@ Rules-Requires-Root: no
 Package: pinba-engine-common
 Architecture: all
 Depends: ${misc:Depends}
-Description: Pinba MySQL Storage Engine — common files
- Pinba is a MySQL storage engine used to collect and analyze PHP runtime
- statistics sent over UDP by the Pinba PHP extension.
+Description: Pinba storage engine for MySQL and MariaDB — common files
+ Pinba is a storage engine for MySQL and MariaDB that collects and processes
+ application runtime statistics sent over UDP by Pinba clients, most commonly
+ the Pinba PHP extension. It provides real-time, per-request performance
+ monitoring and profiling, queried through ordinary SQL, without any additional
+ infrastructure.
  .
- This package contains shared data files: SQL schema for default tables
+ This package contains shared data files: the SQL schema for the default tables
  and documentation.
 
 Package: pinba-engine-mysql-8.0
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, pinba-engine-common
 Recommends: mysql-server-8.0 | mysql-community-server-8.0
-Description: Pinba MySQL Storage Engine — MySQL 8.0
- Pinba is a MySQL storage engine used to collect and analyze PHP runtime
- statistics sent over UDP by the Pinba PHP extension.
+Description: Pinba storage engine plugin for MySQL 8.0
+ Pinba collects and processes application runtime statistics sent over UDP by
+ Pinba clients, most commonly the Pinba PHP extension, and exposes them through
+ ordinary SQL as real-time reports for performance monitoring and profiling.
  .
  This package contains ha_pinba.so compiled against MySQL 8.0 server headers.
  Install this package if you run MySQL 8.0.
@@ -47,9 +51,10 @@ Package: pinba-engine-mysql-8.4
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, pinba-engine-common
 Recommends: mysql-server-8.4 | mysql-community-server-8.4
-Description: Pinba MySQL Storage Engine — MySQL 8.4
- Pinba is a MySQL storage engine used to collect and analyze PHP runtime
- statistics sent over UDP by the Pinba PHP extension.
+Description: Pinba storage engine plugin for MySQL 8.4
+ Pinba collects and processes application runtime statistics sent over UDP by
+ Pinba clients, most commonly the Pinba PHP extension, and exposes them through
+ ordinary SQL as real-time reports for performance monitoring and profiling.
  .
  This package contains ha_pinba.so compiled against MySQL 8.4 server headers.
  Install this package if you run MySQL 8.4.
