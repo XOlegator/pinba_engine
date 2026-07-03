@@ -1,4 +1,8 @@
 debian/build-mysql80
 debian/build-mysql84
+debian/build-mariadb1011
+debian/build-mariadb118
 debian/tmp-mysql80
 debian/tmp-mysql84
+debian/tmp-mariadb1011
+debian/tmp-mariadb118

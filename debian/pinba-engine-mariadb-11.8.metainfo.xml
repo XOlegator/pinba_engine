@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="addon">
+  <id>io.github.xolegator.pinba-engine-mariadb118</id>
+  <pkgname>pinba-engine-mariadb-11.8</pkgname>
+  <extends>io.github.xolegator.pinba-engine</extends>
+  <metadata_license>MIT</metadata_license>
+  <project_license>GPL-2.0-only</project_license>
+
+  <name>Pinba Engine (MariaDB 11.8)</name>
+  <summary>Pinba storage engine plugin built for MariaDB 11.8</summary>
+
+  <description>
+    <p>
+      This package provides ha_pinba.so compiled against MariaDB 11.8 server
+      headers (the default MariaDB on Ubuntu 26.04 LTS). Pinba collects and
+      processes application runtime statistics sent over UDP by Pinba clients,
+      most commonly the Pinba PHP extension, and exposes them through ordinary
+      SQL as real-time reports.
+    </p>
+  </description>
+
+  <developer id="io.github.xolegator">
+    <name>Oleg Ekhlakov</name>
+  </developer>
+
+  <url type="homepage">https://github.com/XOlegator/pinba_engine</url>
+  <url type="bugtracker">https://github.com/XOlegator/pinba_engine/issues</url>
+  <url type="vcs-browser">https://github.com/XOlegator/pinba_engine</url>
+
+  <!--
+    The topmost release is refreshed automatically by the PPA build workflow
+    (.github/workflows/ppa-build.yml) from the version being packaged, so this
+    list does not need to be bumped by hand on every release.
+  -->
+  <releases>
+    <release version="2.10.1" date="2026-07-03"/>
+  </releases>
+
+  <content_rating type="oars-1.1"/>
+</component>

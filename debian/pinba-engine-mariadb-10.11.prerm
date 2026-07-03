@@ -1,0 +1,54 @@
+#!/bin/sh
+set -e
+
+MYSQL_SOCKET="/var/run/mysqld/mysqld.sock"
+DEBIAN_CNF="/etc/mysql/debian.cnf"
+PLUGIN_CNF="/etc/mysql/conf.d/pinba-engine.cnf"
+
+DB_CLIENT="$(command -v mariadb || command -v mysql || true)"
+
+db_available() {
+    [ -n "$DB_CLIENT" ] || return 1
+    if [ -r "$DEBIAN_CNF" ] && \
+       "$DB_CLIENT" --defaults-file="$DEBIAN_CNF" -e "SELECT 1" >/dev/null 2>&1; then
+        return 0
+    fi
+    "$DB_CLIENT" --no-defaults -u root -S "$MYSQL_SOCKET" -e "SELECT 1" >/dev/null 2>&1
+}
+
+db_exec() {
+    if [ -r "$DEBIAN_CNF" ] && \
+       "$DB_CLIENT" --defaults-file="$DEBIAN_CNF" -e "SELECT 1" >/dev/null 2>&1; then
+        "$DB_CLIENT" --defaults-file="$DEBIAN_CNF" "$@"
+    else
+        "$DB_CLIENT" --no-defaults -u root -S "$MYSQL_SOCKET" "$@"
+    fi
+}
+
+case "$1" in
+    remove|purge)
+        # Remove plugin-load-add config so MariaDB won't reload the plugin on
+        # the next restart after the package is gone.
+        rm -f "$PLUGIN_CNF"
+
+        if db_available 2>/dev/null; then
+            PLUGIN_ACTIVE=$(db_exec --skip-column-names \
+                -e "SELECT COUNT(*) FROM information_schema.PLUGINS \
+                    WHERE PLUGIN_NAME='pinba' AND PLUGIN_STATUS='ACTIVE';" \
+                2>/dev/null || echo "0")
+            if [ "${PLUGIN_ACTIVE:-0}" != "0" ]; then
+                db_exec -e "UNINSTALL PLUGIN pinba;" 2>&1 || true
+            fi
+        else
+            echo "-------------------------------------------------------"
+            echo "pinba-engine: MariaDB is not running or no usable"
+            echo "connection method found. Unload the plugin manually:"
+            echo ""
+            echo "  mariadb -u root -p -e \"UNINSTALL PLUGIN pinba;\""
+            echo "-------------------------------------------------------"
+        fi
+        ;;
+esac
+
+#DEBHELPER#
+exit 0

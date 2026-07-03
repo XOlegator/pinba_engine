@@ -1,0 +1,147 @@
+#!/bin/sh
+set -e
+
+PLUGIN_SONAME="ha_pinba.so"
+MYSQL_SOCKET="/var/run/mysqld/mysqld.sock"
+PINBA_DB="pinba"
+DEBIAN_CNF="/etc/mysql/debian.cnf"
+PLUGIN_CNF="/etc/mysql/conf.d/pinba-engine.cnf"
+
+# MariaDB 11.x ships only the `mariadb` client; older series and MySQL provide
+# `mysql`. Prefer `mariadb`, fall back to `mysql` for compatibility.
+DB_CLIENT="$(command -v mariadb || command -v mysql || true)"
+
+db_available() {
+    [ -n "$DB_CLIENT" ] || return 1
+    if [ -r "$DEBIAN_CNF" ] && \
+       "$DB_CLIENT" --defaults-file="$DEBIAN_CNF" -e "SELECT 1" >/dev/null 2>&1; then
+        return 0
+    fi
+    # MariaDB root authenticates via unix_socket; postinst runs as root.
+    "$DB_CLIENT" --no-defaults -u root -S "$MYSQL_SOCKET" -e "SELECT 1" >/dev/null 2>&1
+}
+
+db_exec() {
+    if [ -r "$DEBIAN_CNF" ] && \
+       "$DB_CLIENT" --defaults-file="$DEBIAN_CNF" -e "SELECT 1" >/dev/null 2>&1; then
+        "$DB_CLIENT" --defaults-file="$DEBIAN_CNF" "$@"
+    else
+        "$DB_CLIENT" --no-defaults -u root -S "$MYSQL_SOCKET" "$@"
+    fi
+}
+
+plugin_active() {
+    COUNT=$(db_exec --skip-column-names \
+        -e "SELECT COUNT(*) FROM information_schema.PLUGINS \
+            WHERE PLUGIN_NAME='pinba' AND PLUGIN_STATUS='ACTIVE';" \
+        2>/dev/null || echo "0")
+    [ "${COUNT:-0}" != "0" ]
+}
+
+case "$1" in
+    configure)
+        echo "pinba-engine: === Installing pinba storage engine plugin (MariaDB) ==="
+
+        # Write plugin-load-add config unconditionally. This is the reliable
+        # path: the plugin will always load on the next MariaDB start regardless
+        # of whether the immediate INSTALL PLUGIN below succeeds.
+        mkdir -p /etc/mysql/conf.d
+        printf '[mariadb]\nplugin-load-add = %s\n' "${PLUGIN_SONAME}" \
+            > "$PLUGIN_CNF"
+        echo "pinba-engine: [OK] plugin-load-add config written: ${PLUGIN_CNF}"
+
+        NEEDS_RESTART=0
+        NEEDS_TABLES=0
+
+        if db_available 2>/dev/null; then
+            PLUGIN_NOW_ACTIVE=0
+
+            if plugin_active 2>/dev/null; then
+                echo "pinba-engine: [OK] plugin already active in MariaDB."
+                PLUGIN_NOW_ACTIVE=1
+            else
+                # Try immediate activation via INSTALL PLUGIN. If the setup
+                # account lacks privileges this may fail — expected, non-fatal.
+                if db_exec -e \
+                        "INSTALL PLUGIN pinba SONAME '${PLUGIN_SONAME}';" \
+                        >/dev/null 2>&1; then
+                    echo "pinba-engine: [OK] plugin activated immediately via INSTALL PLUGIN."
+                    PLUGIN_NOW_ACTIVE=1
+                else
+                    echo "pinba-engine: [--] immediate activation skipped (the MariaDB account"
+                    echo "              used for package setup lacks the needed privilege)."
+                    echo "              The plugin will load automatically on next MariaDB restart."
+                    NEEDS_RESTART=1
+                fi
+            fi
+
+            # Create the pinba database if it does not exist yet.
+            DB_EXISTS=$(db_exec --skip-column-names \
+                -e "SELECT COUNT(*) FROM information_schema.SCHEMATA \
+                    WHERE SCHEMA_NAME='${PINBA_DB}';" 2>/dev/null || echo "0")
+            if [ "${DB_EXISTS:-0}" = "0" ]; then
+                if db_exec \
+                        -e "CREATE DATABASE ${PINBA_DB} CHARACTER SET latin1;" \
+                        >/dev/null 2>&1; then
+                    echo "pinba-engine: [OK] database '${PINBA_DB}' created."
+                else
+                    echo "pinba-engine: [!!] could not create database '${PINBA_DB}'."
+                    PLUGIN_NOW_ACTIVE=0
+                fi
+            else
+                echo "pinba-engine: [OK] database '${PINBA_DB}' already exists."
+            fi
+
+            # Import default tables only if the plugin is active right now —
+            # CREATE TABLE ... ENGINE=PINBA requires the plugin to be loaded.
+            if [ "$PLUGIN_NOW_ACTIVE" = "1" ]; then
+                TABLES_EXIST=$(db_exec --skip-column-names \
+                    -e "SELECT COUNT(*) FROM information_schema.TABLES \
+                        WHERE TABLE_SCHEMA='${PINBA_DB}';" 2>/dev/null || echo "0")
+                if [ "${TABLES_EXIST:-0}" = "0" ]; then
+                    if db_exec "${PINBA_DB}" \
+                            < /usr/share/pinba_engine/default_tables.sql \
+                            >/dev/null 2>&1; then
+                        echo "pinba-engine: [OK] default tables created in '${PINBA_DB}'."
+                    else
+                        echo "pinba-engine: [!!] could not create tables in '${PINBA_DB}'."
+                        NEEDS_TABLES=1
+                    fi
+                else
+                    echo "pinba-engine: [OK] tables in '${PINBA_DB}' already exist."
+                fi
+            else
+                NEEDS_TABLES=1
+            fi
+        else
+            echo "pinba-engine: [--] MariaDB is not reachable — skipping runtime setup."
+            NEEDS_RESTART=1
+            NEEDS_TABLES=1
+        fi
+
+        echo "pinba-engine: === Setup summary ==="
+        echo "pinba-engine:   ha_pinba.so  installed to MariaDB plugin dir"
+        echo "pinba-engine:   plugin-load-add configured in ${PLUGIN_CNF}"
+        if [ "$NEEDS_RESTART" = "1" ] || [ "$NEEDS_TABLES" = "1" ]; then
+            echo "pinba-engine: --- Action required to complete setup: ---"
+            if [ "$NEEDS_RESTART" = "1" ]; then
+                echo "pinba-engine:   1. Restart MariaDB to activate the plugin:"
+                echo "pinba-engine:        sudo systemctl restart mariadb"
+            fi
+            if [ "$NEEDS_TABLES" = "1" ]; then
+                STEP=2
+                [ "$NEEDS_RESTART" = "0" ] && STEP=1
+                echo "pinba-engine:   ${STEP}. Create the default tables:"
+                echo "pinba-engine:        mariadb -u root -p ${PINBA_DB} < \\"
+                echo "pinba-engine:          /usr/share/pinba_engine/default_tables.sql"
+            fi
+        else
+            echo "pinba-engine:   Plugin active, database and tables ready."
+            echo "pinba-engine:   No further action required."
+        fi
+        echo "pinba-engine: ========================================"
+        ;;
+esac
+
+#DEBHELPER#
+exit 0

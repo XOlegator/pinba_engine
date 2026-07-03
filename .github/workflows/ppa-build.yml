@@ -70,27 +70,47 @@ jobs:
           echo "MySQL versions from JSON: 8.0=$MYSQL80  8.4=$MYSQL84"
           echo "Debian revisions:  noble=$NOBLE_REV  resolute=$RESOLUTE_REV"
 
+          # MariaDB series are ABI-pinned to each distro's native default and
+          # come from the vendored headers (vendor/mariadb-headers-*): Ubuntu
+          # 24.04 noble -> 10.11, Ubuntu 26.04 resolute -> 11.8. Both MySQL and
+          # MariaDB plugin subpackages are built from the one source package per
+          # distro (they Conflict; users install the one matching their server).
+          MARIADB1011=$(jq -r '.noble.mariadb1011   // "10.11.14"' .github/mysql-versions.json)
+          MARIADB118=$(jq -r  '.resolute.mariadb118 // "11.8.6"'   .github/mysql-versions.json)
+          echo "MariaDB versions: 10.11=$MARIADB1011  11.8=$MARIADB118"
+
           case "${{ github.event_name }}:${{ inputs.target_distribution || 'all' }}" in
             workflow_dispatch:noble)
               include=$(jq -cn \
-                --arg m80 "$MYSQL80" --arg m84 "$MYSQL84" --argjson rev "$NOBLE_REV" \
+                --arg m80 "$MYSQL80" --arg m84 "$MYSQL84" \
+                --arg d1011 "$MARIADB1011" --arg d118 "$MARIADB118" --argjson rev "$NOBLE_REV" \
                 '[{"distribution":"noble","ubuntu_version":"24.04","enable_mysql80":"1","enable_mysql84":"0",
-                   "mysql80_version":$m80,"mysql84_version":$m84,"include_orig":"1","debian_revision":$rev}]')
+                   "enable_mariadb1011":"1","enable_mariadb118":"0",
+                   "mysql80_version":$m80,"mysql84_version":$m84,"mariadb1011_version":$d1011,"mariadb118_version":$d118,
+                   "include_orig":"1","debian_revision":$rev}]')
               ;;
             workflow_dispatch:resolute)
               include=$(jq -cn \
-                --arg m80 "$MYSQL80" --arg m84 "$MYSQL84" --argjson rev "$RESOLUTE_REV" \
+                --arg m80 "$MYSQL80" --arg m84 "$MYSQL84" \
+                --arg d1011 "$MARIADB1011" --arg d118 "$MARIADB118" --argjson rev "$RESOLUTE_REV" \
                 '[{"distribution":"resolute","ubuntu_version":"26.04","enable_mysql80":"0","enable_mysql84":"1",
-                   "mysql80_version":$m80,"mysql84_version":$m84,"include_orig":"1","debian_revision":$rev}]')
+                   "enable_mariadb1011":"0","enable_mariadb118":"1",
+                   "mysql80_version":$m80,"mysql84_version":$m84,"mariadb1011_version":$d1011,"mariadb118_version":$d118,
+                   "include_orig":"1","debian_revision":$rev}]')
               ;;
             *)
               include=$(jq -cn \
                 --arg m80 "$MYSQL80" --arg m84 "$MYSQL84" \
+                --arg d1011 "$MARIADB1011" --arg d118 "$MARIADB118" \
                 --argjson nrev "$NOBLE_REV" --argjson rrev "$RESOLUTE_REV" \
                 '[{"distribution":"noble","ubuntu_version":"24.04","enable_mysql80":"1","enable_mysql84":"0",
-                   "mysql80_version":$m80,"mysql84_version":$m84,"include_orig":"1","debian_revision":$nrev},
+                   "enable_mariadb1011":"1","enable_mariadb118":"0",
+                   "mysql80_version":$m80,"mysql84_version":$m84,"mariadb1011_version":$d1011,"mariadb118_version":$d118,
+                   "include_orig":"1","debian_revision":$nrev},
                   {"distribution":"resolute","ubuntu_version":"26.04","enable_mysql80":"0","enable_mysql84":"1",
-                   "mysql80_version":$m80,"mysql84_version":$m84,"include_orig":"0","debian_revision":$rrev}]')
+                   "enable_mariadb1011":"0","enable_mariadb118":"1",
+                   "mysql80_version":$m80,"mysql84_version":$m84,"mariadb1011_version":$d1011,"mariadb118_version":$d118,
+                   "include_orig":"0","debian_revision":$rrev}]')
               ;;
           esac
 
@@ -168,8 +188,12 @@ jobs:
           cat > debian/pinba-ppa-build.mk <<EOF
           ENABLE_MYSQL80=${{ matrix.enable_mysql80 }}
           ENABLE_MYSQL84=${{ matrix.enable_mysql84 }}
+          ENABLE_MARIADB1011=${{ matrix.enable_mariadb1011 }}
+          ENABLE_MARIADB118=${{ matrix.enable_mariadb118 }}
           MYSQL80_VERSION=${{ matrix.mysql80_version }}
           MYSQL84_VERSION=${{ matrix.mysql84_version }}
+          MARIADB1011_VERSION=${{ matrix.mariadb1011_version }}
+          MARIADB118_VERSION=${{ matrix.mariadb118_version }}
           EOF
 
       - name: Rewrite debian/changelog for target distro
