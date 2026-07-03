@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="generic">
+  <id>io.github.xolegator.pinba-engine</id>
+  <pkgname>pinba-engine-common</pkgname>
+  <metadata_license>MIT</metadata_license>
+  <project_license>GPL-2.0-only</project_license>
+
+  <name>Pinba Engine</name>
+  <summary>Real-time statistics storage engine for MySQL and MariaDB</summary>
+
+  <description>
+    <p>
+      Pinba is a storage engine for MySQL and MariaDB that collects and
+      processes application runtime statistics sent over UDP by Pinba clients,
+      most commonly the Pinba PHP extension. It provides real-time, per-request
+      performance monitoring and profiling, queried through ordinary SQL,
+      without any additional infrastructure.
+    </p>
+  </description>
+
+  <developer id="io.github.xolegator">
+    <name>Oleg Ekhlakov</name>
+  </developer>
+
+  <url type="homepage">https://github.com/XOlegator/pinba_engine</url>
+  <url type="bugtracker">https://github.com/XOlegator/pinba_engine/issues</url>
+  <url type="vcs-browser">https://github.com/XOlegator/pinba_engine</url>
+
+  <categories>
+    <category>Database</category>
+  </categories>
+
+  <!--
+    The build injects this release's notes (from CHANGELOG.md) as the newest
+    <release> during rpmbuild %install; this seed keeps the file valid for local
+    builds of a version the changelog does not list.
+  -->
+  <releases>
+    <release version="2.10.1" date="2026-07-03"/>
+  </releases>
+
+  <content_rating type="oars-1.1"/>
+</component>

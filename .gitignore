@@ -42,6 +42,7 @@ benchmark_results/
 coverage-*.info
 *.xml
 !debian/*.metainfo.xml
+!rpm/*.metainfo.xml
 *.json
 !CMakePresets.json
 !.release-please-manifest.json
