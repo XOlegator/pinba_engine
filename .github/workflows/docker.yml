@@ -8,6 +8,8 @@ on:
     paths:
       - 'Dockerfile.mysql80'
       - 'Dockerfile.mysql84'
+      - 'Dockerfile.mariadb1011'
+      - 'Dockerfile.mariadb118'
   workflow_dispatch:
     inputs:
       release-tag:
@@ -17,15 +19,24 @@ on:
 
 jobs:
   build-push:
-    name: Build and push (${{ matrix.series }})
+    name: Build and push (${{ matrix.label }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - dockerfile: Dockerfile.mysql80
-            series: "8.0"
+            label: "MySQL 8.0"
+            tag: "8.0"
           - dockerfile: Dockerfile.mysql84
-            series: "8.4"
+            label: "MySQL 8.4"
+            tag: "8.4"
+          - dockerfile: Dockerfile.mariadb1011
+            label: "MariaDB 10.11"
+            tag: "mariadb-10.11"
+          - dockerfile: Dockerfile.mariadb118
+            label: "MariaDB 11.8"
+            tag: "mariadb-11.8"
     steps:
       - uses: actions/checkout@v7
         with:
@@ -49,7 +60,7 @@ jobs:
             VERSION="$(jq -r '."."' .release-please-manifest.json)"
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Building Docker image: pinba-engine $VERSION (MySQL ${{ matrix.series }})"
+          echo "Building Docker image: pinba-engine $VERSION (${{ matrix.label }})"
 
       - uses: docker/build-push-action@v7
         with:
@@ -57,7 +68,7 @@ jobs:
           file: ${{ matrix.dockerfile }}
           push: true
           tags: |
-            xolegator/pinba-engine:${{ matrix.series }}-v${{ steps.meta.outputs.version }}
-            xolegator/pinba-engine:${{ matrix.series }}
+            xolegator/pinba-engine:${{ matrix.tag }}-v${{ steps.meta.outputs.version }}
+            xolegator/pinba-engine:${{ matrix.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
