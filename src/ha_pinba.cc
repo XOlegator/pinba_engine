@@ -878,7 +878,8 @@ static inline void pinba_get_tag_report_id(PINBA_SHARE *share) /* {{{ */
     len = sizeof(share->index) - 1;
   }
   for (i = 0; i < share->params_num && (size_t)len < sizeof(share->index) - 1; i++) {
-    int n = snprintf((char *)share->index + len, sizeof(share->index) - len, "|%s", share->params[i]);
+    int n =
+        snprintf((char *)share->index + len, sizeof(share->index) - len, "|%s", share->params[i]);
     if (n < 0) {
       break;
     }
