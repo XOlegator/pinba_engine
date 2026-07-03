@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.0](https://github.com/XOlegator/pinba_engine/compare/v2.10.1...v2.11.0) (2026-07-03)
+
+
+### Features
+
+* **packaging:** AppStream metainfo, CHANGELOG-sourced release notes, and action updates ([#72](https://github.com/XOlegator/pinba_engine/issues/72)) ([db734c0](https://github.com/XOlegator/pinba_engine/commit/db734c01321c95e8aa1f98487f5f200e37d4644d))
+
 ## [2.10.1](https://github.com/XOlegator/pinba_engine/compare/v2.10.0...v2.10.1) (2026-07-03)
 
 
