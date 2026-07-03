@@ -2,7 +2,7 @@
 
 Pinba Engine is a MySQL/MariaDB storage engine that collects and analyzes PHP runtime statistics sent over UDP by the [Pinba PHP extension](https://github.com/tony2001/pinba2).
 
-This is an actively maintained fork of [tony2001/pinba_engine](https://github.com/tony2001/pinba_engine) with full support for MySQL 8.0 and MySQL 8.4 LTS, and for MariaDB 10.11 and 11.8 LTS from the same source tree. Pre-built packages are available for both databases: **Docker images** and an **Ubuntu PPA** (MySQL), and **Fedora/Enterprise-Linux RPMs** via Copr (MariaDB, plus MySQL on Fedora).
+This is an actively maintained fork of [tony2001/pinba_engine](https://github.com/tony2001/pinba_engine) with full support for MySQL 8.0 and MySQL 8.4 LTS, and for MariaDB 10.11 and 11.8 LTS from the same source tree. Pre-built packages are available for both databases: **Docker images**, an **Ubuntu PPA** (MySQL and MariaDB), and **Fedora/Enterprise-Linux RPMs** via Copr (MariaDB, plus MySQL on Fedora).
 
 ## Install
 
@@ -40,17 +40,22 @@ See [docs/docker.md](docs/docker.md) for full Docker usage including tagging, va
 
 ### Ubuntu / Debian package (PPA)
 
-Packages are available via Launchpad PPA:
+Packages are available via Launchpad PPA. Each Ubuntu release ships a plugin
+built for its native MySQL and MariaDB servers — install the one matching your
+database (the plugin is ABI-bound to the server's major.minor series):
 
-| Ubuntu release | MySQL version | Package |
+| Ubuntu release | MySQL | MariaDB |
 |---|---|---|
-| 24.04 Noble | 8.0 | `pinba-engine-mysql-8.0` |
-| 26.04 Resolute | 8.4 | `pinba-engine-mysql-8.4` |
+| 24.04 Noble | `pinba-engine-mysql-8.0` | `pinba-engine-mariadb-10.11` |
+| 26.04 Resolute | `pinba-engine-mysql-8.4` | `pinba-engine-mariadb-11.8` |
 
 ```bash
 sudo add-apt-repository ppa:xolegator/packages
 sudo apt-get update
-sudo apt-get install pinba-engine-mysql-8.0   # or pinba-engine-mysql-8.4
+# MySQL (pick your release's series):
+sudo apt-get install pinba-engine-mysql-8.0     # 24.04 Noble
+# MariaDB (pick your release's series):
+sudo apt-get install pinba-engine-mariadb-10.11 # 24.04 Noble
 ```
 
 After install, load the plugin and initialize the schema:

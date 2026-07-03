@@ -4,12 +4,18 @@ ifneq ($(wildcard debian/pinba-ppa-build.mk),)
 include debian/pinba-ppa-build.mk
 endif
 
-MYSQL80_SOURCE_DIR  = $(CURDIR)/vendor/mysql-headers-8.0
-MYSQL84_SOURCE_DIR  = $(CURDIR)/vendor/mysql-headers-8.4
+MYSQL80_SOURCE_DIR    = $(CURDIR)/vendor/mysql-headers-8.0
+MYSQL84_SOURCE_DIR    = $(CURDIR)/vendor/mysql-headers-8.4
+MARIADB1011_SOURCE_DIR = $(CURDIR)/vendor/mariadb-headers-10.11
+MARIADB118_SOURCE_DIR  = $(CURDIR)/vendor/mariadb-headers-11.8
 ENABLE_MYSQL80     ?= 1
 ENABLE_MYSQL84     ?= 1
+ENABLE_MARIADB1011 ?= 0
+ENABLE_MARIADB118  ?= 0
 MYSQL80_VERSION    ?= 8.0.46
 MYSQL84_VERSION    ?= 8.4.9
+MARIADB1011_VERSION ?= 10.11.14
+MARIADB118_VERSION  ?= 11.8.6
 NPROC              := $(shell nproc)
 DH_EXCLUDE_PACKAGES :=
 
@@ -21,13 +27,24 @@ ifeq ($(ENABLE_MYSQL84),0)
 DH_EXCLUDE_PACKAGES += -Npinba-engine-mysql-8.4
 endif
 
-ifeq ($(ENABLE_MYSQL80)$(ENABLE_MYSQL84),00)
-$(error At least one MySQL series must be enabled in debian/pinba-ppa-build.mk)
+ifeq ($(ENABLE_MARIADB1011),0)
+DH_EXCLUDE_PACKAGES += -Npinba-engine-mariadb-10.11
+endif
+
+ifeq ($(ENABLE_MARIADB118),0)
+DH_EXCLUDE_PACKAGES += -Npinba-engine-mariadb-11.8
+endif
+
+ifeq ($(ENABLE_MYSQL80)$(ENABLE_MYSQL84)$(ENABLE_MARIADB1011)$(ENABLE_MARIADB118),0000)
+$(error At least one MySQL or MariaDB series must be enabled in debian/pinba-ppa-build.mk)
 endif
 
 %:
 	dh $@ $(DH_EXCLUDE_PACKAGES)
 
+# MariaDB flavor takes mysql.h from its vendored source include/ (no client -dev
+# package needed) and must NOT define MYSQL_INCLUDE_DIR from the system; point it
+# at the vendored tree, mirroring rpm/pinba-engine.spec.
 override_dh_auto_configure:
 ifeq ($(ENABLE_MYSQL80),1)
 	cmake -B debian/build-mysql80 \
@@ -51,6 +68,32 @@ ifeq ($(ENABLE_MYSQL84),1)
 	  -DCMAKE_INSTALL_PREFIX=/usr \
 	  -DCMAKE_INSTALL_LIBDIR=lib
 endif
+ifeq ($(ENABLE_MARIADB1011),1)
+	cmake -B debian/build-mariadb1011 \
+	  -DCMAKE_BUILD_TYPE=Release \
+	  -DPINBA_DB_FLAVOR=mariadb \
+	  -DPINBA_MYSQL_SERIES=10.11 \
+	  -DPINBA_MYSQL_SOURCE_DIR=$(MARIADB1011_SOURCE_DIR) \
+	  -DPINBA_MYSQL_SOURCE_VERSION=$(MARIADB1011_VERSION) \
+	  -DMYSQL_INCLUDE_DIR=$(MARIADB1011_SOURCE_DIR)/include \
+	  -DPINBA_WITH_TESTS=OFF \
+	  -DPINBA_FETCH_DEPENDENCIES=OFF \
+	  -DCMAKE_INSTALL_PREFIX=/usr \
+	  -DCMAKE_INSTALL_LIBDIR=lib
+endif
+ifeq ($(ENABLE_MARIADB118),1)
+	cmake -B debian/build-mariadb118 \
+	  -DCMAKE_BUILD_TYPE=Release \
+	  -DPINBA_DB_FLAVOR=mariadb \
+	  -DPINBA_MYSQL_SERIES=11.8 \
+	  -DPINBA_MYSQL_SOURCE_DIR=$(MARIADB118_SOURCE_DIR) \
+	  -DPINBA_MYSQL_SOURCE_VERSION=$(MARIADB118_VERSION) \
+	  -DMYSQL_INCLUDE_DIR=$(MARIADB118_SOURCE_DIR)/include \
+	  -DPINBA_WITH_TESTS=OFF \
+	  -DPINBA_FETCH_DEPENDENCIES=OFF \
+	  -DCMAKE_INSTALL_PREFIX=/usr \
+	  -DCMAKE_INSTALL_LIBDIR=lib
+endif
 
 override_dh_auto_build:
 ifeq ($(ENABLE_MYSQL80),1)
@@ -58,6 +101,12 @@ ifeq ($(ENABLE_MYSQL80),1)
 endif
 ifeq ($(ENABLE_MYSQL84),1)
 	cmake --build debian/build-mysql84 --parallel $(NPROC)
+endif
+ifeq ($(ENABLE_MARIADB1011),1)
+	cmake --build debian/build-mariadb1011 --parallel $(NPROC)
+endif
+ifeq ($(ENABLE_MARIADB118),1)
+	cmake --build debian/build-mariadb118 --parallel $(NPROC)
 endif
 
 override_dh_auto_install:
@@ -67,16 +116,37 @@ endif
 ifeq ($(ENABLE_MYSQL84),1)
 	DESTDIR=$(CURDIR)/debian/tmp-mysql84 cmake --install debian/build-mysql84
 endif
+ifeq ($(ENABLE_MARIADB1011),1)
+	DESTDIR=$(CURDIR)/debian/tmp-mariadb1011 cmake --install debian/build-mariadb1011
+endif
+ifeq ($(ENABLE_MARIADB118),1)
+	DESTDIR=$(CURDIR)/debian/tmp-mariadb118 cmake --install debian/build-mariadb118
+endif
 
+# Ship the plugin .so from each enabled flavor's staging tree, and the shared
+# data files (schema, docs) from whichever flavor tree is available — they are
+# identical across flavors, so pick the first enabled one.
 override_dh_install:
 ifeq ($(ENABLE_MYSQL80),1)
 	dh_install --sourcedir=debian/tmp-mysql80 -ppinba-engine-mysql-8.0
 endif
 ifeq ($(ENABLE_MYSQL84),1)
 	dh_install --sourcedir=debian/tmp-mysql84 -ppinba-engine-mysql-8.4
-	dh_install --sourcedir=debian/tmp-mysql84 -ppinba-engine-common
-else
+endif
+ifeq ($(ENABLE_MARIADB1011),1)
+	dh_install --sourcedir=debian/tmp-mariadb1011 -ppinba-engine-mariadb-10.11
+endif
+ifeq ($(ENABLE_MARIADB118),1)
+	dh_install --sourcedir=debian/tmp-mariadb118 -ppinba-engine-mariadb-11.8
+endif
+ifeq ($(ENABLE_MYSQL80),1)
 	dh_install --sourcedir=debian/tmp-mysql80 -ppinba-engine-common
+else ifeq ($(ENABLE_MYSQL84),1)
+	dh_install --sourcedir=debian/tmp-mysql84 -ppinba-engine-common
+else ifeq ($(ENABLE_MARIADB1011),1)
+	dh_install --sourcedir=debian/tmp-mariadb1011 -ppinba-engine-common
+else
+	dh_install --sourcedir=debian/tmp-mariadb118 -ppinba-engine-common
 endif
 	install -D -m 644 debian/pinba-engine.metainfo.xml \
 		$(CURDIR)/debian/pinba-engine-common/usr/share/metainfo/io.github.xolegator.pinba-engine.metainfo.xml
@@ -87,6 +157,14 @@ endif
 ifeq ($(ENABLE_MYSQL84),1)
 	install -D -m 644 debian/pinba-engine-mysql-8.4.metainfo.xml \
 		$(CURDIR)/debian/pinba-engine-mysql-8.4/usr/share/metainfo/io.github.xolegator.pinba-engine-mysql84.metainfo.xml
+endif
+ifeq ($(ENABLE_MARIADB1011),1)
+	install -D -m 644 debian/pinba-engine-mariadb-10.11.metainfo.xml \
+		$(CURDIR)/debian/pinba-engine-mariadb-10.11/usr/share/metainfo/io.github.xolegator.pinba-engine-mariadb1011.metainfo.xml
+endif
+ifeq ($(ENABLE_MARIADB118),1)
+	install -D -m 644 debian/pinba-engine-mariadb-11.8.metainfo.xml \
+		$(CURDIR)/debian/pinba-engine-mariadb-11.8/usr/share/metainfo/io.github.xolegator.pinba-engine-mariadb118.metainfo.xml
 endif
 
 override_dh_auto_test: ;
