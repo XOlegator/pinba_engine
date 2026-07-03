@@ -1,3 +1,9 @@
+pinba-engine (2.11.1-1) noble; urgency=medium
+
+  * threadpool: initialize sentinel node's next pointer in queue_create
+
+ -- Oleg Ekhlakov <o.ekhlakov@protonmail.com>  Fri, 03 Jul 2026 16:02:49 +0000
+
 pinba-engine (2.11.0-1) noble; urgency=medium
 
   * packaging: AppStream metainfo, CHANGELOG-sourced release notes, and
