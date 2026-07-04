@@ -1,11 +1,26 @@
+# Engine sources with no dependency on the running MySQL server. Compiling them
+# into the test binary lets the unit tests exercise them directly (and, under the
+# coverage preset, report real coverage for these translation units instead of
+# the 0% they show when they are only ever linked into the never-executed plugin).
+set(PINBA_TESTABLE_ENGINE_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/pinba_lmap.cc
+    ${CMAKE_SOURCE_DIR}/src/pinba_map.cc
+    ${CMAKE_SOURCE_DIR}/src/xxhash.c
+    ${CMAKE_SOURCE_DIR}/src/threadpool.cc
+    ${CMAKE_SOURCE_DIR}/src/pinba.pb-c.cc
+    ${PINBA_PROTO_SRCS})
+
 set(PINBA_TEST_SOURCES
     test_pinba_engine.cc
     test_error_system.cc
     test_logging_system.cc
     test_monitoring_system.cc
-    test_integration.cc)
+    test_integration.cc
+    test_pinba_map.cc
+    test_threadpool.cc
+    test_pinba_protobuf.cc)
 
-add_executable(pinba_tests ${PINBA_TEST_SOURCES})
+add_executable(pinba_tests ${PINBA_TEST_SOURCES} ${PINBA_TESTABLE_ENGINE_SOURCES})
 target_link_libraries(
   pinba_tests
   PRIVATE pinba_project_options
