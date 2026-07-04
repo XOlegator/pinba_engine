@@ -424,6 +424,51 @@ jobs:
       - name: SQL smoke test (drives the handler)
         run: MYSQL_CLIENT=mariadb bash scripts/smoke_test.sh 127.0.0.1 3306 pinba pinba pinba
 
+      - name: Ingest UDP traffic (drives the data path)
+        run: |
+          # The smoke test only exercises table open/create/read/drop. Sending real
+          # Pinba packets additionally drives the collector and aggregation paths in
+          # main.cc / data.cc / tags.cc, and populates the reports so the read path
+          # runs with actual data.
+
+          # Register a tag report so the engine aggregates the 'group' timer tag the
+          # sender emits (tag reports are only built for tags with a report table).
+          sudo mariadb pinba -e "
+            CREATE TABLE IF NOT EXISTS \`report_by_group_tag\` (
+              \`script_name\`    varchar(128) DEFAULT NULL,
+              \`tag_value\`      varchar(64)  DEFAULT NULL,
+              \`req_count\`      int          DEFAULT NULL,
+              \`req_per_sec\`    float        DEFAULT NULL,
+              \`hit_count\`      int          DEFAULT NULL,
+              \`hit_per_sec\`    float        DEFAULT NULL,
+              \`timer_value\`    float        DEFAULT NULL,
+              \`timer_median\`   float        DEFAULT NULL,
+              \`ru_utime_value\` float        DEFAULT NULL,
+              \`ru_stime_value\` float        DEFAULT NULL,
+              \`index_value\`    varchar(256) DEFAULT NULL
+            ) ENGINE=PINBA DEFAULT CHARSET=latin1 COMMENT='tag_report:group';"
+
+          # Send real Pinba protobuf packets to the collector (default UDP port 30002).
+          python3 scripts/send_pinba_packet.py --host 127.0.0.1 --port 30002 --count 300
+
+          # The gathering period is 10ms; poll until the base report is populated.
+          rows=0
+          for _ in $(seq 1 30); do
+            rows=$(sudo mariadb pinba -N -B -e "SELECT COUNT(*) FROM report_by_script_name;" 2>/dev/null | head -1)
+            [ "${rows:-0}" -gt 0 ] && break
+            sleep 1
+          done
+          echo "report_by_script_name rows: ${rows}"
+          [ "${rows:-0}" -gt 0 ] || { echo "no data aggregated — UDP ingest path did not run" >&2; exit 1; }
+
+          # Read a spread of now-populated tables to exercise the read path with data.
+          for t in report_by_script_name report_by_server_name report_by_hostname \
+                   report_by_server_and_script report_by_status report_by_schema \
+                   report_by_group_tag request timer tag timertag; do
+            printf '%-24s ' "${t}"
+            sudo mariadb pinba -N -B -e "SELECT COUNT(*) FROM \`${t}\`;"
+          done
+
       - name: Stop server and collect gcov data
         run: |
           # A clean shutdown runs the plugin's destructors / gcov atexit handlers,
