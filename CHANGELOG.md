@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.2](https://github.com/XOlegator/pinba_engine/compare/v2.11.1...v2.11.2) (2026-07-04)
+
+
+### Bug Fixes
+
+* **pinba_map:** plug key-overwrite leak; add unit tests + Codecov config ([#80](https://github.com/XOlegator/pinba_engine/issues/80)) ([b431cee](https://github.com/XOlegator/pinba_engine/commit/b431cee55dabbbc9ca12a9dc7934f315ae99e8be))
+
 ## [2.11.1](https://github.com/XOlegator/pinba_engine/compare/v2.11.0...v2.11.1) (2026-07-03)
 
 
