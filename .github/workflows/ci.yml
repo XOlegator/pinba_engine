@@ -390,12 +390,25 @@ jobs:
       - name: Build
         run: cmake --build build-mariadb-cov --parallel "$(nproc)" --target pinba_engine
 
-      - name: Make gcov data dirs writable by the server user
+      - name: Redirect gcov output and restart server
         run: |
-          # gcov writes .gcda next to the compile-time .gcno paths (inside
-          # build-mariadb-cov). mariadbd runs as the 'mysql' user, so it must be able
-          # to create those files. Grant world write/traverse on the build tree.
-          chmod -R a+rwX build-mariadb-cov
+          # gcov writes .gcda next to the compile-time .gcno paths, but mariadbd runs
+          # as the 'mysql' user under a systemd unit that typically sets PrivateTmp
+          # and ProtectSystem, so it can reach neither the runner-owned build tree nor
+          # /tmp. Redirect gcov output with GCOV_PREFIX to a dedicated world-writable
+          # dir (outside /tmp, and whitelisted via ReadWritePaths), and restart the
+          # server so the plugin inherits the environment before it is loaded.
+          # GCOV_PREFIX_STRIP=0 keeps the full build path under the prefix, so the
+          # .gcda can later be overlaid back onto the matching .gcno tree.
+          sudo mkdir -p /gcovdata
+          sudo chmod 777 /gcovdata
+          sudo mkdir -p /etc/systemd/system/mariadb.service.d
+          # printf (not a heredoc) to avoid YAML block indentation leaking into the
+          # unit file and breaking the [Service] section header.
+          printf '[Service]\nEnvironment=GCOV_PREFIX=/gcovdata\nEnvironment=GCOV_PREFIX_STRIP=0\nReadWritePaths=/gcovdata\n' \
+            | sudo tee /etc/systemd/system/mariadb.service.d/gcov.conf >/dev/null
+          sudo systemctl daemon-reload
+          sudo systemctl restart mariadb
 
       - name: Install plugin into the running server
         run: |
@@ -411,12 +424,20 @@ jobs:
       - name: SQL smoke test (drives the handler)
         run: MYSQL_CLIENT=mariadb bash scripts/smoke_test.sh 127.0.0.1 3306 pinba pinba pinba
 
-      - name: Stop server to flush gcov counters
+      - name: Stop server and collect gcov data
         run: |
           # A clean shutdown runs the plugin's destructors / gcov atexit handlers,
-          # which write the .gcda files. A hard kill would lose them.
+          # which write the .gcda files (a hard kill would lose them).
           sudo systemctl stop mariadb || sudo service mariadb stop
-          # .gcda files are now owned by 'mysql'; take them back so lcov can read them.
+          # With GCOV_PREFIX_STRIP=0 the .gcda mirror the full build path under the
+          # prefix. Verify some were produced, then overlay them onto the build tree
+          # so each .gcda sits next to its matching .gcno for lcov.
+          gcov_src="/gcovdata${GITHUB_WORKSPACE}/build-mariadb-cov"
+          echo "=== .gcda under ${gcov_src} ==="
+          n=$(sudo find "${gcov_src}" -name '*.gcda' 2>/dev/null | tee /dev/stderr | wc -l)
+          echo "gcda count: ${n}"
+          [ "${n}" -gt 0 ] || { echo "no .gcda produced — gcov counters were not flushed" >&2; exit 1; }
+          sudo cp -a "${gcov_src}/." build-mariadb-cov/
           sudo chown -R "$(id -un)":"$(id -gn)" build-mariadb-cov
 
       - name: Collect coverage
