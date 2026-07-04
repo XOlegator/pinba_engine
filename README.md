@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/XOlegator/pinba_engine/actions/workflows/ci.yml/badge.svg)](https://github.com/XOlegator/pinba_engine/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/XOlegator/pinba_engine/actions/workflows/codeql.yml/badge.svg)](https://github.com/XOlegator/pinba_engine/actions/workflows/codeql.yml)
+[![codecov](https://codecov.io/gh/XOlegator/pinba_engine/branch/master/graph/badge.svg)](https://codecov.io/gh/XOlegator/pinba_engine)
 [![Release](https://img.shields.io/github/v/release/XOlegator/pinba_engine)](https://github.com/XOlegator/pinba_engine/releases/latest)
 [![Docker Pulls](https://img.shields.io/docker/pulls/xolegator/pinba-engine?logo=docker&logoColor=white)](https://hub.docker.com/r/xolegator/pinba-engine)
 [![Copr](https://copr.fedorainfracloud.org/coprs/xolegator/pinba/package/pinba-engine/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/xolegator/pinba/)
