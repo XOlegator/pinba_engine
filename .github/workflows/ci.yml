@@ -310,6 +310,14 @@ jobs:
           path: ${{ matrix.artifact-name }}.info
           retention-days: 30
 
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: ${{ matrix.artifact-name }}.info
+          flags: mysql-${{ matrix.mysql-series }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
   benchmark:
     name: Benchmark / MySQL 8.4
     runs-on: ubuntu-latest

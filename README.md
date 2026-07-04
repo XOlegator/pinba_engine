@@ -1,5 +1,16 @@
 # Pinba Engine
 
+[![CI](https://github.com/XOlegator/pinba_engine/actions/workflows/ci.yml/badge.svg)](https://github.com/XOlegator/pinba_engine/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/XOlegator/pinba_engine/actions/workflows/codeql.yml/badge.svg)](https://github.com/XOlegator/pinba_engine/actions/workflows/codeql.yml)
+[![codecov](https://codecov.io/gh/XOlegator/pinba_engine/branch/master/graph/badge.svg)](https://codecov.io/gh/XOlegator/pinba_engine)
+[![Release](https://img.shields.io/github/v/release/XOlegator/pinba_engine)](https://github.com/XOlegator/pinba_engine/releases/latest)
+[![Docker Pulls](https://img.shields.io/docker/pulls/xolegator/pinba-engine?logo=docker&logoColor=white)](https://hub.docker.com/r/xolegator/pinba-engine)
+[![Copr](https://copr.fedorainfracloud.org/coprs/xolegator/pinba/package/pinba-engine/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/xolegator/pinba/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0%20%E2%80%93%208.4-4479A1?logo=mysql&logoColor=white)](docs/build.md)
+[![MariaDB](https://img.shields.io/badge/MariaDB-10.11%20%E2%80%93%2011.8-003545?logo=mariadb&logoColor=white)](docs/build.md)
+[![Docs](https://img.shields.io/badge/docs-API%20reference-1f6feb)](https://xolegator.github.io/pinba_engine/)
+[![License: GPL-2.0-only](https://img.shields.io/badge/license-GPL--2.0--only-blue)](LICENSE)
+
 Pinba Engine is a MySQL/MariaDB storage engine that collects and analyzes PHP runtime statistics sent over UDP by the [Pinba PHP extension](https://github.com/tony2001/pinba2).
 
 This is an actively maintained fork of [tony2001/pinba_engine](https://github.com/tony2001/pinba_engine) with full support for MySQL 8.0 and MySQL 8.4 LTS, and for MariaDB 10.11 and 11.8 LTS from the same source tree. Pre-built packages are available for both databases: **Docker images**, an **Ubuntu PPA** (MySQL and MariaDB), and **Fedora/Enterprise-Linux RPMs** via Copr (MariaDB, plus MySQL on Fedora).
