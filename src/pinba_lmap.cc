@@ -181,6 +181,9 @@ void pinba_lmap_destroy(void *data) /* {{{ */
 
 size_t pinba_lmap_count(void *map_report) /* {{{ */
 {
+  if (!map_report) {
+    return 0;
+  }
   pinba_lmap *map = static_cast<pinba_lmap *>(map_report);
   return map->size();
 }

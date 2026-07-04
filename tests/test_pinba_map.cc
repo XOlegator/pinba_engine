@@ -229,10 +229,7 @@ TEST(PinbaLmap, NullMapArgumentsAreSafe) {
   EXPECT_EQ(pinba_lmap_next(nullptr, &index), nullptr);
   EXPECT_EQ(pinba_lmap_get(nullptr, 1), nullptr);
   EXPECT_EQ(pinba_lmap_delete(nullptr, 1), -1);
-  /* NOTE: pinba_lmap_count() intentionally not called with nullptr here — unlike
-   * pinba_map_count(), it does not guard against a null map and would dereference
-   * a null pointer. Callers in the engine never pass null, so this only documents
-   * the asymmetry rather than asserting on it. */
+  EXPECT_EQ(pinba_lmap_count(nullptr), 0u);
   pinba_lmap_destroy(nullptr);
 }
 
