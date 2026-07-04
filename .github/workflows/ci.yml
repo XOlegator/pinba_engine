@@ -311,7 +311,7 @@ jobs:
           retention-days: 30
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           files: ${{ matrix.artifact-name }}.info
           flags: mysql-${{ matrix.mysql-series }}
@@ -322,6 +322,148 @@ jobs:
           # every never-executed plugin object at 0% (the 5% artifact).
           disable_search: true
           plugins: noop
+
+  coverage-integration:
+    # Integration coverage for the handler itself. The bulk of the engine
+    # (ha_pinba.cc, data.cc, main.cc, pool.cc, the report-generation headers) only
+    # runs when the plugin is loaded inside a live server, so the unit `coverage`
+    # job cannot reach it. Here we build the plugin with gcov instrumentation, load
+    # it into a real MariaDB, drive it with the SQL smoke test, then shut the server
+    # down cleanly so gcov flushes .gcda for the plugin's objects.
+    name: Integration coverage (MariaDB ${{ matrix.mariadb-series }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mariadb-series: "11.8"
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake bison \
+            libprotobuf-dev protobuf-compiler \
+            rapidjson-dev \
+            libssl-dev libncurses-dev pkg-config \
+            lcov
+
+      - name: Install MariaDB ${{ matrix.mariadb-series }} server
+        run: |
+          curl -fsSL https://r.mariadb.com/downloads/mariadb_repo_setup \
+            | sudo bash -s -- --mariadb-server-version="mariadb-${{ matrix.mariadb-series }}"
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends mariadb-server mariadb-client
+          sudo systemctl start mariadb || sudo service mariadb start
+
+      - name: Resolve exact server version
+        id: dbver
+        run: |
+          ver=$(mariadbd --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          [ -n "$ver" ] || { echo "could not resolve MariaDB version" >&2; exit 1; }
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+
+      - name: Cache MariaDB source tarball
+        uses: actions/cache@v6
+        with:
+          path: mariadb-src/.cache
+          key: mariadb-src-${{ steps.dbver.outputs.version }}
+
+      - name: Prepare MariaDB headers
+        run: bash scripts/prepare-mariadb-headers.sh "${{ steps.dbver.outputs.version }}" mariadb-src
+
+      - name: Configure (coverage-instrumented plugin)
+        run: |
+          cmake -B build-mariadb-cov \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DPINBA_DB_FLAVOR=mariadb \
+            -DPINBA_MYSQL_SERIES=${{ matrix.mariadb-series }} \
+            -DPINBA_MYSQL_SOURCE_DIR="$PWD/mariadb-src" \
+            -DPINBA_MYSQL_SOURCE_VERSION="${{ steps.dbver.outputs.version }}" \
+            -DMYSQL_INCLUDE_DIR="$PWD/mariadb-src/include" \
+            -DPINBA_WITH_TESTS=OFF -DPINBA_FETCH_DEPENDENCIES=OFF \
+            -DPINBA_ENABLE_COVERAGE=ON
+
+      - name: Build
+        run: cmake --build build-mariadb-cov --parallel "$(nproc)" --target pinba_engine
+
+      - name: Make gcov data dirs writable by the server user
+        run: |
+          # gcov writes .gcda next to the compile-time .gcno paths (inside
+          # build-mariadb-cov). mariadbd runs as the 'mysql' user, so it must be able
+          # to create those files. Grant world write/traverse on the build tree.
+          chmod -R a+rwX build-mariadb-cov
+
+      - name: Install plugin into the running server
+        run: |
+          plugin_dir=$(sudo mariadb -N -B -e "SELECT @@plugin_dir")
+          sudo install -m 0644 build-mariadb-cov/ha_pinba.so "$plugin_dir/ha_pinba.so"
+          sudo mariadb -e "INSTALL PLUGIN pinba SONAME 'ha_pinba.so';"
+          sudo mariadb -e "CREATE DATABASE IF NOT EXISTS pinba;"
+          sudo mariadb pinba < default_tables.sql
+          sudo mariadb -e "CREATE USER IF NOT EXISTS 'pinba'@'127.0.0.1' IDENTIFIED BY 'pinba';
+                           GRANT ALL PRIVILEGES ON *.* TO 'pinba'@'127.0.0.1' WITH GRANT OPTION;
+                           FLUSH PRIVILEGES;"
+
+      - name: SQL smoke test (drives the handler)
+        run: MYSQL_CLIENT=mariadb bash scripts/smoke_test.sh 127.0.0.1 3306 pinba pinba pinba
+
+      - name: Stop server to flush gcov counters
+        run: |
+          # A clean shutdown runs the plugin's destructors / gcov atexit handlers,
+          # which write the .gcda files. A hard kill would lose them.
+          sudo systemctl stop mariadb || sudo service mariadb stop
+          # .gcda files are now owned by 'mysql'; take them back so lcov can read them.
+          sudo chown -R "$(id -un)":"$(id -gn)" build-mariadb-cov
+
+      - name: Collect coverage
+        run: |
+          lcov \
+            --capture \
+            --directory build-mariadb-cov \
+            --output-file integration-mariadb.info \
+            --ignore-errors source,mismatch,mismatch,negative,negative,gcov,gcov \
+            --rc geninfo_unexecuted_blocks=1
+          lcov \
+            --remove integration-mariadb.info \
+              '/usr/*' \
+              '*/build*/_deps/*' \
+              '*/mariadb-src/*' \
+              '*/tests/*' \
+            --output-file integration-mariadb.info \
+            --ignore-errors unused,unused
+          lcov --summary integration-mariadb.info
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-integration-mariadb
+          path: integration-mariadb.info
+          retention-days: 30
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          files: integration-mariadb.info
+          flags: integration
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+          disable_search: true
+          plugins: noop
+
+      - name: Dump MariaDB error log on failure
+        if: failure()
+        run: |
+          echo "=== server alive? ==="
+          sudo mariadb -e "SELECT VERSION();" || echo "server not answering"
+          echo "=== error log (journal) ==="
+          sudo journalctl -u mariadb --no-pager -n 200 2>/dev/null || true
+          for f in /var/log/mysql/error.log /var/lib/mysql/*.err; do
+            [ -f "$f" ] && { echo "--- $f ---"; sudo tail -n 200 "$f"; }
+          done
 
   benchmark:
     name: Benchmark / MySQL 8.4
