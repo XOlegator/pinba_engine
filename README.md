@@ -5,6 +5,7 @@
 [![codecov](https://codecov.io/gh/XOlegator/pinba_engine/branch/master/graph/badge.svg)](https://codecov.io/gh/XOlegator/pinba_engine)
 [![Release](https://img.shields.io/github/v/release/XOlegator/pinba_engine)](https://github.com/XOlegator/pinba_engine/releases/latest)
 [![Docker Pulls](https://img.shields.io/docker/pulls/xolegator/pinba-engine?logo=docker&logoColor=white)](https://hub.docker.com/r/xolegator/pinba-engine)
+[![Docker Image Size](https://img.shields.io/docker/image-size/xolegator/pinba-engine/latest?logo=docker&logoColor=white)](https://hub.docker.com/r/xolegator/pinba-engine)
 [![Copr](https://copr.fedorainfracloud.org/coprs/xolegator/pinba/package/pinba-engine/status_image/last_build.png)](https://copr.fedorainfracloud.org/coprs/xolegator/pinba/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0%20%E2%80%93%208.4-4479A1?logo=mysql&logoColor=white)](docs/build.md)
 [![MariaDB](https://img.shields.io/badge/MariaDB-10.11%20%E2%80%93%2011.8-003545?logo=mariadb&logoColor=white)](docs/build.md)
