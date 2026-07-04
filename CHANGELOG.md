@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.3](https://github.com/XOlegator/pinba_engine/compare/v2.11.2...v2.11.3) (2026-07-04)
+
+
+### Bug Fixes
+
+* **pinba_lmap:** guard pinba_lmap_count against a null map ([#83](https://github.com/XOlegator/pinba_engine/issues/83)) ([dc7f78c](https://github.com/XOlegator/pinba_engine/commit/dc7f78c9c3b715604a658a777291d4363ebc6b6f))
+
 ## [2.11.2](https://github.com/XOlegator/pinba_engine/compare/v2.11.1...v2.11.2) (2026-07-04)
 
 
