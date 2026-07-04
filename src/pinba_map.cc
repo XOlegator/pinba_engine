@@ -59,7 +59,16 @@ int pinba_map::is_empty() { return hash_map.empty(); }
 
 int pinba_map::data_add(const char *index, const void *report) /* {{{ */
 {
-  hash_map[strdup(index)] = report;
+  /* Only strdup a key on first insertion. Using hash_map[strdup(index)] = report
+   * unconditionally leaks the freshly duplicated string whenever the key already
+   * exists, because operator[] finds the existing (strcmp-equal) entry and merely
+   * overwrites its value, dropping the new key on the floor. */
+  dense_hash_t::iterator it = hash_map.find(index);
+  if (it != hash_map.end()) {
+    it->second = report;
+  } else {
+    hash_map[strdup(index)] = report;
+  }
   return 0;
 }
 /* }}} */

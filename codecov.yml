@@ -1,0 +1,44 @@
+# Codecov configuration for pinba_engine.
+#
+# Why this file exists: pinba is a MySQL/MariaDB storage-engine plugin. Most of
+# the engine (ha_pinba.cc, data.cc, main.cc, pool.cc, the report-generation
+# headers) only executes when the plugin is loaded inside a running mysqld, which
+# the unit-test/coverage job does not do. The `coverage` CI job therefore measures
+# the parts that CAN run standalone (hash maps, thread pool, protobuf decode, and
+# the header-only error/logging/monitoring subsystems) and uploads a filtered lcov
+# report. Without the settings below, Codecov's gcov auto-plugin re-scans the whole
+# build tree and folds in every never-executed plugin object at 0%, which is a
+# measurement artifact rather than a real coverage signal.
+
+codecov:
+  require_ci_to_pass: true
+
+coverage:
+  precision: 1
+  round: down
+  # Report coverage, but never block a PR on it: this is a plugin whose main body
+  # is integration-tested, so a hard coverage gate would be misleading.
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true
+
+comment:
+  layout: "reach, diff, flags, files"
+  require_changes: false
+
+# Per-database-series flags, uploaded as mysql-8.0 / mysql-8.4 by the coverage job.
+# carryforward keeps a flag's last report when a given run does not re-upload it.
+flag_management:
+  default_rules:
+    carryforward: true
+
+ignore:
+  - "src/xxhash.c"      # vendored third-party hashing (xxHash)
+  - "src/xxhash.h"
+  - "**/*.pb.cc"        # protobuf-generated code
+  - "**/*.pb.h"
+  - "tests/**"          # the tests themselves
