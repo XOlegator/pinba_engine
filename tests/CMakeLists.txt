@@ -21,6 +21,11 @@ set(PINBA_TEST_SOURCES
     test_pinba_protobuf.cc)
 
 add_executable(pinba_tests ${PINBA_TEST_SOURCES} ${PINBA_TESTABLE_ENGINE_SOURCES})
+
+# test_pinba_protobuf.cc and pinba.pb-c.cc include the protobuf-generated
+# pinba.pb.h; ensure code generation runs before any test object compiles so a
+# clean parallel build cannot race ahead of it.
+add_dependencies(pinba_tests pinba_proto_generated)
 target_link_libraries(
   pinba_tests
   PRIVATE pinba_project_options

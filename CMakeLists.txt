@@ -368,6 +368,11 @@ set(PINBA_PROTO ${CMAKE_CURRENT_SOURCE_DIR}/pinba.proto)
 protobuf_generate_cpp(PINBA_PROTO_SRCS PINBA_PROTO_HDRS ${PINBA_PROTO})
 set_source_files_properties(${PINBA_PROTO_SRCS} ${PINBA_PROTO_HDRS} PROPERTIES GENERATED TRUE)
 
+# Order-only target so any consumer (e.g. the unit-test binary, which includes
+# pinba.pb.h) can depend on protobuf code generation having completed before it
+# starts compiling, without racing the custom command on a clean parallel build.
+add_custom_target(pinba_proto_generated DEPENDS ${PINBA_PROTO_SRCS} ${PINBA_PROTO_HDRS})
+
 add_library(pinba_project_options INTERFACE)
 target_compile_features(pinba_project_options INTERFACE cxx_std_23)
 target_compile_options(
