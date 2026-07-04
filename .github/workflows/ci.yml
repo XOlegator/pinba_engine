@@ -317,6 +317,11 @@ jobs:
           flags: mysql-${{ matrix.mysql-series }}
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
+          # Upload only the filtered lcov report we built above. Without these,
+          # Codecov's gcov auto-plugin re-scans the whole build tree and folds in
+          # every never-executed plugin object at 0% (the 5% artifact).
+          disable_search: true
+          plugins: noop
 
   benchmark:
     name: Benchmark / MySQL 8.4
