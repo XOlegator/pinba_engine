@@ -1,3 +1,9 @@
+pinba-engine (2.11.2-1) noble; urgency=medium
+
+  * pinba_map: plug key-overwrite leak; add unit tests + Codecov config
+
+ -- Oleg Ekhlakov <o.ekhlakov@protonmail.com>  Sat, 04 Jul 2026 09:41:59 +0000
+
 pinba-engine (2.11.1-1) noble; urgency=medium
 
   * threadpool: initialize sentinel node's next pointer in queue_create
