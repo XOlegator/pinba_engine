@@ -25,9 +25,12 @@ Pre-built images are published to Docker Hub for both databases — MySQL 8.0 / 
 | Database | Tag |
 |---|---|
 | MySQL 8.0 | `xolegator/pinba-engine:8.0` |
-| MySQL 8.4 LTS | `xolegator/pinba-engine:8.4` |
+| MySQL 8.4 LTS | `xolegator/pinba-engine:8.4` (also `latest`) |
 | MariaDB 10.11 LTS | `xolegator/pinba-engine:mariadb-10.11` |
 | MariaDB 11.8 LTS | `xolegator/pinba-engine:mariadb-11.8` |
+
+All images are multi-arch (`linux/amd64` + `linux/arm64`) except MySQL 8.0,
+whose upstream Debian base image is amd64-only.
 
 ```bash
 # MySQL 8.4 LTS
@@ -37,6 +40,7 @@ docker run -d \
   -e MYSQL_DATABASE=pinba \
   -p 3306:3306 \
   -p 30002:30002/udp \
+  -v pinba-data:/var/lib/mysql \
   xolegator/pinba-engine:8.4
 
 # MariaDB 11.8 LTS
@@ -46,8 +50,13 @@ docker run -d \
   -e MARIADB_DATABASE=pinba \
   -p 3306:3306 \
   -p 30002:30002/udp \
+  -v pinba-data:/var/lib/mysql \
   xolegator/pinba-engine:mariadb-11.8
 ```
+
+The named volume keeps user accounts, plugin registration, and your own tables
+across container recreations (Pinba's stats tables themselves are in-memory by
+design).
 
 Validate that the plugin is active:
 
@@ -58,7 +67,9 @@ docker exec pinba mysql -uroot -psecret -e "SHOW PLUGINS LIKE 'pinba';"
 docker exec pinba mariadb -uroot -psecret -e "SHOW PLUGINS LIKE 'pinba';"
 ```
 
-See [docs/docker.md](docs/docker.md) for full Docker usage including tagging, validation, and troubleshooting.
+See [docs/docker.md](docs/docker.md) for full Docker usage including production
+deployment (Compose, healthchecks), tag stability and digest pinning, validation,
+and troubleshooting.
 
 ### Ubuntu / Debian package (PPA)
 

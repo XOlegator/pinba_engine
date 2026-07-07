@@ -8,7 +8,7 @@ related:
   - wiki/concepts/docker-build-strategy.md
   - wiki/concepts/cmake-build-system.md
 confidence: high
-updated: 2026-05-23
+updated: 2026-07-07
 ---
 
 # MySQL Plugin Migration: 8.0 → 8.4
@@ -69,24 +69,38 @@ when building only the plugin against downloaded headers — we don't run MySQL'
 | Base OS | Debian bookworm | Oracle Linux 9.7 |
 | Plugin dir | `/usr/lib/mysql/plugin/` | `/usr/lib64/mysql/plugin/` |
 | Library dir | `/usr/lib/x86_64-linux-gnu/` | `/usr/lib64/` |
-| glibc | 2.35 | 2.34 |
+| glibc | 2.36 | 2.34 |
 | libstdc++ | GLIBCXX_3.4.30 | GLIBCXX_3.4.29 |
-| ldconfig on lib copy | Not needed (DEB auto) | Required |
+| protobuf delivery | `libprotobuf.so.*` copied from builder | static PIC, linked into the plugin |
+| Bundled server protobuf | (not an issue) | `/usr/lib64/mysql/private/libprotobuf*.so` 4.x — clashes with any dynamic protobuf in the plugin |
 
-Plugin built on Debian bookworm (glibc 2.35 host) is **compatible with OL9** (glibc 2.34)
-only if it uses ≤GLIBC_2.34 and ≤GLIBCXX_3.4.29 symbols. Verified by:
-```bash
-objdump -T ha_pinba.so | grep GLIBC | sort -V
-```
-The pinba_engine plugin meets this constraint.
+A plugin built on Debian bookworm loads on OL9 **only** if it uses ≤GLIBC_2.34 and
+≤GLIBCXX_3.4.29 symbols — and this constraint proved too fragile to rely on. It held
+when first audited, then a code change started using `std::condition_variable::wait`,
+which libstdc++ 12 versions as `GLIBCXX_3.4.30`, and the published `:8.4` image
+silently shipped a plugin that OL9's mysqld could not load (incident 2026-07-06;
+details in [[docker-build-strategy]]).
+
+**Rule: build the 8.4 flavor on Oracle Linux 9** (`oraclelinux:9` + `gcc-toolset-13`
+for C++23; its newer libstdc++ pieces are linked statically via `libstdc++_nonshared.a`).
+A symbol audit (`objdump -T ha_pinba.so | grep -oE 'GLIBC(XX)?_[0-9.]+' | sort -Vu`)
+is a useful spot check but NOT sufficient — only a runtime smoke test (`INSTALL PLUGIN`
+inside the actual runtime image, now part of `.github/workflows/docker.yml`) catches
+this class of breakage before publishing.
 
 ## What a 8.0 → 8.4 Port Requires
 
 1. **Download MySQL 8.4 source headers** (pinba_engine CMake handles this via `PINBA_MYSQL_SERIES=8.4`)
-2. **Set `PINBA_MYSQL_SOURCE_VERSION`** to the exact target patch (e.g., `8.4.9`)
-3. **Update runtime Dockerfile** to use `mysql:8.4.9` base
-4. **Fix library paths** for OL9 layout (plugin dir: `/usr/lib64/mysql/plugin/`, libs: `/usr/lib64/`)
-5. **Add `ldconfig`** after copying `.so` files to OL9 image
+2. **Set `PINBA_MYSQL_SOURCE_VERSION` to the exact runtime patch** — the server
+   requires an exact `MYSQL_VERSION_ID` match ("API version too different"
+   otherwise). The Dockerfiles derive it from the `MYSQL_IMAGE` tag.
+3. **Update runtime Dockerfile** to use the matching `mysql:8.4.x` base
+4. **Fix library paths** for OL9 layout (plugin dir: `/usr/lib64/mysql/plugin/`;
+   CMake installs to `/usr/local/lib64/...` on OL9, not `.../lib/...`)
+5. **Link protobuf statically and skip libmysqlclient** (`PINBA_LINK_MYSQL_CLIENT=OFF`,
+   `-Wl,--exclude-libs,ALL`) — mysqld 8.4 bundles its own protobuf 4.x that clashes
+   with dynamic protobuf, and the image ships no libmysqlclient (details in
+   [[docker-build-strategy]])
 6. **Fix the `mysql_version.h` generation** (applies to both 8.0 and 8.4):
    - Source tarball ships only `mysql_version.h.in` (CMake template), not the generated `.h`
    - Without running mysql's cmake, `MYSQL_VERSION_ID` is undefined → defaults to 0 → plugin always rejected
