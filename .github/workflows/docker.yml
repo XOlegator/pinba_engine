@@ -64,7 +64,7 @@ jobs:
           ref: ${{ github.event_name == 'release' && (inputs.release-tag || github.ref) || github.sha }}
 
       # arm64 layers are built under QEMU emulation.
-      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@v4
 
       - uses: docker/setup-buildx-action@v4
 
