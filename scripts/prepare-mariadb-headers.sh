@@ -4,7 +4,7 @@
 # can be built with -DPINBA_DB_FLAVOR=mariadb against it. The MariaDB source tarball
 # ships only *.in templates for these, so we run MariaDB's own CMake far enough to
 # generate them — no full server build is required (see the project's knowledge base:
-# concepts/mysql-plugin-abi.md and the ai_rpm_maria.log R1 note).
+# concepts/mysql-plugin-abi.md).
 #
 # Usage:
 #   scripts/prepare-mariadb-headers.sh <version> <dest-source-root> [tarball-cache-dir]
