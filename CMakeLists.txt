@@ -587,7 +587,7 @@ set(CPACK_PACKAGE_NAME "pinba-engine")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY ${PROJECT_DESCRIPTION})
 set(CPACK_PACKAGE_VENDOR "Pinba Engine Team")
-set(CPACK_PACKAGE_CONTACT "pinba-engine@example.com")
+set(CPACK_PACKAGE_CONTACT "Oleg Ekhlakov <o.ekhlakov@protonmail.com>")
 include(CPack)
 
 message(STATUS "")
