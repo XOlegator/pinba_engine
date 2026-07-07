@@ -67,7 +67,12 @@ RUN set -eux; \
       -DMYSQL_INCLUDE_DIR=/build/mariadb-src/include \
       -DPINBA_FETCH_DEPENDENCIES=OFF; \
     cmake --build build -j"$(nproc)"; \
-    cmake --install build
+    cmake --install build; \
+    # Stage libprotobuf under an architecture-neutral path: the Ubuntu multiarch
+    # dir ($(gcc -dumpmachine)) differs between amd64 and arm64, and COPY cannot
+    # expand variables in the source path.
+    mkdir -p /staging/lib; \
+    cp -a "/usr/lib/$(gcc -dumpmachine)"/libprotobuf.so.* /staging/lib/
 
 FROM ${MARIADB_IMAGE}
 
@@ -75,7 +80,9 @@ FROM ${MARIADB_IMAGE}
 RUN mkdir -p /usr/lib/mysql/plugin
 
 COPY --from=builder /usr/local/lib/mysql/plugin/ha_pinba.so /usr/lib/mysql/plugin/libpinba_engine.so
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libprotobuf.so.* /usr/lib/x86_64-linux-gnu/
+# /usr/local/lib is architecture-neutral and in the default ld.so search path on
+# Ubuntu; ldconfig below registers the staged libprotobuf there.
+COPY --from=builder /staging/lib/ /usr/local/lib/
 COPY --from=builder /build/pinba_engine/default_tables.sql /usr/share/pinba_engine/default_tables.sql
 COPY docker/mariadb/conf.d/zz-pinba.cnf /etc/mysql/conf.d/zz-pinba.cnf
 COPY docker/mariadb/initdb.d/ /docker-entrypoint-initdb.d/

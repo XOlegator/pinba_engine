@@ -9,6 +9,7 @@ FROM ${BUILDER_IMAGE} AS builder
 ENV DEBIAN_FRONTEND=noninteractive
 ARG CMAKE_BUILD_TYPE=Release
 ARG PINBA_MYSQL_SERIES
+ARG MYSQL_IMAGE
 
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -32,12 +33,19 @@ COPY . .
 
 # Build against MySQL source headers downloaded by CMake for target series.
 # Builder and runtime use the same MySQL base, which keeps GLIBC/GLIBCXX ABI compatible.
-RUN cmake -S . -B build \
+# PINBA_MYSQL_SOURCE_VERSION is derived from the runtime image tag (e.g.
+# "8.0.46-bookworm" -> "8.0.46"): the server only loads a storage engine whose
+# MYSQL_VERSION_ID matches its own exactly ("API version too different"
+# otherwise), so the source headers must be the same patch release as
+# ${MYSQL_IMAGE} — including when mysql-version-monitor bumps the tag.
+RUN MYSQL_VERSION="${MYSQL_IMAGE#*:}" && MYSQL_VERSION="${MYSQL_VERSION%%-*}" && \
+    cmake -S . -B build \
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
       -DCMAKE_INSTALL_PREFIX=/usr/local \
       -DPINBA_WITH_TESTS=OFF \
       -DPINBA_WITH_BENCHMARKS=OFF \
       -DPINBA_MYSQL_SERIES=${PINBA_MYSQL_SERIES} \
+      -DPINBA_MYSQL_SOURCE_VERSION="${MYSQL_VERSION}" \
       -DPINBA_DOWNLOAD_MYSQL_SOURCE=ON && \
     cmake --build build -j"$(nproc)" && \
     cmake --install build

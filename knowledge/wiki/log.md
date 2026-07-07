@@ -5,7 +5,7 @@ sources: []
 related:
   - wiki/index.md
 confidence: high
-updated: 2026-07-02
+updated: 2026-07-07
 ---
 
 # Activity Log
@@ -696,3 +696,44 @@ deleted from Docker Hub before anyone used them. Documenting removed tags serves
 makes the page look like a work-in-progress changelog rather than authoritative reference.
 
 ---
+
+---
+
+## 2026-07-07 — Revision: Docker prod-usability session (GLIBCXX incident + multi-arch)
+
+**Action:** Documented the 2026-07-06/07 live session on branch `ci/docker-prod-usability`:
+production-usability review of the Docker images, discovery that the published
+`xolegator/pinba-engine:8.4` could not load the plugin, and the resulting pipeline changes.
+
+**Source read:** live session; `Dockerfile.mysql84`, `Dockerfile.mariadb1011/118`,
+`.github/workflows/docker.yml`, `docs/docker.md`; container tests of published images
+(`8.0` ACTIVE, `mariadb-11.8` ACTIVE, `8.4` broken), `objdump -T` symbol audits.
+
+**Pages updated:**
+- `wiki/concepts/docker-build-strategy.md` — replaced the false "bookworm-built plugin is
+  compatible with OL9" claim with the builder-OS-must-match-runtime rule, the GLIBCXX_3.4.30
+  incident record, per-channel libprotobuf delivery, multi-arch staging pattern, smoke test.
+- `wiki/concepts/mysql-plugin-migration-80-to-84.md` — same correction; symbol audit demoted
+  to a spot check, runtime smoke test declared the only reliable gate.
+
+**Key findings documented:**
+- `std::condition_variable::wait` gained symbol version GLIBCXX_3.4.30 in libstdc++ 12;
+  OL9's system libstdc++ (GCC 11 runtime) tops out at 3.4.29 → Debian-bookworm-built
+  plugin fails `INSTALL PLUGIN` on `mysql:8.4` (Oracle Linux 9).
+- Fix: build the 8.4 flavor on `oraclelinux:9` with `gcc-toolset-13` (C++23 via statically
+  linked libstdc++_nonshared.a); rapidjson-devel from EPEL (MySQL 8.4's own
+  `sql/dd/sdi_fwd.h` includes rapidjson — it is a server-header dependency, not a pinba
+  dependency).
+- Verifying the OL9 build surfaced four more load-time failures, fixed and re-verified
+  (local image: plugin ACTIVE, NEEDED = system libs only, GLIBCXX ≤ 3.4.29):
+  OL9 installs to `/usr/local/lib64/...`; OL9's libmysqlclient exports `my_*` symbols so
+  `--as-needed` keeps it in NEEDED (new CMake option `PINBA_LINK_MYSQL_CLIENT=OFF`);
+  mysqld 8.4 bundles protobuf 4.24.4 in `/usr/lib64/mysql/private/` that clashes with any
+  dynamic protobuf in the plugin → protobuf 3.21.12 built from source, static PIC,
+  `-Wl,--exclude-libs,ALL`; storage engines need an exact `MYSQL_VERSION_ID` match →
+  `PINBA_MYSQL_SOURCE_VERSION` now derived from the `MYSQL_IMAGE` tag in both MySQL
+  Dockerfiles (CMakeLists drops its default source MD5 when the version is overridden).
+- `mysql:8.0.x-bookworm` base image is amd64-only; 8.4 + MariaDB channels are now built
+  for amd64 + arm64 (libprotobuf staged via `$(gcc -dumpmachine)` into an arch-neutral dir).
+- All published Docker tags are mutable (version tags get re-pushed on base-image bumps);
+  docs/docker.md now documents digest pinning with a CI-maintained digest table.

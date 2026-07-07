@@ -4,7 +4,7 @@ type: index
 sources: []
 related: []
 confidence: high
-updated: 2026-06-14
+updated: 2026-07-07
 ---
 
 # Pinba Engine — Knowledge Base Index
@@ -21,7 +21,7 @@ Master catalog. Maintained by LLM agents.
 | [[pinba-pool-model]] | Cyclic buffer memory model, overflow behaviour, monitoring |
 | [[mysql-plugin-abi]] | **Critical**: 8.0 vs 8.4 ABI incompatibility, implications |
 | [[mysql-plugin-install]] | INSTALL PLUGIN lifecycle, reinstall procedure |
-| [[mysql-plugin-migration-80-to-84]] | Porting checklist: ABI, build requirements, OS paths |
+| [[mysql-plugin-migration-80-to-84]] | Porting checklist: ABI, build requirements, OS paths, OL9 builder rule |
 | [[php-pinba-configuration]] | php.ini settings, deployment scenarios, silent failure |
 | [[php-extension-api]] | Complete PHP function reference: timer lifecycle, request tags, overrides |
 | [[php-extension-build]] | phpize build system, PHPT tests, multi-PHP CI matrix |
@@ -29,7 +29,7 @@ Master catalog. Maintained by LLM agents.
 | [[php-extension-packaging]] | Debian packaging for PHP extensions: php-pinba source, php{X.Y}-pinba binaries |
 | [[php-version-monitoring]] | Automated PHP version discovery: weekly cron, php.net parsing, PR gate |
 | [[cmake-build-system]] | Presets, MySQL headers sourcing, Ubuntu 24.04 deps |
-| [[docker-build-strategy]] | Multi-stage build, libprotobuf copy, filename gotchas |
+| [[docker-build-strategy]] | Multi-stage build, builder-OS-matches-runtime rule, GLIBCXX incident, multi-arch, smoke test |
 | [[docker-tag-strategy]] | Docker Hub naming rules, rolling vs pinned tags |
 | [[github-actions-docker]] | CI/CD workflow for Docker Hub build+push automation |
 | [[github-actions-ppa]] | GitHub Actions workflow: source package build, signing, multi-series, FTP upload with passive mode and retry |

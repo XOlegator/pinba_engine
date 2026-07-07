@@ -10,12 +10,21 @@ on:
       - 'Dockerfile.mysql84'
       - 'Dockerfile.mariadb1011'
       - 'Dockerfile.mariadb118'
+      - 'docker/**'
+      - 'docker-entrypoint-initdb.d/**'
+      - '.github/workflows/docker.yml'
   workflow_dispatch:
     inputs:
       release-tag:
         description: 'Release tag to publish, e.g. v1.2.3. Leave empty to use the current ref.'
         required: false
         type: string
+
+# Serialize runs: concurrent runs could push channel tags out of order and race
+# the docs digest-update commit.
+concurrency:
+  group: docker-publish
+  cancel-in-progress: false
 
 jobs:
   build-push:
@@ -25,22 +34,37 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # The upstream mysql:8.0 Debian (-bookworm) image is published for
+          # amd64 only, so the 8.0 channel cannot be built for arm64.
           - dockerfile: Dockerfile.mysql80
             label: "MySQL 8.0"
             tag: "8.0"
+            platforms: linux/amd64
+            client: mysql
           - dockerfile: Dockerfile.mysql84
             label: "MySQL 8.4"
             tag: "8.4"
+            platforms: linux/amd64,linux/arm64
+            client: mysql
+            # `latest` is an alias for the MySQL 8.4 LTS channel.
+            latest: true
           - dockerfile: Dockerfile.mariadb1011
             label: "MariaDB 10.11"
             tag: "mariadb-10.11"
+            platforms: linux/amd64,linux/arm64
+            client: mariadb
           - dockerfile: Dockerfile.mariadb118
             label: "MariaDB 11.8"
             tag: "mariadb-11.8"
+            platforms: linux/amd64,linux/arm64
+            client: mariadb
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event_name == 'release' && (inputs.release-tag || github.ref) || github.sha }}
+
+      # arm64 layers are built under QEMU emulation.
+      - uses: docker/setup-qemu-action@v3
 
       - uses: docker/setup-buildx-action@v4
 
@@ -49,7 +73,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Resolve pinba version
+      - name: Resolve pinba version and image tags
         id: meta
         run: |
           if [[ "${{ github.event_name }}" == "release" ]]; then
@@ -59,16 +83,107 @@ jobs:
             # push (MySQL update) or workflow_dispatch without tag: read from manifest
             VERSION="$(jq -r '."."' .release-please-manifest.json)"
           fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          TAGS="xolegator/pinba-engine:${{ matrix.tag }}-v${VERSION}"$'\n'"xolegator/pinba-engine:${{ matrix.tag }}"
+          if [[ "${{ matrix.latest }}" == "true" ]]; then
+            TAGS+=$'\n'"xolegator/pinba-engine:latest"
+          fi
+          {
+            echo "version=$VERSION"
+            echo "tags<<TAGS_EOF"
+            echo "$TAGS"
+            echo "TAGS_EOF"
+          } >> "$GITHUB_OUTPUT"
           echo "Building Docker image: pinba-engine $VERSION (${{ matrix.label }})"
+
+      # Build the amd64 image into the local Docker daemon first and prove the
+      # plugin actually loads before anything is pushed. This gate exists because
+      # a plugin built against a mismatched runtime (e.g. wrong libstdc++) fails
+      # only at INSTALL PLUGIN time — an error no build step can catch.
+      - name: Build image for smoke test (amd64)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          load: true
+          tags: pinba-smoke:${{ matrix.tag }}
+          cache-from: type=gha,scope=${{ matrix.tag }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.tag }}
+
+      - name: Smoke test — pinba plugin must be ACTIVE
+        run: |
+          set -euo pipefail
+          docker run -d --name smoke -e MYSQL_ROOT_PASSWORD=smoke "pinba-smoke:${{ matrix.tag }}"
+          for i in $(seq 1 60); do
+            status="$(docker exec smoke ${{ matrix.client }} -uroot -psmoke -N \
+              -e "SELECT plugin_status FROM information_schema.plugins WHERE plugin_name='pinba'" 2>/dev/null || true)"
+            if [[ "$status" == "ACTIVE" ]]; then
+              echo "pinba plugin is ACTIVE"
+              docker rm -f smoke
+              exit 0
+            fi
+            if [[ "$(docker inspect -f '{{.State.Status}}' smoke)" != "running" ]]; then
+              echo "container exited before the plugin became ACTIVE" >&2
+              break
+            fi
+            sleep 3
+          done
+          echo "pinba plugin did not become ACTIVE; container logs:" >&2
+          docker logs smoke >&2
+          exit 1
 
       - uses: docker/build-push-action@v7
         with:
           context: .
           file: ${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platforms }}
           push: true
-          tags: |
-            xolegator/pinba-engine:${{ matrix.tag }}-v${{ steps.meta.outputs.version }}
-            xolegator/pinba-engine:${{ matrix.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=${{ matrix.tag }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.tag }}
+
+  # All published tags are mutable (channel tags move with releases; version
+  # tags are re-pushed when the base MySQL/MariaDB image gets a patch bump), so
+  # docs/docker.md documents digest pinning and carries a table of current
+  # digests. Keep that table in sync with what was just pushed.
+  update-docs-digests:
+    name: Update pinned digests in docs
+    needs: build-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: master
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+
+      - name: Refresh digest table in docs/docker.md
+        run: |
+          set -euo pipefail
+          for tag in 8.0 8.4 mariadb-10.11 mariadb-11.8; do
+            digest="$(docker buildx imagetools inspect --format '{{.Manifest.Digest}}' "xolegator/pinba-engine:${tag}")"
+            if ! [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "Unexpected digest for ${tag}: ${digest}" >&2
+              exit 1
+            fi
+            # Update the digest-table row for this channel...
+            sed -i -E "/^\| \`${tag}\` \|/ s|sha256:[0-9a-f]{64}|${digest}|" docs/docker.md
+            # ...and the inline pull example marked with "# <tag> channel".
+            sed -i -E "/# ${tag} channel/ s|sha256:[0-9a-f]{64}|${digest}|" docs/docker.md
+          done
+
+      - name: Commit and push if changed
+        run: |
+          set -euo pipefail
+          if git diff --quiet docs/docker.md; then
+            echo "Digests unchanged; nothing to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/docker.md
+          git commit -m "docs(docker): update pinned image digests [skip ci]"
+          # Another job may have pushed to master while the images were building.
+          git pull --rebase origin master
+          git push origin HEAD:master
