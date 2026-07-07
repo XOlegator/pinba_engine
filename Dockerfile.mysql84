@@ -1,64 +1,110 @@
 # syntax=docker/dockerfile:1.7
 
 ARG MYSQL_IMAGE=mysql:8.4.10
-ARG BUILDER_IMAGE=debian:bookworm
+ARG BUILDER_IMAGE=oraclelinux:9
 ARG PINBA_MYSQL_SERIES=8.4
 
 FROM ${BUILDER_IMAGE} AS builder
 
-ENV DEBIAN_FRONTEND=noninteractive
 ARG CMAKE_BUILD_TYPE=Release
 ARG PINBA_MYSQL_SERIES
+ARG MYSQL_IMAGE
 
-# hadolint ignore=DL3008
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    g++ \
-    cmake \
-    wget \
-    ca-certificates \
-    libprotobuf-dev \
-    protobuf-compiler \
-    rapidjson-dev \
-    pkg-config \
-    # Keep this unpinned: strict pin may conflict with libssl3 from the base image.
-    libssl-dev \
-    # Debian bookworm provides default-libmysqlclient-dev (libmysqlclient-dev is unavailable).
-    default-libmysqlclient-dev && \
-    rm -rf /var/lib/apt/lists/*
+# Build on the same OS family as the runtime (mysql:8.4 is Oracle Linux 9): a
+# plugin built on Debian bookworm (gcc 12) needs GLIBCXX_3.4.30, which OL9's
+# system libstdc++ (gcc 11 runtime) does not provide, so mysqld cannot load it.
+# gcc-toolset-13 gives C++23 support while linking the newer libstdc++ pieces
+# statically (libstdc++_nonshared.a), so the plugin runs against the stock OL9
+# libstdc++.
+# rapidjson-devel (a header-only dependency of MySQL 8.4's own server headers,
+# sql/dd/sdi_fwd.h) comes from EPEL; mysql-devel provides the client headers
+# the CMake configure step requires.
+# Keep packages unpinned (DL3041): OL9 repos drop old point releases.
+# hadolint ignore=DL3041
+RUN dnf config-manager --set-enabled ol9_codeready_builder && \
+    dnf install -y oracle-epel-release-el9 && \
+    dnf install -y \
+      gcc-toolset-13-gcc-c++ \
+      cmake \
+      make \
+      tar \
+      gzip \
+      rapidjson-devel \
+      openssl-devel \
+      mysql-devel && \
+    dnf clean all
+
+# Put gcc-toolset-13 first in PATH (what `scl enable gcc-toolset-13` does):
+# protobuf's configure probes $PATH for a C compiler beyond $CC, and CMake
+# picks the toolset compilers up automatically.
+ENV PATH=/opt/rh/gcc-toolset-13/root/usr/bin:${PATH}
+
+# Build protobuf from source as a static PIC library. mysqld in the mysql:8.4
+# image loads its own bundled libprotobuf(-lite) 4.x from
+# /usr/lib64/mysql/private/ before our plugin is dlopen()ed, so any protobuf
+# symbols the plugin imports dynamically bind to mysqld's copy — a version
+# mismatch aborts the server inside the plugin's static initializers
+# ("This program was compiled against version X ... not compatible").
+# Statically linking protobuf (hidden at link time via --exclude-libs) keeps
+# the plugin's protobuf fully private, independent of whatever protobuf
+# version Oracle bundles into the runtime image. The distro libprotobuf.a is
+# non-PIC and cannot go into a shared module, hence the source build.
+ARG PROTOBUF_VERSION=3.21.12
+WORKDIR /tmp/protobuf-src
+RUN curl -fsSL -o protobuf.tar.gz \
+      "https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protobuf-cpp-${PROTOBUF_VERSION}.tar.gz" && \
+    tar -xzf protobuf.tar.gz --strip-components=1 && \
+    rm protobuf.tar.gz && \
+    ./configure --disable-shared --enable-static --with-pic --without-zlib && \
+    make -j"$(nproc)" && \
+    make install && \
+    rm -rf /tmp/protobuf-src/*
 
 WORKDIR /build/pinba_engine
 COPY . .
 
-# Build against MySQL source headers downloaded by CMake for target series.
-# Builder and runtime use the same MySQL base, which keeps GLIBC/GLIBCXX ABI compatible.
-RUN cmake -S . -B build \
+# Build against MySQL source headers downloaded by CMake for the target series.
+# PINBA_LINK_MYSQL_CLIENT=OFF: the runtime image ships no libmysqlclient — the
+# server itself resolves those symbols when it loads the plugin. (OL9's
+# libmysqlclient exports my_* symbols, so even -Wl,--as-needed would keep it
+# in the plugin's NEEDED list if it were linked.)
+# --exclude-libs,ALL hides every symbol pulled in from static archives (the
+# protobuf built above), so the plugin neither exports protobuf symbols nor
+# clashes with mysqld's bundled protobuf.
+# PINBA_MYSQL_SOURCE_VERSION is derived from the runtime image tag: the server
+# only loads a storage engine whose MYSQL_VERSION_ID matches its own exactly
+# ("API version too different" otherwise), so the source headers must be the
+# same patch release as ${MYSQL_IMAGE} — including when mysql-version-monitor
+# bumps the tag.
+RUN MYSQL_VERSION="${MYSQL_IMAGE#*:}" && MYSQL_VERSION="${MYSQL_VERSION%%-*}" && \
+    cmake -S . -B build \
+      -DCMAKE_MODULE_LINKER_FLAGS="-Wl,--exclude-libs,ALL" \
+      -DPINBA_LINK_MYSQL_CLIENT=OFF \
       -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} \
       -DCMAKE_INSTALL_PREFIX=/usr/local \
       -DPINBA_WITH_TESTS=OFF \
       -DPINBA_WITH_BENCHMARKS=OFF \
       -DPINBA_MYSQL_SERIES=${PINBA_MYSQL_SERIES} \
+      -DPINBA_MYSQL_SOURCE_VERSION="${MYSQL_VERSION}" \
       -DPINBA_DOWNLOAD_MYSQL_SOURCE=ON && \
     cmake --build build -j"$(nproc)" && \
     cmake --install build
 
 FROM ${MYSQL_IMAGE}
 
+# No runtime libraries to install: protobuf is statically linked into the
+# plugin and everything else comes from the base image.
+
 # MySQL 8.4 uses /usr/lib64/mysql/plugin/ (vs /usr/lib/mysql/plugin/ in MySQL 8.0)
 RUN mkdir -p /usr/lib64/mysql/plugin
 
-COPY --from=builder /usr/local/lib/mysql/plugin/ha_pinba.so /usr/lib64/mysql/plugin/libpinba_engine.so
-# MySQL 8.4 image is Oracle Linux 9 (RPM layout): libraries live in /usr/lib64/, not
-# the Debian /usr/lib/x86_64-linux-gnu/. Copy the builder's libprotobuf here so the
-# plugin can load. ldconfig registers the new library in the runtime cache.
-COPY --from=builder /usr/lib/x86_64-linux-gnu/libprotobuf.so.* /usr/lib64/
+COPY --from=builder /usr/local/lib64/mysql/plugin/ha_pinba.so /usr/lib64/mysql/plugin/libpinba_engine.so
 COPY --from=builder /build/pinba_engine/default_tables.sql /usr/share/pinba_engine/default_tables.sql
 COPY docker/mysql/conf.d/zz-pinba.cnf /etc/mysql/conf.d/zz-pinba.cnf
 COPY docker-entrypoint-initdb.d/ /docker-entrypoint-initdb.d/
 
 RUN chmod 755 /usr/lib64/mysql/plugin/libpinba_engine.so && \
     chmod 644 /usr/share/pinba_engine/default_tables.sql && \
-    chmod 644 /etc/mysql/conf.d/zz-pinba.cnf && \
-    ldconfig
+    chmod 644 /etc/mysql/conf.d/zz-pinba.cnf
 
 EXPOSE 3306 30002/udp

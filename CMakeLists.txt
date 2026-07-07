@@ -25,6 +25,11 @@ option(PINBA_WITH_BENCHMARKS "Build benchmarks" OFF)
 option(PINBA_FETCH_DEPENDENCIES "Download test/benchmark dependencies when not installed" ON)
 option(PINBA_DOWNLOAD_MYSQL_SOURCE "Download MySQL source headers when no local source tree is found" OFF)
 option(PINBA_ENABLE_SANITIZERS "Enable ASan/UBSan for debug hardening" OFF)
+option(PINBA_LINK_MYSQL_CLIENT
+       "Link the plugin against the MySQL/MariaDB client library. The server \
+supplies these symbols when it loads the plugin, so disable this when the \
+runtime host does not ship libmysqlclient (e.g. the mysql:8.4 Docker image)"
+       ON)
 
 set(PINBA_DB_FLAVOR "mysql" CACHE STRING "Target server flavor for source headers (mysql or mariadb)")
 set_property(CACHE PINBA_DB_FLAVOR PROPERTY STRINGS mysql mariadb)
@@ -83,6 +88,19 @@ set(
   PINBA_MYSQL_SOURCE_HASH
   "${PINBA_DEFAULT_MYSQL_SOURCE_HASH}"
   CACHE STRING "Expected hash for PINBA_MYSQL_SOURCE_URL")
+
+# The default hash only matches the default source version. When the build
+# overrides PINBA_MYSQL_SOURCE_VERSION (the Docker builds derive it from the
+# runtime image tag) and leaves the hash untouched, drop the stale hash instead
+# of failing the download against the wrong checksum. The download still runs
+# with TLS_VERIFY ON.
+if(PINBA_DEFAULT_MYSQL_SOURCE_VERSION
+   AND NOT PINBA_MYSQL_SOURCE_VERSION STREQUAL PINBA_DEFAULT_MYSQL_SOURCE_VERSION
+   AND PINBA_MYSQL_SOURCE_HASH STREQUAL PINBA_DEFAULT_MYSQL_SOURCE_HASH)
+  message(STATUS "PINBA_MYSQL_SOURCE_VERSION overridden to ${PINBA_MYSQL_SOURCE_VERSION}; "
+                 "ignoring the default source hash recorded for ${PINBA_DEFAULT_MYSQL_SOURCE_VERSION}.")
+  set(PINBA_MYSQL_SOURCE_HASH "")
+endif()
 
 find_package(Threads REQUIRED)
 find_package(Protobuf REQUIRED)
@@ -213,10 +231,17 @@ find_library(
 # load time, so the client library is only needed for standalone linking. Require
 # it for MySQL (matches the historical behaviour); make it optional for MariaDB,
 # where the -devel client package is often absent on build hosts.
-if(NOT MYSQL_LIBRARY AND NOT PINBA_DB_FLAVOR STREQUAL "mariadb")
+# PINBA_LINK_MYSQL_CLIENT=OFF skips the link entirely: needed when the client
+# library found at build time is absent on the runtime host (OL9's
+# libmysqlclient.so.21 exports my_* symbols, so --as-needed keeps it in NEEDED,
+# and the mysql:8.4 image does not ship it — the plugin then fails to load).
+if(NOT PINBA_LINK_MYSQL_CLIENT)
+  set(MYSQL_LIBRARY "")
+  message(STATUS "PINBA_LINK_MYSQL_CLIENT=OFF: linking the plugin without a client "
+                 "library (the server resolves the symbols at load time).")
+elseif(NOT MYSQL_LIBRARY AND NOT PINBA_DB_FLAVOR STREQUAL "mariadb")
   message(FATAL_ERROR "MySQL client library not found. Install libmysqlclient development files or set MYSQL_LIBRARY.")
-endif()
-if(NOT MYSQL_LIBRARY)
+elseif(NOT MYSQL_LIBRARY)
   set(MYSQL_LIBRARY "")
   message(STATUS "MariaDB client library not found; linking the plugin without it "
                  "(the server resolves the symbols at load time).")
