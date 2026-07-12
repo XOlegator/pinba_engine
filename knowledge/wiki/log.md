@@ -737,3 +737,17 @@ production-usability review of the Docker images, discovery that the published
   for amd64 + arm64 (libprotobuf staged via `$(gcc -dumpmachine)` into an arch-neutral dir).
 - All published Docker tags are mutable (version tags get re-pushed on base-image bumps);
   docs/docker.md now documents digest pinning with a CI-maintained digest table.
+
+## 2026-07-12 — Revision: docker-tag-strategy.md (stale -lts scheme)
+
+- Rewrote [[docker-tag-strategy]] — the page still described the pre-#87 scheme
+  (`8.4-lts` channel, `latest`→8.0, "pinned immutable" version tags, manual
+  `docker push`, `docker-push.yml`). Discovered while reworking Pinboard's
+  containerization: its compose files were silently pinned to the dead
+  `8.4-lts-v2.0.0` tag (frozen 2026-05-23).
+- Now documents: four rolling channels (8.0 amd64-only / 8.4 / mariadb-10.11 /
+  mariadb-11.8, `latest`→8.4), `{channel}-v{version}` per-release tags, the
+  all-tags-are-mutable rule with digest pinning, CI publishing via docker.yml
+  (smoke-test gate, concurrency group, update-docs-digests), and the downstream
+  Pinboard default (rolling `8.4` via `PINBA_ENGINE_TAG`).
+- Updated the [[docker-tag-strategy]] row in index.md accordingly.
