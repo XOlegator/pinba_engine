@@ -30,7 +30,7 @@ Master catalog. Maintained by LLM agents.
 | [[php-version-monitoring]] | Automated PHP version discovery: weekly cron, php.net parsing, PR gate |
 | [[cmake-build-system]] | Presets, MySQL headers sourcing, Ubuntu 24.04 deps |
 | [[docker-build-strategy]] | Multi-stage build, builder-OS-matches-runtime rule, GLIBCXX incident, multi-arch, smoke test |
-| [[docker-tag-strategy]] | Docker Hub naming rules, rolling vs pinned tags |
+| [[docker-tag-strategy]] | Docker Hub naming: rolling channels (8.0/8.4/mariadb-*), version-suffixed tags, all tags mutable → digest pinning; old `8.4-lts*` dead |
 | [[github-actions-docker]] | CI/CD workflow for Docker Hub build+push automation |
 | [[github-actions-ppa]] | GitHub Actions workflow: source package build, signing, multi-series, FTP upload with passive mode and retry |
 | [[github-actions-mysql-version-monitor]] | Weekly MySQL version monitor: auto-PR with vendor header update and full release cycle trigger |
