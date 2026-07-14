@@ -5,12 +5,31 @@ sources: []
 related:
   - wiki/index.md
 confidence: high
-updated: 2026-07-07
+updated: 2026-07-14
 ---
 
 # Activity Log
 
 Chronological record of all ingest, query, lint, and revision operations.
+
+---
+
+## 2026-07-14 — Revision: deb cross-series Conflicts + dh_clean gotcha
+
+**Action:** Extended `wiki/concepts/debian-ppa-packaging.md` with two gotchas discovered while
+debugging a real Kubuntu 24.04 → 26.04 upgrade: (1) the MySQL 8.0/8.4 plugin packages lacked
+mutual `Conflicts:`/`Replaces:`, so a distro upgrade left the stale ABI-incompatible
+`pinba-engine-mysql-8.0` installed and `apt install` of the 8.4 package failed with a dpkg
+file-overwrite error; (2) directory paths in `debian/clean` require a trailing slash under
+debhelper compat 13 or local rebuilds fail in `debian/rules clean`.
+
+**Source read:** live debugging session on the maintainer's workstation; `debian/control`,
+`debian/clean`, `/var/log/mysql/error.log`, dpkg upgrade transcript.
+
+**Pages updated:** `wiki/concepts/debian-ppa-packaging.md` (two new sections).
+Accompanying code change: cross-series `Conflicts:`/`Replaces:` added to `debian/control`,
+`debian/clean` directory entries fixed, `debian_revision` bumped (noble 2, resolute 3) to
+republish the fixed packaging to the PPA.
 
 ---
 
