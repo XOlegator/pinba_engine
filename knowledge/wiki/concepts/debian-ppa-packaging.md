@@ -11,7 +11,7 @@ related:
   - wiki/concepts/cmake-build-system.md
   - wiki/concepts/launchpad-ppa-workflow.md
 confidence: high
-updated: 2026-06-07
+updated: 2026-07-14
 ---
 
 # Debian/PPA Packaging for MySQL Storage Engine Plugins
@@ -221,3 +221,29 @@ Summary:
 2. postinst: attempts `INSTALL PLUGIN` for immediate activation (may fail, non-fatal)
 3. postinst: creates database `pinba` and imports `default_tables.sql` (only if plugin is active)
 4. prerm: removes config, unloads plugin if loaded
+
+## Cross-series Conflicts are mandatory, not cosmetic
+
+All flavor packages ship the same file path `/usr/lib/mysql/plugin/ha_pinba.so`, and the
+plugin is ABI-bound to one server series ([[mysql-plugin-abi]]). Every flavor package must
+therefore declare `Conflicts:` (and `Replaces:` within the same DB flavor) against **all**
+other flavor packages — the MariaDB packages did this from the start, but the MySQL 8.0/8.4
+pair initially did not.
+
+Real-world failure without it (observed on a Kubuntu 24.04 → 26.04 upgrade, 2026-07-14):
+`do-release-upgrade` moves the distro from MySQL 8.0 to 8.4 but leaves
+`pinba-engine-mysql-8.0` installed (nothing obsoletes it). The stale plugin then fails to
+load on every start with `API version for STORAGE ENGINE plugin is too different`
+(non-fatal, but monitoring is silently gone), and `apt install ./pinba-engine-mysql-8.4_*.deb`
+aborts with a dpkg file-overwrite error instead of swapping the package. With mutual
+`Conflicts:` + `Replaces:` declared, the same `apt install` removes the 8.0 package and
+completes the migration in one step.
+
+## dh_clean: directory entries in debian/clean need a trailing slash
+
+With debhelper compat 13, paths listed in `debian/clean` that are directories **must** end
+with `/` (e.g. `debian/build-mysql84/`). Without the slash, the first build succeeds (nothing
+to clean yet), but any rebuild in the same tree fails in `debian/rules clean` with
+`dh_clean: error: If the removals of these directories were intentional, ensure it ends with
+a trailing slash`. CI chroots always build from a clean checkout, so this only bites local
+incremental rebuilds.
