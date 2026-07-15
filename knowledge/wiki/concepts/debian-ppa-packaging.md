@@ -11,7 +11,7 @@ related:
   - wiki/concepts/cmake-build-system.md
   - wiki/concepts/launchpad-ppa-workflow.md
 confidence: high
-updated: 2026-07-14
+updated: 2026-07-15
 ---
 
 # Debian/PPA Packaging for MySQL Storage Engine Plugins
@@ -139,12 +139,25 @@ Expected lintian warnings (non-critical):
 
 `dpkg-buildpackage -S -sa` does **not** create the `orig.tar.gz` itself — it expects
 `../pinba-engine_{VERSION}.orig.tar.gz` to already exist.
-Create it with `git archive` before each PPA upload:
+
+**If the upstream version is already published in the PPA, download its orig instead of
+recreating it.** Launchpad requires the orig of a given upstream version to stay
+byte-identical forever, and `git archive | gzip` is not byte-stable across environments
+(same tar, different gzip layer — verified on 2.11.3). The published file lives at
+`https://ppa.launchpadcontent.net/xolegator/packages/ubuntu/pool/main/p/pinba-engine/pinba-engine_{VERSION}.orig.tar.gz`.
+
+Only for a brand-new upstream version, create the orig with `git archive` from the
+release tag (use `gzip -n` for reproducibility):
 
 ```bash
-git archive --prefix=pinba-engine-2.3.0/ HEAD | gzip -9 > ../pinba-engine_2.3.0.orig.tar.gz
+git archive --prefix=pinba-engine-2.3.0/ v2.3.0 | gzip -9n > ../pinba-engine_2.3.0.orig.tar.gz
 dpkg-buildpackage -S -sa -us -uc
 ```
+
+For a rebuild (bumped debian revision) of a released version, also build from the
+unpacked orig with the current `debian/` copied over it, not from the git working tree —
+otherwise any post-release change outside `debian/` makes `dpkg-source` fail with
+"unexpected upstream changes". See [[github-actions-ppa]] for the automated flow.
 
 `vendor/mysql-headers-*` are committed to git → they are included in the orig automatically.
 Final orig size: ~1.1 MB.
