@@ -3914,15 +3914,15 @@ inline int ha_pinba::tag_values_fetch_by_timer_id(unsigned char *) /* {{{ */
 }
 /* }}} */
 
-#define REPORT_PERCENTILE_FIELD(last_field_num, data, cnt)                                 \
-  if (PINBA_FIELD_INDEX(*field) > (last_field_num) &&                                      \
-      PINBA_FIELD_INDEX(*field) <= (last_field_num) + share->percentiles_num) {            \
-    int p_num = PINBA_FIELD_INDEX(*field) - (last_field_num) - 1;                          \
-    (*field)->set_notnull();                                                               \
-    (*field)->store(pinba_histogram_value((pinba_std_report *)report, data,                \
-                                          cnt *((float)share->percentiles[p_num] / 100))); \
-  } else {                                                                                 \
-    (*field)->set_null();                                                                  \
+#define REPORT_PERCENTILE_FIELD(last_field_num, data, cnt)                                  \
+  if (PINBA_FIELD_INDEX(*field) > (last_field_num) &&                                       \
+      PINBA_FIELD_INDEX(*field) <= (last_field_num) + share->percentiles_num) {             \
+    int p_num = PINBA_FIELD_INDEX(*field) - (last_field_num) - 1;                           \
+    (*field)->set_notnull();                                                                \
+    (*field)->store(pinba_histogram_value((pinba_std_report *)report, data,                 \
+                                          cnt * ((float)share->percentiles[p_num] / 100))); \
+  } else {                                                                                  \
+    (*field)->set_null();                                                                   \
   }
 
 #define REPORT_FETCH_TOP_BLOCK(report_num)                                                    \

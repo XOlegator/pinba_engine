@@ -23,7 +23,7 @@ typedef std::unordered_map<uint64_t, const void *> sparse_hash_t;
 class pinba_lmap {
  public:
   sparse_hash_t hash_map;
-  ~pinba_lmap(){};
+  ~pinba_lmap() {};
   pinba_lmap() {
     // std::unordered_map doesn't need set_deleted_key
   }

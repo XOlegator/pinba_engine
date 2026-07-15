@@ -1,11 +1,16 @@
 ---
 # C++23 project — use "Latest" so clang-format understands the newest syntax.
-# On clang-format 18 (ubuntu-latest) this resolves to C++20; upgrade clang-format
-# to 19+ when Cpp23 becomes a valid enum value.
 BasedOnStyle: Google
 Standard: Latest
 ColumnLimit: 100
 IndentWidth: 2
 TabWidth: 2
 UseTab: Never
+# Google style defaults to DerivePointerAlignment: true, which guesses the
+# alignment from each file and guesses differently across clang-format major
+# versions (18 accepted this codebase, 21 flagged ~4200 lines). Pin the
+# alignment the code actually uses ("char *p", "auto &x") so results are
+# stable regardless of the clang-format version.
+DerivePointerAlignment: false
+PointerAlignment: Right
 ---

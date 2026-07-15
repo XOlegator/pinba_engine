@@ -39,7 +39,7 @@ enum class PinbaErrorCode : int {
 // Error category for Pinba errors
 class PinbaErrorCategory : public std::error_category {
  public:
-  const char* name() const noexcept override { return "pinba"; }
+  const char *name() const noexcept override { return "pinba"; }
 
   std::string message(int ev) const override {
     switch (static_cast<PinbaErrorCode>(ev)) {
@@ -82,7 +82,7 @@ class PinbaErrorCategory : public std::error_category {
 };
 
 // Get error category instance
-inline const PinbaErrorCategory& pinba_error_category() {
+inline const PinbaErrorCategory &pinba_error_category() {
   static PinbaErrorCategory instance;
   return instance;
 }
@@ -95,12 +95,12 @@ inline std::error_code make_error_code(PinbaErrorCode e) {
 // Exception hierarchy
 class PinbaException : public std::exception {
  public:
-  PinbaException(PinbaErrorCode code, const std::string& message)
+  PinbaException(PinbaErrorCode code, const std::string &message)
       : code_(code), message_(message) {}
 
-  PinbaException(PinbaErrorCode code, const char* message) : code_(code), message_(message) {}
+  PinbaException(PinbaErrorCode code, const char *message) : code_(code), message_(message) {}
 
-  const char* what() const noexcept override { return message_.c_str(); }
+  const char *what() const noexcept override { return message_.c_str(); }
 
   PinbaErrorCode code() const noexcept { return code_; }
 
@@ -113,7 +113,7 @@ class PinbaException : public std::exception {
 
 class PinbaSystemException : public PinbaException {
  public:
-  PinbaSystemException(PinbaErrorCode code, const std::string& message, int errno_value)
+  PinbaSystemException(PinbaErrorCode code, const std::string &message, int errno_value)
       : PinbaException(code, message + ": " + std::to_string(errno_value)),
         errno_value_(errno_value) {}
 
@@ -133,7 +133,7 @@ class Result {
     return r;
   }
 
-  static Result error(PinbaErrorCode code, const std::string& message) {
+  static Result error(PinbaErrorCode code, const std::string &message) {
     Result r;
     r.error_code_ = code;
     r.error_message_ = message;
@@ -144,14 +144,14 @@ class Result {
 
   bool is_error() const { return value_ == nullptr; }
 
-  T& value() {
+  T &value() {
     if (!value_) {
       throw PinbaException(error_code_, error_message_);
     }
     return *value_;
   }
 
-  const T& value() const {
+  const T &value() const {
     if (!value_) {
       throw PinbaException(error_code_, error_message_);
     }
@@ -160,7 +160,7 @@ class Result {
 
   PinbaErrorCode error_code() const { return error_code_; }
 
-  const std::string& error_message() const { return error_message_; }
+  const std::string &error_message() const { return error_message_; }
 
   std::error_code std_error_code() const { return make_error_code(error_code_); }
 
@@ -180,7 +180,7 @@ class Result<void> {
     return r;
   }
 
-  static Result error(PinbaErrorCode code, const std::string& message) {
+  static Result error(PinbaErrorCode code, const std::string &message) {
     Result r;
     r.success_ = false;
     r.error_code_ = code;
@@ -194,7 +194,7 @@ class Result<void> {
 
   PinbaErrorCode error_code() const { return error_code_; }
 
-  const std::string& error_message() const { return error_message_; }
+  const std::string &error_message() const { return error_message_; }
 
   std::error_code std_error_code() const { return make_error_code(error_code_); }
 

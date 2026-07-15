@@ -30,8 +30,8 @@ enum class MetricType {
 class Metric {
  public:
   virtual ~Metric() = default;
-  virtual std::string to_prometheus(const std::string& name,
-                                    const std::string& labels = "") const = 0;
+  virtual std::string to_prometheus(const std::string &name,
+                                    const std::string &labels = "") const = 0;
   virtual MetricType type() const = 0;
 };
 
@@ -46,8 +46,8 @@ class CounterMetric : public Metric {
 
   std::int64_t get() const { return value_.load(std::memory_order_relaxed); }
 
-  std::string to_prometheus(const std::string& name,
-                            const std::string& labels = "") const override {
+  std::string to_prometheus(const std::string &name,
+                            const std::string &labels = "") const override {
     std::string result;
     result.reserve(64);
     result += "# TYPE ";
@@ -84,8 +84,8 @@ class GaugeMetric : public Metric {
 
   std::int64_t get() const { return value_.load(std::memory_order_relaxed); }
 
-  std::string to_prometheus(const std::string& name,
-                            const std::string& labels = "") const override {
+  std::string to_prometheus(const std::string &name,
+                            const std::string &labels = "") const override {
     std::string result;
     result.reserve(64);
     result += "# TYPE ";
@@ -112,7 +112,7 @@ class GaugeMetric : public Metric {
 // Histogram metric (simplified - stores buckets)
 class HistogramMetric : public Metric {
  public:
-  HistogramMetric(const std::vector<double>& buckets) : buckets_(buckets) {
+  HistogramMetric(const std::vector<double> &buckets) : buckets_(buckets) {
     counts_.resize(buckets.size() + 1, 0);  // +1 for +Inf bucket
     sum_ = 0.0;
     count_.store(0, std::memory_order_relaxed);
@@ -134,8 +134,8 @@ class HistogramMetric : public Metric {
     counts_[bucket_idx]++;
   }
 
-  std::string to_prometheus(const std::string& name,
-                            const std::string& labels = "") const override {
+  std::string to_prometheus(const std::string &name,
+                            const std::string &labels = "") const override {
     std::string result;
     result.reserve(256);
     result += "# TYPE ";
@@ -212,41 +212,41 @@ class HistogramMetric : public Metric {
 // Metrics registry
 class MetricsRegistry {
  public:
-  static MetricsRegistry& instance() {
+  static MetricsRegistry &instance() {
     static MetricsRegistry registry;
     return registry;
   }
 
-  CounterMetric& counter(const std::string& name) {
+  CounterMetric &counter(const std::string &name) {
     std::lock_guard<std::mutex> lock(mutex_);
     auto it = counters_.find(name);
     if (it == counters_.end()) {
       auto metric = std::make_unique<CounterMetric>();
-      auto* ptr = metric.get();
+      auto *ptr = metric.get();
       counters_[name] = std::move(metric);
       return *ptr;
     }
     return *it->second;
   }
 
-  GaugeMetric& gauge(const std::string& name) {
+  GaugeMetric &gauge(const std::string &name) {
     std::lock_guard<std::mutex> lock(mutex_);
     auto it = gauges_.find(name);
     if (it == gauges_.end()) {
       auto metric = std::make_unique<GaugeMetric>();
-      auto* ptr = metric.get();
+      auto *ptr = metric.get();
       gauges_[name] = std::move(metric);
       return *ptr;
     }
     return *it->second;
   }
 
-  HistogramMetric& histogram(const std::string& name, const std::vector<double>& buckets) {
+  HistogramMetric &histogram(const std::string &name, const std::vector<double> &buckets) {
     std::lock_guard<std::mutex> lock(mutex_);
     auto it = histograms_.find(name);
     if (it == histograms_.end()) {
       auto metric = std::make_unique<HistogramMetric>(buckets);
-      auto* ptr = metric.get();
+      auto *ptr = metric.get();
       histograms_[name] = std::move(metric);
       return *ptr;
     }
@@ -257,15 +257,15 @@ class MetricsRegistry {
     std::string result;
     std::lock_guard<std::mutex> lock(mutex_);
 
-    for (const auto& [name, metric] : counters_) {
+    for (const auto &[name, metric] : counters_) {
       result += metric->to_prometheus("pinba_" + name);
     }
 
-    for (const auto& [name, metric] : gauges_) {
+    for (const auto &[name, metric] : gauges_) {
       result += metric->to_prometheus("pinba_" + name);
     }
 
-    for (const auto& [name, metric] : histograms_) {
+    for (const auto &[name, metric] : histograms_) {
       result += metric->to_prometheus("pinba_" + name);
     }
 
@@ -300,12 +300,12 @@ class HealthCheck {
 // Health check registry
 class HealthRegistry {
  public:
-  static HealthRegistry& instance() {
+  static HealthRegistry &instance() {
     static HealthRegistry registry;
     return registry;
   }
 
-  void register_check(const std::string& name, std::unique_ptr<HealthCheck> check) {
+  void register_check(const std::string &name, std::unique_ptr<HealthCheck> check) {
     std::lock_guard<std::mutex> lock(mutex_);
     checks_[name] = std::move(check);
   }
@@ -334,7 +334,7 @@ class HealthRegistry {
     result += "\",\"checks\":{";
 
     bool first = true;
-    for (const auto& [name, check] : checks_) {
+    for (const auto &[name, check] : checks_) {
       if (!first) result += ",";
       first = false;
 
@@ -368,7 +368,7 @@ class HealthRegistry {
   HealthStatus overall_status_unlocked() const {
     HealthStatus worst = HealthStatus::HEALTHY;
 
-    for (const auto& [name, check] : checks_) {
+    for (const auto &[name, check] : checks_) {
       HealthStatus status = check->check();
       if (status > worst) {
         worst = status;

@@ -11,6 +11,11 @@ ENV DEBIAN_FRONTEND=noninteractive
 ARG CMAKE_BUILD_TYPE=Release
 ARG PINBA_MARIADB_SERIES
 
+# Several RUN steps below pipe commands (wget | gpg, mariadbd --version |
+# grep); without pipefail a failure in the left-hand command is silently
+# swallowed and the build continues with broken output.
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # bison + curl + libssl-dev + libncurses-dev are needed by
 # scripts/prepare-mariadb-headers.sh to generate the server headers
 # (comp_err/gen_lex_hash) for the exact runtime version — mirrors the ci.yml

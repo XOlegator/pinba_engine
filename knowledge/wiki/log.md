@@ -14,6 +14,48 @@ Chronological record of all ingest, query, lint, and revision operations.
 
 ---
 
+## 2026-07-15 — Revision: clang-format version parity + pre-commit hygiene
+
+**Action:** After reinstalling pre-commit on the maintainer's workstation (now
+Kubuntu 26.04, clang-format 21), `pre-commit run --all-files` failed on three hooks
+that CI (ubuntu-24.04, clang-format 18) did not catch.
+
+**Key findings documented:**
+- Google style's default `DerivePointerAlignment: true` guesses `&`/`*` alignment
+  per file and guesses differently across clang-format major versions: v18 accepted
+  the whole tree, v21 flagged ~4200 lines in 31 files. Pinning
+  `DerivePointerAlignment: false` + `PointerAlignment: Right` (the dominant codebase
+  style) makes verdicts version-stable; only 7 files (the newer `*_modern.h` headers
+  and a few others) were left-aligned and needed a mechanical reformat (~70 lines).
+- The `ci.yml` clang-format job moved to the `ubuntu-26.04` runner (preview label,
+  available since ~mid-2026) so CI checks with the same clang-format major as the
+  maintainer's machine; the job's `find` now also covers `benchmarks/` and `*.cpp`,
+  matching the pre-commit hook.
+- The repo has `core.filemode=false` in `.git/config`, so `chmod +x` alone never
+  reaches the index — executable bits must be set with `git update-index --chmod=+x`.
+  Fixed 9 scripts with shebangs but no exec bit (mariadb postinst/prerm now match
+  their mysql twins, which were already 755).
+- MariaDB Dockerfiles' builder stages pipe `wget | gpg` and `mariadbd --version |
+  grep`; added `SHELL ["/bin/bash", "-o", "pipefail", "-c"]` (hadolint DL4006) and
+  verified both piped RUNs work under pipefail on the mariadb:10.11 (jammy) base.
+- `docker/mariadb/initdb.d/*.sh`: the entrypoint *executes* executable scripts but
+  *sources* non-executable ones; the script is self-contained, and its
+  `docker-entrypoint-initdb.d/` twin was already executable, so +x is safe.
+- `pre-commit install` also installs a **pre-push** hook: the project wires cppcheck
+  and clang-tidy to the push stage (they need `build/compile_commands.json`), so the
+  first `git push` after installing may take minutes — it is not hung.
+- cppcheck 2.19 (Ubuntu 26.04) introduced `nullPointerOutOfMemory` and
+  `dangerousTypeCast` (absent from CI's 2.13): 138 findings, all confined to legacy
+  C-style code (`pinba_update_report.h`, `data.cc`, `main.cc` — unchecked
+  malloc/calloc + old-style casts). Suppressed per file in `.cppcheck-suppressions`
+  with rationale; candidates for a dedicated OOM-hardening/cast-modernization pass.
+
+**Pages updated:** log entry only.
+Accompanying code change: `.clang-format`, `.github/workflows/ci.yml`,
+`Dockerfile.mariadb*`, exec bits on 9 scripts, clang-format-21 reformat of 7 files.
+
+---
+
 ## 2026-07-15 — Workflow Fix: Reuse published orig tarball for PPA rebuilds
 
 **Action:** Fixed `ppa-build.yml` after Launchpad rejected the push-triggered rebuild

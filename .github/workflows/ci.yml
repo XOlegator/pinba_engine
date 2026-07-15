@@ -13,7 +13,11 @@ concurrency:
 jobs:
   clang-format:
     name: clang-format
-    runs-on: ubuntu-latest
+    # ubuntu-26.04 ships clang-format 21 — the same major version as the
+    # maintainer's workstation and the pre-commit hook, so CI and local
+    # formatting verdicts match. .clang-format pins the alignment options
+    # that used to differ between clang-format majors.
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
 
@@ -22,7 +26,8 @@ jobs:
 
       - name: Check formatting
         run: |
-          find src tests -type f \( -name "*.cc" -o -name "*.h" -o -name "*.c" \) \
+          find src tests benchmarks -type f \
+            \( -name "*.cc" -o -name "*.cpp" -o -name "*.h" -o -name "*.c" \) \
             ! -name "xxhash.c" ! -name "xxhash.h" \
             ! -name "pinba.pb-c.cc" ! -name "pinba.pb-c.h" \
             | xargs clang-format --dry-run --Werror

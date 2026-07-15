@@ -17,7 +17,7 @@
 
 #include "pinba.h"
 
-pinba_daemon* D = nullptr;
+pinba_daemon *D = nullptr;
 
 static void test_compat_buffers() {
   char small[5];
@@ -57,7 +57,7 @@ int main() {
 
   // Test modern containers
   std::vector<std::string> items = {"item1", "item2", "item3"};
-  for (const auto& item : items) {
+  for (const auto &item : items) {
     std::cout << "Item: " << item << std::endl;
   }
 
