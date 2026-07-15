@@ -222,14 +222,43 @@ jobs:
             appstreamcli validate --no-net "$meta"
           done
 
-      - name: Create orig tarball
+      - name: Obtain orig tarball
         run: |
-          git archive \
-            --prefix="pinba-engine-${{ steps.version.outputs.upstream_version }}/" \
-            HEAD \
-            | gzip -9 > "../pinba-engine_${{ steps.version.outputs.upstream_version }}.orig.tar.gz"
+          ver="${{ steps.version.outputs.upstream_version }}"
+          mkdir -p "$RUNNER_TEMP/source-build"
+          orig="$RUNNER_TEMP/source-build/pinba-engine_${ver}.orig.tar.gz"
+          url="https://ppa.launchpadcontent.net/${PPA_OWNER}/${PPA_NAME}/ubuntu/pool/main/p/pinba-engine/pinba-engine_${ver}.orig.tar.gz"
+
+          # Launchpad requires the orig tarball of a given upstream version to
+          # stay byte-identical forever, and regenerating it is not byte-stable
+          # (the gzip layer differs across environments even for an identical
+          # tar). Reuse the published orig whenever this upstream version
+          # already exists in the PPA; generate one only for new versions.
+          if curl -fsSL --retry 3 -o "$orig" "$url"; then
+            echo "Reusing published orig tarball: $url"
+          else
+            echo "No published orig for ${ver}; generating a fresh one from git."
+            if git fetch --depth=1 origin "refs/tags/v${ver}:refs/tags/v${ver}"; then
+              src="v${ver}"
+            else
+              src="HEAD"
+            fi
+            git archive --prefix="pinba-engine-${ver}/" "$src" | gzip -9n > "$orig"
+          fi
+
+      - name: Assemble source tree from orig and current debian/
+        run: |
+          ver="${{ steps.version.outputs.upstream_version }}"
+          # Build from the pristine upstream tree plus this checkout's debian/
+          # directory. Building straight from the checkout would diff master
+          # against the (older) orig and fail on any drift outside debian/.
+          tar -xzf "$RUNNER_TEMP/source-build/pinba-engine_${ver}.orig.tar.gz" \
+            -C "$RUNNER_TEMP/source-build"
+          rm -rf "$RUNNER_TEMP/source-build/pinba-engine-${ver}/debian"
+          cp -a debian "$RUNNER_TEMP/source-build/pinba-engine-${ver}/debian"
 
       - name: Build source package
+        working-directory: ${{ runner.temp }}/source-build/pinba-engine-${{ steps.version.outputs.upstream_version }}
         run: |
           if [[ "${{ matrix.include_orig }}" == "1" ]]; then
             dpkg-buildpackage -S -sa -us -uc
@@ -239,16 +268,16 @@ jobs:
 
       - name: Check source package with lintian
         run: |
-          lintian --fail-on error ../pinba-engine_*_source.changes
+          lintian --fail-on error "$RUNNER_TEMP"/source-build/pinba-engine_*_source.changes
 
       - name: Collect source package artifacts
         run: |
           mkdir -p "$RUNNER_TEMP/ppa-artifacts"
-          cp ../pinba-engine_*.dsc "$RUNNER_TEMP/ppa-artifacts/"
-          cp ../pinba-engine_*.orig.tar.gz "$RUNNER_TEMP/ppa-artifacts/"
-          cp ../pinba-engine_*.buildinfo "$RUNNER_TEMP/ppa-artifacts/"
-          cp ../pinba-engine_*_source.changes "$RUNNER_TEMP/ppa-artifacts/"
-          cp ../pinba-engine_*.debian.tar.* "$RUNNER_TEMP/ppa-artifacts/"
+          cp "$RUNNER_TEMP"/source-build/pinba-engine_*.dsc "$RUNNER_TEMP/ppa-artifacts/"
+          cp "$RUNNER_TEMP"/source-build/pinba-engine_*.orig.tar.gz "$RUNNER_TEMP/ppa-artifacts/"
+          cp "$RUNNER_TEMP"/source-build/pinba-engine_*.buildinfo "$RUNNER_TEMP/ppa-artifacts/"
+          cp "$RUNNER_TEMP"/source-build/pinba-engine_*_source.changes "$RUNNER_TEMP/ppa-artifacts/"
+          cp "$RUNNER_TEMP"/source-build/pinba-engine_*.debian.tar.* "$RUNNER_TEMP/ppa-artifacts/"
 
       - name: Upload source package artifacts
         uses: actions/upload-artifact@v7

@@ -5,12 +5,41 @@ sources: []
 related:
   - wiki/index.md
 confidence: high
-updated: 2026-07-14
+updated: 2026-07-15
 ---
 
 # Activity Log
 
 Chronological record of all ingest, query, lint, and revision operations.
+
+---
+
+## 2026-07-15 — Workflow Fix: Reuse published orig tarball for PPA rebuilds
+
+**Action:** Fixed `ppa-build.yml` after Launchpad rejected the push-triggered rebuild
+`2.11.3-2~noble1` / `2.11.3-3~resolute1` (from commit `111f1d6`) with
+"pinba-engine_2.11.3.orig.tar.gz already exists ... but uploaded version has different
+contents". Same failure class as the 2026-06-06 `2.2.0` incident, reintroduced by the
+push-trigger path: the workflow regenerated the orig with `git archive HEAD` from a
+`master` commit 7 commits past the `v2.11.3` tag.
+
+**Key findings documented:**
+- Regenerating the orig is not byte-stable even from the correct tag: for `v2.11.3` the
+  `git archive` tar output matched the published orig byte-for-byte, but `gzip -9`
+  produced a different `.gz` on a different machine. The only safe rebuild strategy is
+  downloading the published orig from the PPA pool (`ppa.launchpadcontent.net/.../pool/main/p/pinba-engine/`).
+- With the older orig in place, building from the `master` checkout would fail in
+  `dpkg-source` (3.0 quilt) on post-release drift outside `debian/`; the workflow now
+  unpacks the orig and overlays only the checkout's `debian/`.
+- The rejected `-2~noble1`/`-3~resolute1` versions were never accepted, so they remain
+  usable; no version burn needed this time (unlike `2.2.0` → `2.2.1`).
+- Verified locally end-to-end (noble simulation): source package builds from the
+  downloaded orig, lintian passes, `.dsc` references the exact published orig sha256.
+
+**Pages updated:** `wiki/concepts/github-actions-ppa.md`,
+`wiki/concepts/debian-ppa-packaging.md`.
+Accompanying code change: `.github/workflows/ppa-build.yml` — new "Obtain orig tarball"
+(download-or-generate) and "Assemble source tree" steps; build runs in the assembled tree.
 
 ---
 
