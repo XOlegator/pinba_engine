@@ -41,7 +41,7 @@ typedef std::unordered_map<const char *, const void *, xxhash, eqstr> dense_hash
 class pinba_map {
  public:
   dense_hash_t hash_map;
-  ~pinba_map(){};
+  ~pinba_map() {};
   pinba_map() {
     // std::unordered_map doesn't need set_empty_key/set_deleted_key
   }

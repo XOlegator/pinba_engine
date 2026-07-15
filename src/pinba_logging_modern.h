@@ -36,7 +36,7 @@ enum class LogLevel : std::uint8_t {
 };
 
 // Convert log level to string
-inline const char* log_level_to_string(LogLevel level) {
+inline const char *log_level_to_string(LogLevel level) {
   switch (level) {
     case LogLevel::DEBUG:
       return "DEBUG";
@@ -65,7 +65,7 @@ struct LogEntry {
   std::string message;
   std::string json_fields;  // Additional JSON fields for structured logging
 
-  LogEntry(LogLevel lvl, const char* f, int ln, const char* func, const std::string& msg)
+  LogEntry(LogLevel lvl, const char *f, int ln, const char *func, const std::string &msg)
       : timestamp(std::chrono::system_clock::now()),
         level(lvl),
         file(f),
@@ -77,7 +77,7 @@ struct LogEntry {
 // Asynchronous logger
 class AsyncLogger {
  public:
-  AsyncLogger(const std::string& log_file = "", LogLevel min_level = LogLevel::INFO)
+  AsyncLogger(const std::string &log_file = "", LogLevel min_level = LogLevel::INFO)
       : log_file_(log_file),
         min_level_(min_level),
         running_(true),
@@ -85,8 +85,8 @@ class AsyncLogger {
 
   ~AsyncLogger() { stop(); }
 
-  void log(LogLevel level, const char* file, int line, const char* function,
-           const std::string& message) {
+  void log(LogLevel level, const char *file, int line, const char *function,
+           const std::string &message) {
     if (level < min_level_) {
       return;
     }
@@ -101,8 +101,8 @@ class AsyncLogger {
     condition_.notify_one();
   }
 
-  void log_with_fields(LogLevel level, const char* file, int line, const char* function,
-                       const std::string& message, const std::string& json_fields) {
+  void log_with_fields(LogLevel level, const char *file, int line, const char *function,
+                       const std::string &message, const std::string &json_fields) {
     if (level < min_level_) {
       return;
     }
@@ -161,7 +161,7 @@ class AsyncLogger {
     }
   }
 
-  void process_entry(const LogEntry& entry) {
+  void process_entry(const LogEntry &entry) {
     std::string formatted = format_entry(entry);
 
     if (!log_file_.empty()) {
@@ -176,7 +176,7 @@ class AsyncLogger {
     }
   }
 
-  std::string format_entry(const LogEntry& entry) const {
+  std::string format_entry(const LogEntry &entry) const {
     auto time_t = std::chrono::system_clock::to_time_t(entry.timestamp);
     auto ms =
         std::chrono::duration_cast<std::chrono::milliseconds>(entry.timestamp.time_since_epoch()) %
@@ -192,7 +192,7 @@ class AsyncLogger {
 
     if (!entry.file.empty()) {
       // Extract filename from path
-      const char* filename = std::strrchr(entry.file.c_str(), '/');
+      const char *filename = std::strrchr(entry.file.c_str(), '/');
       filename = filename ? filename + 1 : entry.file.c_str();
       oss << " " << filename << ":" << entry.line;
     }
@@ -222,12 +222,12 @@ class AsyncLogger {
 // Global logger instance (thread-safe singleton)
 class Logger {
  public:
-  static Logger& instance() {
+  static Logger &instance() {
     static Logger logger;
     return logger;
   }
 
-  void initialize(const std::string& log_file = "", LogLevel min_level = LogLevel::INFO) {
+  void initialize(const std::string &log_file = "", LogLevel min_level = LogLevel::INFO) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (async_logger_) {
       async_logger_->stop();
@@ -235,8 +235,8 @@ class Logger {
     async_logger_ = std::make_unique<AsyncLogger>(log_file, min_level);
   }
 
-  void log(LogLevel level, const char* file, int line, const char* function,
-           const std::string& message) {
+  void log(LogLevel level, const char *file, int line, const char *function,
+           const std::string &message) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (async_logger_) {
       async_logger_->log(level, file, line, function, message);
@@ -246,8 +246,8 @@ class Logger {
     }
   }
 
-  void log_with_fields(LogLevel level, const char* file, int line, const char* function,
-                       const std::string& message, const std::string& json_fields) {
+  void log_with_fields(LogLevel level, const char *file, int line, const char *function,
+                       const std::string &message, const std::string &json_fields) {
     std::lock_guard<std::mutex> lock(mutex_);
     if (async_logger_) {
       async_logger_->log_with_fields(level, file, line, function, message, json_fields);
@@ -279,8 +279,8 @@ class Logger {
   }
 
  private:
-  void log_sync(LogLevel level, const char* file, int line, const char* function,
-                const std::string& message) {
+  void log_sync(LogLevel level, const char *file, int line, const char *function,
+                const std::string &message) {
     auto now = std::chrono::system_clock::now();
     auto time_t = std::chrono::system_clock::to_time_t(now);
     std::tm tm_buf;

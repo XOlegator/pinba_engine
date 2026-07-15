@@ -4,7 +4,26 @@
 // struct initializer. cppcheck cannot parse it without full MySQL headers.
 syntaxError:src/ha_pinba.cc
 
+// cppcheck 2.19 fails to parse the GoogleTest TEST() macro in these files
+// (same class of limitation as mysql_declare_plugin above).
+syntaxError:tests/test_pinba_map.cc
+syntaxError:tests/test_threadpool.cc
+
 // new (std::nothrow) T{} value-initializes the object; all fields are
 // zero/default-constructed. cppcheck incorrectly flags the pointer variable
 // as uninitialized even though it is assigned on the same line.
 legacyUninitvar:src/threadpool.cc
+
+// Checks introduced in cppcheck 2.17+ (present on Ubuntu 26.04's 2.19, absent
+// from the CI runner's 2.13). The findings below are confined to legacy
+// C-style code inherited from the original engine: unchecked malloc/calloc
+// followed by an immediate dereference (the project's de-facto OOM policy is
+// crash-on-allocation-failure), and old-style casts such as the canonical
+// (struct sockaddr *)&addr socket idiom and casts of malloc results.
+// Suppressed per file so new code stays fully checked; a dedicated
+// OOM-hardening / cast-modernization pass can remove these entries.
+nullPointerOutOfMemory:src/pinba_update_report.h
+dangerousTypeCast:src/pinba_update_report.h
+dangerousTypeCast:src/data.cc
+nullPointerOutOfMemory:src/main.cc
+dangerousTypeCast:src/main.cc
