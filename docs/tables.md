@@ -57,7 +57,7 @@ This adds `p90`, `p95`, `p99` columns (one per percentile value) after the stand
 ```sql
 CREATE TABLE `report_by_hostname_p95` (
   -- standard report3 columns ...
-  `hostname`          varchar(32)  DEFAULT NULL,
+  `hostname`          varchar(64)  DEFAULT NULL,
   -- extra percentile columns (must be last, one per value in suffix)
   `p90`               float        DEFAULT NULL,
   `p95`               float        DEFAULT NULL,

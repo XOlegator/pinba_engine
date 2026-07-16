@@ -9,7 +9,7 @@ related:
   - wiki/concepts/pinba-pool-model.md
   - wiki/concepts/pinba-report-tables.md
 confidence: high
-updated: 2026-05-23
+updated: 2026-07-16
 ---
 
 # Pinba Engine — MySQL System Variables & Table Schema
@@ -46,6 +46,10 @@ Grouped by combinations of: hostname, server_name, script_name, status, schema.
 
 Each report table has columns: req_count, req_per_sec, req_time_total/percent/per_sec,
 ru_utime/stime totals, traffic, memory_footprint, req_time_median, index_value (group key).
+
+In the current maintained fork, the default schema uses `varchar(64)` for
+`hostname` and `server_name` dimensions in the built-in report tables that store
+those fields.
 
 ### status table — important for monitoring
 

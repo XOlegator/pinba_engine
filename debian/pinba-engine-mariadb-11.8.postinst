@@ -6,6 +6,7 @@ MYSQL_SOCKET="/var/run/mysqld/mysqld.sock"
 PINBA_DB="pinba"
 DEBIAN_CNF="/etc/mysql/debian.cnf"
 PLUGIN_CNF="/etc/mysql/conf.d/pinba-engine.cnf"
+HOSTNAME_MIGRATION_SQL="/usr/share/pinba_engine/upgrade_hostname_64.sql"
 
 # MariaDB 11.x ships only the `mariadb` client; older series and MySQL provide
 # `mysql`. Prefer `mariadb`, fall back to `mysql` for compatibility.
@@ -38,6 +39,45 @@ plugin_active() {
     [ "${COUNT:-0}" != "0" ]
 }
 
+schema_exists() {
+    COUNT=$(db_exec --skip-column-names \
+        -e "SELECT COUNT(*) FROM information_schema.SCHEMATA \
+            WHERE SCHEMA_NAME='${PINBA_DB}';" \
+        2>/dev/null || echo "0")
+    [ "${COUNT:-0}" != "0" ]
+}
+
+hostname_column_length() {
+    db_exec --skip-column-names \
+        -e "SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS \
+            WHERE TABLE_SCHEMA='${PINBA_DB}' \
+              AND TABLE_NAME='${1}' \
+              AND COLUMN_NAME='hostname';" \
+        2>/dev/null || true
+}
+
+apply_hostname_width_migration() {
+    NEEDS_MANUAL_MIGRATION=0
+
+    schema_exists || return 0
+
+    if ! plugin_active 2>/dev/null; then
+        if [ "$(hostname_column_length request)" = "32" ]; then
+            NEEDS_MANUAL_MIGRATION=1
+        fi
+        return 0
+    fi
+
+    if db_exec "${PINBA_DB}" < "${HOSTNAME_MIGRATION_SQL}" >/dev/null 2>&1; then
+        if [ "$(hostname_column_length request)" = "64" ]; then
+            echo "pinba-engine: [OK] hostname width migration applied (64 chars)."
+        fi
+    else
+        echo "pinba-engine: [!!] could not apply hostname width migration automatically."
+        NEEDS_MANUAL_MIGRATION=1
+    fi
+}
+
 case "$1" in
     configure)
         echo "pinba-engine: === Installing pinba storage engine plugin (MariaDB) ==="
@@ -52,6 +92,7 @@ case "$1" in
 
         NEEDS_RESTART=0
         NEEDS_TABLES=0
+        NEEDS_MANUAL_MIGRATION=0
 
         if db_available 2>/dev/null; then
             PLUGIN_NOW_ACTIVE=0
@@ -113,6 +154,8 @@ case "$1" in
             else
                 NEEDS_TABLES=1
             fi
+
+            apply_hostname_width_migration
         else
             echo "pinba-engine: [--] MariaDB is not reachable — skipping runtime setup."
             NEEDS_RESTART=1
@@ -122,7 +165,7 @@ case "$1" in
         echo "pinba-engine: === Setup summary ==="
         echo "pinba-engine:   ha_pinba.so  installed to MariaDB plugin dir"
         echo "pinba-engine:   plugin-load-add configured in ${PLUGIN_CNF}"
-        if [ "$NEEDS_RESTART" = "1" ] || [ "$NEEDS_TABLES" = "1" ]; then
+        if [ "$NEEDS_RESTART" = "1" ] || [ "$NEEDS_TABLES" = "1" ] || [ "$NEEDS_MANUAL_MIGRATION" = "1" ]; then
             echo "pinba-engine: --- Action required to complete setup: ---"
             if [ "$NEEDS_RESTART" = "1" ]; then
                 echo "pinba-engine:   1. Restart MariaDB to activate the plugin:"
@@ -134,6 +177,15 @@ case "$1" in
                 echo "pinba-engine:   ${STEP}. Create the default tables:"
                 echo "pinba-engine:        mariadb -u root -p ${PINBA_DB} < \\"
                 echo "pinba-engine:          /usr/share/pinba_engine/default_tables.sql"
+            fi
+            if [ "$NEEDS_MANUAL_MIGRATION" = "1" ]; then
+                STEP=1
+                [ "$NEEDS_RESTART" = "1" ] && STEP=2
+                [ "$NEEDS_TABLES" = "1" ] && STEP=3
+                echo "pinba-engine:   ${STEP}. If this is an existing schema created before July 16, 2026,"
+                echo "pinba-engine:      run the hostname-width upgrade after the plugin is active:"
+                echo "pinba-engine:        mariadb -u root -p ${PINBA_DB} < \\"
+                echo "pinba-engine:          ${HOSTNAME_MIGRATION_SQL}"
             fi
         else
             echo "pinba-engine:   Plugin active, database and tables ready."

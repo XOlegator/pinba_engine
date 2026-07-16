@@ -11,7 +11,7 @@ related:
   - wiki/concepts/cmake-build-system.md
   - wiki/concepts/launchpad-ppa-workflow.md
 confidence: high
-updated: 2026-07-15
+updated: 2026-07-16
 ---
 
 # Debian/PPA Packaging for MySQL Storage Engine Plugins
@@ -233,7 +233,9 @@ Summary:
 1. postinst: writes `/etc/mysql/conf.d/pinba-engine.cnf` (`plugin-load-add`)
 2. postinst: attempts `INSTALL PLUGIN` for immediate activation (may fail, non-fatal)
 3. postinst: creates database `pinba` and imports `default_tables.sql` (only if plugin is active)
-4. prerm: removes config, unloads plugin if loaded
+4. postinst: applies idempotent schema upgrades for existing installations when the server is reachable and the plugin is active
+5. postinst: if that upgrade step cannot run during `apt install` / `apt upgrade`, prints the exact manual `mysql` / `mariadb` command to finish it later
+6. prerm: removes config, unloads plugin if loaded
 
 ## Cross-series Conflicts are mandatory, not cosmetic
 

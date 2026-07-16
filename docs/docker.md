@@ -102,6 +102,11 @@ Things to know for long-term operation:
   volume this happens exactly once; later image upgrades reuse the plugin
   registration stored in the data directory (the plugin binary itself always
   comes from the image).
+- **Schema upgrades on existing volumes:** because `/docker-entrypoint-initdb.d`
+  only runs on first boot, DDL changes must be applied manually for already
+  initialized databases. For the hostname-width upgrade introduced in July 2026,
+  run `mysql -uroot -p... pinba < /usr/share/pinba_engine/upgrade_hostname_64.sql`
+  (or `mariadb ...`) after starting the new image.
 - **Upgrades:** stay within one channel (e.g. `8.4`). The MySQL/MariaDB
   data-directory upgrade rules of the upstream images apply unchanged.
 - **UDP ingestion:** Pinba listens on `30002/udp` inside the container. Publish

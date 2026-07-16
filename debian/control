@@ -27,8 +27,9 @@ Description: Pinba storage engine for MySQL and MariaDB — common files
  monitoring and profiling, queried through ordinary SQL, without any additional
  infrastructure.
  .
- This package contains shared data files: the SQL schema for the default tables
- and documentation.
+ This package contains shared data files: the SQL schema for the default tables,
+ the hostname-width upgrade SQL script for existing installations, and
+ documentation.
 
 Package: pinba-engine-mysql-8.0
 Architecture: any

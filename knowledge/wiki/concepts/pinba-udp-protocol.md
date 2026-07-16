@@ -9,7 +9,7 @@ related:
   - wiki/concepts/pinba-engine-internals.md
   - wiki/concepts/protobuf-runtime-strategy.md
 confidence: high
-updated: 2026-06-09
+updated: 2026-07-16
 ---
 
 # Pinba UDP Protocol
@@ -68,5 +68,20 @@ shared, stable artifact is the schema, not the generated code. See
 Note: fields `timer_ru_utime` (22) and `timer_ru_stime` (23) carry per-timer CPU usage as
 `repeated float` arrays parallel to `timer_value`; they are decoded the same way as the
 other parallel timer arrays.
+
+## Length Semantics
+
+The protobuf schema itself does not impose a fixed string length on `hostname`
+or `server_name`.
+
+Current practical limits in this forked stack are implementation-specific:
+
+- `pinba_engine` stores both dimensions in fixed internal buffers sized for 64
+  characters plus the terminating NUL
+- the default engine tables now use `varchar(64)` for both dimensions where they
+  are present
+- `pinba_extension` keeps `server_name` dynamically allocated and keeps
+  `hostname` in a 128-byte process buffer, so it does not need a code change for
+  the engine's 64-character limit
 
 See: [[pinba-data-flow]], [[pinba-engine-internals]], [[protobuf-runtime-strategy]]

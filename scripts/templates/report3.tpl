@@ -13,7 +13,7 @@ CREATE TABLE `%name%` (
 	`traffic_total` float DEFAULT NULL,
 	`traffic_percent` float DEFAULT NULL,
 	`traffic_per_sec` float DEFAULT NULL,
-	`hostname` varchar(32) DEFAULT NULL,
+	`hostname` varchar(64) DEFAULT NULL,
 	`memory_footprint_total` float DEFAULT NULL,
 	`memory_footprint_percent` float DEFAULT NULL,
 	`req_time_median` float DEFAULT NULL,
