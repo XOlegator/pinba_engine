@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.4](https://github.com/XOlegator/pinba_engine/compare/v2.11.3...v2.11.4) (2026-07-16)
+
+
+### Bug Fixes
+
+* **schema:** widen host fields and automate upgrades ([#94](https://github.com/XOlegator/pinba_engine/issues/94)) ([e9ae174](https://github.com/XOlegator/pinba_engine/commit/e9ae174feb12fc1bf7fe32346f385d8f5bec9336))
+
 ## [2.11.3](https://github.com/XOlegator/pinba_engine/compare/v2.11.2...v2.11.3) (2026-07-04)
 
 
