@@ -191,6 +191,7 @@ nm -D "%{buildroot}%{_libdir}/mysql/plugin/ha_pinba.so" | grep -q %{plugin_symbo
 %dir %{_datadir}/pinba_engine
 %{_datadir}/pinba_engine/default_tables.sql
 %{_datadir}/pinba_engine/pinba_tables.sql
+%{_datadir}/pinba_engine/upgrade_hostname_64.sql
 %{_metainfodir}/io.github.xolegator.pinba-engine.metainfo.xml
 
 %files %{flavor}

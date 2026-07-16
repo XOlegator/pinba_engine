@@ -568,7 +568,7 @@ install(TARGETS pinba_engine LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/mysql/p
 if(PINBA_WITH_TESTS)
   install(TARGETS pinba_test RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
-install(FILES README.md default_tables.sql DESTINATION ${CMAKE_INSTALL_DATADIR}/pinba_engine)
+install(FILES README.md default_tables.sql upgrade_hostname_64.sql DESTINATION ${CMAKE_INSTALL_DATADIR}/pinba_engine)
 install(FILES default_tables.sql DESTINATION ${CMAKE_INSTALL_DATADIR}/pinba_engine RENAME pinba_tables.sql)
 
 write_basic_package_version_file(

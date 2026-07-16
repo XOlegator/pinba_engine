@@ -8,7 +8,7 @@ related:
   - wiki/concepts/docker-build-strategy.md
   - wiki/concepts/docker-tag-strategy.md
 confidence: high
-updated: 2026-05-23
+updated: 2026-07-16
 ---
 
 # Pinboard Architecture
@@ -104,6 +104,9 @@ where `N = count * (1 - 0.90)`. Simple offset-based approximation, not a window 
 | `request`, `timer`, `timertag`, `tag` | `ipm_report_*`, `ipm_tag_info`, `ipm_req_time_details`, `ipm_timer`, `ipm_status_details`, `ipm_mem_peak_usage_details`, `ipm_cpu_usage_details` |
 | Live, written by Pinba engine via UDP | Timestamped snapshots, written by aggregate command |
 | No history (Pinba's virtual views are live-computed) | History kept for `APP_RECORDS_LIFETIME` |
+
+As of July 16, 2026, the shared `hostname` / `server_name` dimensions in the
+engine and Pinboard-managed aggregate tables are standardized on `varchar(64)`.
 
 ## Key Configuration Variables
 

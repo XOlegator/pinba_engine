@@ -8,7 +8,7 @@ related:
   - wiki/concepts/php-pinba-configuration.md
   - wiki/concepts/pinba-udp-protocol.md
 confidence: high
-updated: 2026-05-23
+updated: 2026-07-16
 ---
 
 # PHP Pinba Extension
@@ -39,6 +39,11 @@ The two most common misconfiguration errors:
 
 Automatically at shutdown: hostname, server_name, script_name, request_time, ru_utime, ru_stime,
 document_size, memory_peak, memory_footprint, HTTP status, schema, all timers, request-level tags.
+
+Implementation note for the maintained fork: `server_name` is stored dynamically
+in the extension runtime, and the process-level hostname buffer is 128 bytes.
+That means the July 16, 2026 engine-side increase to 64-character hostname/server
+dimensions does not require a matching client-side wire-format change.
 
 ## Timer API Pattern
 

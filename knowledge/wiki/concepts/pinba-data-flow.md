@@ -11,7 +11,7 @@ related:
   - wiki/concepts/pinba-pool-model.md
   - wiki/concepts/php-pinba-configuration.md
 confidence: high
-updated: 2026-05-23
+updated: 2026-07-16
 ---
 
 # Pinba Data Flow — End to End
@@ -33,6 +33,7 @@ Pinba Engine UDP listener thread
        │
        ├─► decodes protobuf packet
        ├─► validates fields
+       ├─► stores hostname/server_name up to the engine's current 64-character limit
        └─► adds to per-thread temporary pool (cyclic buffer)
                      │
                      │ every pinba_stats_gathering_period (10ms default)

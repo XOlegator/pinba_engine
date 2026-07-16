@@ -9,7 +9,7 @@ related:
   - wiki/concepts/pinba-udp-protocol.md
   - wiki/concepts/pinba-data-flow.md
 confidence: high
-updated: 2026-06-07
+updated: 2026-07-16
 ---
 
 # PHP Pinba Extension API
@@ -88,6 +88,9 @@ Overrides `$_SERVER['SCRIPT_NAME']` sent in the protobuf message.
 bool pinba_hostname_set(string $hostname): bool
 ```
 Overrides the server's hostname (defaults to `gethostname()`).
+In the current fork, the process buffer for this override is 128 bytes including
+the terminating NUL, which is already above the engine's current 64-character
+storage limit.
 
 ```php
 bool pinba_schema_set(string $schema): bool
@@ -98,6 +101,8 @@ Sets the schema field (e.g., `"http"`, `"https"`, `"grpc"`). Empty by default.
 bool pinba_server_name_set(string $server_name): bool
 ```
 Overrides `$_SERVER['SERVER_NAME']` / `HTTP_HOST` (the virtual host name sent to Pinba).
+This value is dynamically allocated in the extension, so there is no 32-character
+limit in the client-side implementation.
 
 ```php
 bool pinba_request_time_set(float $time): bool

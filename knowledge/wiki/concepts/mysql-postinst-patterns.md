@@ -7,7 +7,7 @@ related:
   - wiki/concepts/debian-ppa-packaging.md
   - wiki/concepts/mysql-plugin-install.md
 confidence: high
-updated: 2026-06-07
+updated: 2026-07-16
 ---
 
 # MySQL Plugin postinst/prerm — Patterns and Pitfalls
@@ -156,6 +156,31 @@ fi
 **Important:** `CREATE TABLE ... ENGINE=PINBA` fails if the plugin is not loaded.
 If `INSTALL PLUGIN` did not succeed (insufficient privileges), the import cannot run;
 the user must be instructed to do it after the next MySQL restart.
+
+---
+
+## Schema upgrades during package updates
+
+When a package ships a DDL fix for already initialized PINBA tables, `postinst`
+can apply it automatically if:
+
+- MySQL/MariaDB is reachable during package configuration
+- the `pinba` schema already exists
+- the Pinba plugin is active in the running server
+
+Pattern:
+
+```sh
+if plugin_active && schema_exists; then
+    mysql_exec pinba < /usr/share/pinba_engine/upgrade_hostname_64.sql
+else
+    echo "run the upgrade script manually after restart"
+fi
+```
+
+This keeps `apt upgrade` mostly automatic while preserving a safe fallback for
+cases where the plugin is not active yet or the server is offline during package
+configuration.
 
 ---
 

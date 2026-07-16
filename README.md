@@ -99,6 +99,14 @@ mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS pinba;"
 mysql -u root -p pinba < /usr/share/pinba_engine/default_tables.sql
 ```
 
+On package upgrades, the Debian/RPM post-install flow attempts to apply this
+upgrade automatically when it can reach an active server. If that automatic step
+is skipped, run the upgrade script manually after deploying the new plugin binary:
+
+```bash
+mysql -u root -p pinba < /usr/share/pinba_engine/upgrade_hostname_64.sql
+```
+
 ### Fedora / Enterprise Linux package (Copr RPM)
 
 RPM packages are published to the [`xolegator/pinba`](https://copr.fedorainfracloud.org/coprs/xolegator/pinba/) Copr repository, in two mutually-exclusive flavors — install the one matching your database server (`x86_64`):
@@ -121,6 +129,14 @@ The plugin (`ha_pinba.so`) and the shared schema (`pinba-engine-common`) are ins
 sudo mariadb -e "INSTALL PLUGIN pinba SONAME 'ha_pinba.so';"
 sudo mariadb -e "CREATE DATABASE IF NOT EXISTS pinba;"
 sudo mariadb pinba < /usr/share/pinba_engine/default_tables.sql
+```
+
+On package upgrades, the Debian/RPM post-install flow attempts to apply this
+upgrade automatically when it can reach an active server. If that automatic step
+is skipped, apply the accompanying upgrade script after the package update:
+
+```bash
+sudo mariadb pinba < /usr/share/pinba_engine/upgrade_hostname_64.sql
 ```
 
 > On Enterprise Linux the native database is MariaDB, so only the MariaDB flavor is published there; the MySQL flavor is built for Fedora. The plugin is ABI-matched to each distribution's server version.
