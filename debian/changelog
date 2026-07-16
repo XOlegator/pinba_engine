@@ -1,3 +1,9 @@
+pinba-engine (2.11.4-1) noble; urgency=medium
+
+  * schema: widen host fields and automate upgrades
+
+ -- Oleg Ekhlakov <o.ekhlakov@protonmail.com>  Thu, 16 Jul 2026 12:05:02 +0000
+
 pinba-engine (2.11.3-1) noble; urgency=medium
 
   * pinba_lmap: guard pinba_lmap_count against a null map
