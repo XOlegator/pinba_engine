@@ -57,7 +57,7 @@ Name:           pinba-engine
 # Version is kept in sync with the release tag by the sync-rpm-spec job in
 # .github/workflows/release-please.yml (which also prepends the %changelog
 # entry), so it is not managed by release-please's extra-files updater.
-Version:        2.11.3
+Version:        2.11.4
 Release:        1%{?dist}
 Summary:        Pinba storage engine plugin for %{cmake_flavor}
 
@@ -199,6 +199,9 @@ nm -D "%{buildroot}%{_libdir}/mysql/plugin/ha_pinba.so" | grep -q %{plugin_symbo
 %{_metainfodir}/io.github.xolegator.pinba-engine-%{cmake_flavor}.metainfo.xml
 
 %changelog
+* Thu Jul 16 2026 Oleg Ekhlakov <o.ekhlakov@protonmail.com> - 2.11.4-1
+- schema: widen host fields and automate upgrades
+
 * Sat Jul 04 2026 Oleg Ekhlakov <o.ekhlakov@protonmail.com> - 2.11.3-1
 - pinba_lmap: guard pinba_lmap_count against a null map
 
