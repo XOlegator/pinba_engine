@@ -656,31 +656,25 @@ static inline int request_to_record(Pinba__Request *request,
   ru_stime = (double)request->ru_stime;
   doc_size = (double)request->document_size / 1024;
 
-  if (req_time < 0 || doc_size < 0) {
+  if (!pinba_is_valid_time_seconds(req_time) || !pinba_is_valid_time_seconds(ru_utime) ||
+      !pinba_is_valid_time_seconds(ru_stime) || doc_size < 0) {
     pinba_error(P_WARNING,
                 "invalid packet data: req_time=%f, ru_utime=%f, ru_stime=%f, doc_size=%f, "
                 "hostname=%s, script_name=%s",
                 req_time, ru_utime, ru_stime, doc_size, request->hostname, request->script_name);
-
-    if (req_time < 0) {
-      req_time = 0;
-    }
-
-    if (doc_size < 0) {
-      doc_size = 0;
-    }
   }
 
-  if (ru_utime < 0 ||
-      ru_stime < 0) { /* I have no idea why this happens, but this happens VERY often */
-    ru_utime = 0;
-    ru_stime = 0;
+  req_time = pinba_sanitize_time_seconds(req_time);
+  ru_utime = pinba_sanitize_time_seconds(ru_utime);
+  ru_stime = pinba_sanitize_time_seconds(ru_stime);
+  if (doc_size < 0) {
+    doc_size = 0;
   }
 
   record->data.req_time = float_to_timeval(req_time);
   record->data.ru_utime = float_to_timeval(ru_utime);
   record->data.ru_stime = float_to_timeval(ru_stime);
-  record->data.req_count = request->request_count;
+  record->data.req_count = pinba_normalize_request_count(request->request_count);
   record->data.doc_size = (float)doc_size;                          /* Kbytes*/
   record->data.mem_peak_usage = (float)request->memory_peak / 1024; /* Kbytes */
   if (request->has_memory_footprint) {
@@ -795,13 +789,13 @@ inline static int _add_timers(pinba_stats_record *record, const pinba_stats_reco
     timer->request_id = request_id;
 
     if (request->n_timer_ru_stime > i) {
-      timer->ru_stime = float_to_timeval(request->timer_ru_stime[i]);
+      timer->ru_stime = float_to_timeval(pinba_sanitize_time_seconds(request->timer_ru_stime[i]));
     } else {
       timer->ru_stime = null_timeval;
     }
 
     if (request->n_timer_ru_utime > i) {
-      timer->ru_utime = float_to_timeval(request->timer_ru_utime[i]);
+      timer->ru_utime = float_to_timeval(pinba_sanitize_time_seconds(request->timer_ru_utime[i]));
     } else {
       timer->ru_utime = null_timeval;
     }
@@ -816,8 +810,8 @@ inline static int _add_timers(pinba_stats_record *record, const pinba_stats_reco
       continue;
     }
 
-    if (timer_value < 0) {
-      pinba_debug("timer.value is negative: %0.3f", timer_value);
+    if (!pinba_is_valid_time_seconds(timer_value)) {
+      pinba_debug("timer.value is invalid: %0.3f", timer_value);
       timer_value = 0;
     }
 

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <limits>
+
 // Test includes
 #include "pinba.h"
 #include "pinba_limits.h"
@@ -52,6 +54,41 @@ TEST_F(PinbaEngineTest, TimeOperations) {
   pinba_timeradd(&tv1, &tv2, &result);
   EXPECT_EQ(result.tv_sec, 3);
   EXPECT_EQ(result.tv_usec, 750000);
+}
+
+TEST_F(PinbaEngineTest, SanitizeTimeSecondsKeepsFiniteNonNegativeInRangeValues) {
+  EXPECT_DOUBLE_EQ(pinba_sanitize_time_seconds(0.0), 0.0);
+  EXPECT_DOUBLE_EQ(pinba_sanitize_time_seconds(1.5), 1.5);
+  EXPECT_DOUBLE_EQ(pinba_sanitize_time_seconds(static_cast<double>(INT_MAX)),
+                   static_cast<double>(INT_MAX));
+}
+
+TEST_F(PinbaEngineTest, SanitizeTimeSecondsDropsNegativeNonFiniteAndOverflowValues) {
+  EXPECT_DOUBLE_EQ(pinba_sanitize_time_seconds(-0.001), 0.0);
+  EXPECT_DOUBLE_EQ(pinba_sanitize_time_seconds(std::numeric_limits<double>::infinity()), 0.0);
+  EXPECT_DOUBLE_EQ(pinba_sanitize_time_seconds(-std::numeric_limits<double>::infinity()), 0.0);
+  EXPECT_DOUBLE_EQ(pinba_sanitize_time_seconds(std::numeric_limits<double>::quiet_NaN()), 0.0);
+  EXPECT_DOUBLE_EQ(pinba_sanitize_time_seconds(static_cast<double>(INT_MAX) + 1.0), 0.0);
+}
+
+TEST_F(PinbaEngineTest, NormalizeRequestCountPromotesZeroToOne) {
+  EXPECT_EQ(pinba_normalize_request_count(0), 1u);
+  EXPECT_EQ(pinba_normalize_request_count(1), 1u);
+  EXPECT_EQ(pinba_normalize_request_count(7), 7u);
+}
+
+TEST_F(PinbaEngineTest, HistogramTrackingAcceptsFiniteNonNegativeInRangeValues) {
+  EXPECT_TRUE(pinba_should_track_histogram_sample(0.0));
+  EXPECT_TRUE(pinba_should_track_histogram_sample(0.75));
+  EXPECT_TRUE(pinba_should_track_histogram_sample(static_cast<double>(INT_MAX)));
+}
+
+TEST_F(PinbaEngineTest, HistogramTrackingDropsNegativeNonFiniteAndOverflowValues) {
+  EXPECT_FALSE(pinba_should_track_histogram_sample(-0.001));
+  EXPECT_FALSE(pinba_should_track_histogram_sample(std::numeric_limits<double>::infinity()));
+  EXPECT_FALSE(pinba_should_track_histogram_sample(-std::numeric_limits<double>::infinity()));
+  EXPECT_FALSE(pinba_should_track_histogram_sample(std::numeric_limits<double>::quiet_NaN()));
+  EXPECT_FALSE(pinba_should_track_histogram_sample(static_cast<double>(INT_MAX) + 1.0));
 }
 
 // Performance tests
