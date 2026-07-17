@@ -1,3 +1,9 @@
+pinba-engine (2.11.5-1) noble; urgency=medium
+
+  * engine: sanitize invalid timings and source extraction
+
+ -- Oleg Ekhlakov <o.ekhlakov@protonmail.com>  Fri, 17 Jul 2026 13:39:08 +0000
+
 pinba-engine (2.11.4-1) noble; urgency=medium
 
   * schema: widen host fields and automate upgrades
