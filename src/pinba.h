@@ -80,6 +80,7 @@ extern pinba_daemon *D;
 #endif
 
 #include <algorithm>
+#include <climits>
 #include <cstddef>
 
 void *pinba_data_main(void *arg);
@@ -333,6 +334,30 @@ static inline pinba_timeval float_to_timeval(double f) /* {{{ */
 }
 /* }}} */
 
+static inline bool pinba_is_valid_time_seconds(double f) /* {{{ */
+{
+  return isfinite(f) && f >= 0.0 && f <= (double)INT_MAX;
+}
+/* }}} */
+
+static inline double pinba_sanitize_time_seconds(double f) /* {{{ */
+{
+  return pinba_is_valid_time_seconds(f) ? f : 0.0;
+}
+/* }}} */
+
+static inline unsigned int pinba_normalize_request_count(unsigned int value) /* {{{ */
+{
+  return value == 0 ? 1U : value;
+}
+/* }}} */
+
+static inline bool pinba_should_track_histogram_sample(double f) /* {{{ */
+{
+  return pinba_is_valid_time_seconds(f);
+}
+/* }}} */
+
 #define pinba_pool_is_full(pool)                                                             \
   ((pool->in < pool->out) ? pool->size - (pool->out - pool->in) : (pool->in - pool->out)) == \
       (pool->size - 1)
@@ -407,13 +432,17 @@ static inline void pinba_update_histogram(pinba_std_report *report, void **histo
                                           const pinba_timeval *time, const int add) /* {{{ */
 {
   unsigned int slot_num;
-  float time_value = timeval_to_float(*time);
+  double time_value = timeval_to_float(*time);
   size_t value;
 
   if (add > 1) {
     time_value = time_value / add;
   } else if (add < -1) {
     time_value = time_value / -(add);
+  }
+
+  if (!pinba_should_track_histogram_sample(time_value)) {
+    return;
   }
 
   if (time_value > report->histogram_max_time) {

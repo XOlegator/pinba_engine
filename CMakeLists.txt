@@ -135,13 +135,37 @@ if(NOT MYSQL_INCLUDE_DIR)
       "files or set MYSQL_INCLUDE_DIR.")
 endif()
 
-set(PINBA_MYSQL_SOURCE_EXTRACT_BASE "${CMAKE_BINARY_DIR}/_deps/mysql-source")
+set(
+  PINBA_MYSQL_SOURCE_EXTRACT_BASE
+  "${CMAKE_BINARY_DIR}/_deps/${PINBA_DB_FLAVOR}-source-${PINBA_MYSQL_SOURCE_VERSION}")
 set(PINBA_MYSQL_BUILDDIR "")
 set(PINBA_MYSQL_BUILDDIR_INCLUDE "")
 
+function(pinba_find_extracted_source_dir extract_base out_var)
+  file(GLOB _pinba_extracted_handlers "${extract_base}/*/sql/handler.h")
+  list(LENGTH _pinba_extracted_handlers _pinba_extracted_handler_count)
+
+  if(_pinba_extracted_handler_count GREATER 1)
+    message(
+      FATAL_ERROR
+        "Multiple extracted source trees found in ${extract_base}. "
+        "Clean the build directory or set PINBA_MYSQL_SOURCE_DIR explicitly.")
+  endif()
+
+  if(_pinba_extracted_handler_count EQUAL 1)
+    list(GET _pinba_extracted_handlers 0 _pinba_extracted_handler)
+    get_filename_component(_pinba_extracted_sql_dir "${_pinba_extracted_handler}" DIRECTORY)
+    get_filename_component(_pinba_extracted_source_dir "${_pinba_extracted_sql_dir}" DIRECTORY)
+    set(${out_var} "${_pinba_extracted_source_dir}" PARENT_SCOPE)
+  else()
+    set(${out_var} "" PARENT_SCOPE)
+  endif()
+endfunction()
+
 if(NOT PINBA_MYSQL_SOURCE_DIR AND EXISTS "${PINBA_MYSQL_SOURCE_ARCHIVE}")
   file(MAKE_DIRECTORY "${PINBA_MYSQL_SOURCE_EXTRACT_BASE}")
-  if(NOT EXISTS "${PINBA_MYSQL_SOURCE_EXTRACT_BASE}/mysql-${PINBA_MYSQL_SERIES}/sql/handler.h")
+  pinba_find_extracted_source_dir("${PINBA_MYSQL_SOURCE_EXTRACT_BASE}" PINBA_MYSQL_EXTRACTED_SOURCE_DIR)
+  if(NOT PINBA_MYSQL_EXTRACTED_SOURCE_DIR)
     execute_process(
       COMMAND ${CMAKE_COMMAND} -E tar xf "${PINBA_MYSQL_SOURCE_ARCHIVE}"
       WORKING_DIRECTORY "${PINBA_MYSQL_SOURCE_EXTRACT_BASE}"
@@ -149,8 +173,12 @@ if(NOT PINBA_MYSQL_SOURCE_DIR AND EXISTS "${PINBA_MYSQL_SOURCE_ARCHIVE}")
     if(NOT PINBA_MYSQL_EXTRACT_RESULT EQUAL 0)
       message(FATAL_ERROR "Failed to extract ${PINBA_MYSQL_SOURCE_ARCHIVE}")
     endif()
+    pinba_find_extracted_source_dir("${PINBA_MYSQL_SOURCE_EXTRACT_BASE}" PINBA_MYSQL_EXTRACTED_SOURCE_DIR)
+    if(NOT PINBA_MYSQL_EXTRACTED_SOURCE_DIR)
+      message(FATAL_ERROR "Failed to locate sql/handler.h in ${PINBA_MYSQL_SOURCE_ARCHIVE}")
+    endif()
   endif()
-  set(PINBA_MYSQL_SOURCE_DIR "${PINBA_MYSQL_SOURCE_EXTRACT_BASE}/mysql-${PINBA_MYSQL_SERIES}")
+  set(PINBA_MYSQL_SOURCE_DIR "${PINBA_MYSQL_EXTRACTED_SOURCE_DIR}")
 endif()
 
 if(NOT PINBA_MYSQL_SOURCE_DIR AND PINBA_DOWNLOAD_MYSQL_SOURCE)
@@ -179,12 +207,9 @@ if(NOT PINBA_MYSQL_SOURCE_DIR AND PINBA_DOWNLOAD_MYSQL_SOURCE)
   if(NOT PINBA_MYSQL_DOWNLOAD_EXTRACT_RESULT EQUAL 0)
     message(FATAL_ERROR "Failed to extract ${PINBA_MYSQL_DOWNLOAD_ARCHIVE}")
   endif()
-  file(GLOB PINBA_MYSQL_DOWNLOADED_SOURCES "${PINBA_MYSQL_SOURCE_EXTRACT_BASE}/mysql-*/sql/handler.h")
-  list(LENGTH PINBA_MYSQL_DOWNLOADED_SOURCES PINBA_MYSQL_DOWNLOADED_SOURCE_COUNT)
-  if(PINBA_MYSQL_DOWNLOADED_SOURCE_COUNT GREATER 0)
-    list(GET PINBA_MYSQL_DOWNLOADED_SOURCES 0 PINBA_MYSQL_DOWNLOADED_HANDLER)
-    get_filename_component(PINBA_MYSQL_DOWNLOADED_SQL_DIR "${PINBA_MYSQL_DOWNLOADED_HANDLER}" DIRECTORY)
-    get_filename_component(PINBA_MYSQL_SOURCE_DIR "${PINBA_MYSQL_DOWNLOADED_SQL_DIR}" DIRECTORY)
+  pinba_find_extracted_source_dir("${PINBA_MYSQL_SOURCE_EXTRACT_BASE}" PINBA_MYSQL_DOWNLOADED_SOURCE_DIR)
+  if(PINBA_MYSQL_DOWNLOADED_SOURCE_DIR)
+    set(PINBA_MYSQL_SOURCE_DIR "${PINBA_MYSQL_DOWNLOADED_SOURCE_DIR}")
   endif()
 endif()
 
