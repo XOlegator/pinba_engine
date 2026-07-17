@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.5](https://github.com/XOlegator/pinba_engine/compare/v2.11.4...v2.11.5) (2026-07-17)
+
+
+### Bug Fixes
+
+* **engine:** sanitize invalid timings and source extraction ([#96](https://github.com/XOlegator/pinba_engine/issues/96)) ([3737f84](https://github.com/XOlegator/pinba_engine/commit/3737f84d4e1a638ac2a8b239344242ebbff1c763))
+
 ## [2.11.4](https://github.com/XOlegator/pinba_engine/compare/v2.11.3...v2.11.4) (2026-07-16)
 
 
