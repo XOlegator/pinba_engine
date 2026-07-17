@@ -59,7 +59,8 @@ TEST_F(PinbaEngineTest, TimeOperations) {
 TEST_F(PinbaEngineTest, SanitizeTimeSecondsKeepsFiniteNonNegativeInRangeValues) {
   EXPECT_DOUBLE_EQ(pinba_sanitize_time_seconds(0.0), 0.0);
   EXPECT_DOUBLE_EQ(pinba_sanitize_time_seconds(1.5), 1.5);
-  EXPECT_DOUBLE_EQ(pinba_sanitize_time_seconds(static_cast<double>(INT_MAX)), static_cast<double>(INT_MAX));
+  EXPECT_DOUBLE_EQ(pinba_sanitize_time_seconds(static_cast<double>(INT_MAX)),
+                   static_cast<double>(INT_MAX));
 }
 
 TEST_F(PinbaEngineTest, SanitizeTimeSecondsDropsNegativeNonFiniteAndOverflowValues) {
