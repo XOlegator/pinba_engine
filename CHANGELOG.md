@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.6](https://github.com/XOlegator/pinba_engine/compare/v2.11.5...v2.11.6) (2026-07-18)
+
+
+### Bug Fixes
+
+* **engine:** correct report3 percentile field mapping off-by-one ([#98](https://github.com/XOlegator/pinba_engine/issues/98)) ([e260807](https://github.com/XOlegator/pinba_engine/commit/e260807eb71bf57bd267e271a9ce7352befd8717))
+
 ## [2.11.5](https://github.com/XOlegator/pinba_engine/compare/v2.11.4...v2.11.5) (2026-07-17)
 
 
