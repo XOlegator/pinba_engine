@@ -192,6 +192,9 @@ jobs:
           # unix_socket-only and cannot be reached by a normal (non-sudo) client.
           MYSQL_CLIENT=mariadb bash scripts/smoke_test.sh 127.0.0.1 3306 pinba pinba pinba
 
+      - name: Percentile field-mapping test (report2/report3, real data)
+        run: MYSQL_CLIENT=mariadb bash scripts/percentile_mapping_test.sh 127.0.0.1 3306 pinba pinba pinba
+
       - name: Dump MariaDB error log on failure
         if: failure()
         run: |
@@ -473,6 +476,9 @@ jobs:
             printf '%-24s ' "${t}"
             sudo mariadb pinba -N -B -e "SELECT COUNT(*) FROM \`${t}\`;"
           done
+
+      - name: Percentile field-mapping test (report2/report3, real data)
+        run: MYSQL_CLIENT=mariadb bash scripts/percentile_mapping_test.sh 127.0.0.1 3306 pinba pinba pinba
 
       - name: Stop server and collect gcov data
         run: |
