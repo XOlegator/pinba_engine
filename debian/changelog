@@ -1,3 +1,9 @@
+pinba-engine (2.11.6-1) noble; urgency=medium
+
+  * engine: correct report3 percentile field mapping off-by-one
+
+ -- Oleg Ekhlakov <o.ekhlakov@protonmail.com>  Sat, 18 Jul 2026 19:13:31 +0000
+
 pinba-engine (2.11.5-1) noble; urgency=medium
 
   * engine: sanitize invalid timings and source extraction
