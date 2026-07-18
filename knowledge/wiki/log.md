@@ -841,3 +841,21 @@ production-usability review of the Docker images, discovery that the published
   (smoke-test gate, concurrency group, update-docs-digests), and the downstream
   Pinboard default (rolling `8.4` via `PINBA_ENGINE_TAG`).
 - Updated the [[docker-tag-strategy]] row in index.md accordingly.
+
+## 2026-07-18 — Discovery: report3 percentile off-by-one (fix + regression test)
+
+- Root-caused broken `p90` in `report3:::90,95,99` tables (found via Pinboard's
+  aggregation dying on `Data truncated for column 'p90'`): `report3_fetch_row`
+  mapped `index_value` to field 19 and percentiles from 20, while report3's
+  schema (identical to report2) has `index_value` at 18. The p90 column received
+  the hostname string, p95/p99 held the true p90/p95, `index_value` was NULL.
+- The bug dates to upstream `03005d7` (2013-06-18, "add histogram 'view'
+  support") and was still present in v2.11.5 — the 2.11.5 input-sanitization
+  work (`3737f84`) addresses a different failure mode and does not cover this.
+- Audited all `*_fetch_row` percentile numberings: only report3 was off
+  (1-key reports use 18, 2-key 19, 3-key 20 — now consistent).
+- Fixed `case 19`→`case 18` + `REPORT_PERCENTILE_FIELD(19`→`(18`; added
+  data-driven `scripts/percentile_mapping_test.sh` (creates report2+report3
+  percentile variants, drives them via `send_pinba_packet.py`, asserts
+  `index_value <=> key` and `0 < p90 <= p95 <= p99`), wired into both MariaDB
+  CI jobs. New concept page: [[report-percentile-field-mapping]].

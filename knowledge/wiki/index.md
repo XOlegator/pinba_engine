@@ -11,11 +11,12 @@ updated: 2026-07-07
 
 Master catalog. Maintained by LLM agents.
 
-## Concepts (27 articles)
+## Concepts (28 articles)
 
 | Article | Key Topic |
 |---------|-----------|
 | [[pinba-data-flow]] | End-to-end pipeline: PHP → UDP → pool → SQL |
+| [[report-percentile-field-mapping]] | fetch_row hardcoded field indices, report3 p90 off-by-one (2013→2.11.5), SQL regression test |
 | [[pinba-udp-protocol]] | Protobuf message format, timer parallel arrays, field versions |
 | [[protobuf-runtime-strategy]] | Engine (C++ protobuf + shim) vs extension (protobuf-c); shared `pinba.proto` contract; fields 22/23; drift guard |
 | [[pinba-pool-model]] | Cyclic buffer memory model, overflow behaviour, monitoring |

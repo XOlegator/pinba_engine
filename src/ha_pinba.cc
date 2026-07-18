@@ -4249,12 +4249,12 @@ inline int ha_pinba::report3_fetch_row(unsigned char *) /* {{{ */
           (*field)->store(pinba_histogram_value((pinba_std_report *)report, data->histogram_data,
                                                 data->req_count / 2));
           break;
-        case 19: /* index_value */
+        case 18: /* index_value */
           (*field)->set_notnull();
           (*field)->store((const char *)index, strlen((char *)index), &my_charset_bin);
           break;
         default:
-          REPORT_PERCENTILE_FIELD(19, data->histogram_data, data->req_count);
+          REPORT_PERCENTILE_FIELD(18, data->histogram_data, data->req_count);
           break;
       }
     }
