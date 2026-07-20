@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.7](https://github.com/XOlegator/pinba_engine/compare/v2.11.6...v2.11.7) (2026-07-20)
+
+
+### Bug Fixes
+
+* **security:** stop building GoogleTest during CodeQL analysis ([#101](https://github.com/XOlegator/pinba_engine/issues/101)) ([542ad5d](https://github.com/XOlegator/pinba_engine/commit/542ad5d93187627be6da1567ca58d753daec6457))
+
 ## [2.11.6](https://github.com/XOlegator/pinba_engine/compare/v2.11.5...v2.11.6) (2026-07-18)
 
 
