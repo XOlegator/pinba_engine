@@ -5,11 +5,21 @@ name: pinba-engine CodeQL config
 # the engine's own code, so exclude them to keep alerts focused and actionable
 # (mirrors the clang-tidy/cppcheck exclusions in ci.yml).
 #
-# build/** holds third-party sources pulled in only to compile the plugin:
-# the MySQL 8.0 server headers and the GoogleTest framework fetched into
-# build/_deps by CMake FetchContent. They are neither our code nor shipped in
-# the product, so alerts located there (e.g. GoogleTest's own path/process
-# handling) are noise — exclude the whole build tree from analysis.
+# build/** holds third-party sources pulled in only to compile the plugin: the
+# MySQL 8.0 server headers fetched into build/_deps by CMake FetchContent. They
+# are neither our code nor shipped in the product, so exclude the whole build
+# tree from analysis as a backstop.
+#
+# GoogleTest used to land here too and its own path/process handling produced
+# noisy alerts (cpp/path-injection, cpp/uncontrolled-process-operation) that
+# this paths-ignore did not reliably suppress: the C/C++ extractor only
+# extracts files the compiler actually touches during the traced build, and
+# whether gtest.cc got recompiled (and thus extracted) depended on whether the
+# build/_deps actions/cache in codeql.yml happened to hit — a cache miss (e.g.
+# the weekly scheduled run) rebuilt GoogleTest from scratch and CodeQL flagged
+# it despite this exclusion. Fixed at the source instead: codeql.yml now
+# builds with -DPINBA_WITH_TESTS=OFF, so GoogleTest is never fetched or
+# compiled for CodeQL at all.
 paths-ignore:
   - "src/xxhash.c"
   - "src/xxhash.h"

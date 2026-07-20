@@ -59,7 +59,7 @@ jobs:
       # compilation to be traced.
       - name: Build plugin
         run: |
-          cmake --preset release-download-mysql-source
+          cmake --preset release-download-mysql-source -DPINBA_WITH_TESTS=OFF
           cmake --build build --parallel "$(nproc)"
 
       - name: Perform CodeQL Analysis
