@@ -1,3 +1,9 @@
+pinba-engine (2.11.8-1) noble; urgency=medium
+
+  * engine: correct row-reference filesort and pool wraparound
+
+ -- Oleg Ekhlakov <o.ekhlakov@protonmail.com>  Sat, 17 Oct 2026 16:11:27 +0000
+
 pinba-engine (2.11.7-1) noble; urgency=medium
 
   * security: stop building GoogleTest during CodeQL analysis
