@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.11.8](https://github.com/XOlegator/pinba_engine/compare/v2.11.7...v2.11.8) (2026-10-17)
+
+
+### Bug Fixes
+
+* **engine:** correct row-reference filesort and pool wraparound ([#104](https://github.com/XOlegator/pinba_engine/issues/104)) ([6023415](https://github.com/XOlegator/pinba_engine/commit/6023415883996847b22e38afb65b09e01b9cc383))
+
 ## [2.11.7](https://github.com/XOlegator/pinba_engine/compare/v2.11.6...v2.11.7) (2026-07-20)
 
 
