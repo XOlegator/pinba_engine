@@ -73,6 +73,7 @@ class ha_pinba : public handler {
   size_t alloced_rec_buff_length;
   size_t rec_buff_length;
   pinba_index_st this_index[PINBA_MAX_KEYS];
+  my_off_t current_row_position = 0;
 
   int read_row_by_key(unsigned char *buf, uint active_index, const unsigned char *key, uint key_len,
                       int exact);

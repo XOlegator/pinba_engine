@@ -4,19 +4,20 @@ type: index
 sources: []
 related: []
 confidence: high
-updated: 2026-07-07
+updated: 2026-10-17
 ---
 
 # Pinba Engine — Knowledge Base Index
 
 Master catalog. Maintained by LLM agents.
 
-## Concepts (28 articles)
+## Concepts (29 articles)
 
 | Article | Key Topic |
 |---------|-----------|
 | [[pinba-data-flow]] | End-to-end pipeline: PHP → UDP → pool → SQL |
 | [[report-percentile-field-mapping]] | fetch_row hardcoded field indices, report3 p90 off-by-one (2013→2.11.5), SQL regression test |
+| [[engine-row-references]] | Filesort position/rnd_pos contract, physical pool slots, request/timer sort regression and wraparound |
 | [[pinba-udp-protocol]] | Protobuf message format, timer parallel arrays, field versions |
 | [[protobuf-runtime-strategy]] | Engine (C++ protobuf + shim) vs extension (protobuf-c); shared `pinba.proto` contract; fields 22/23; drift guard |
 | [[pinba-pool-model]] | Cyclic buffer memory model, overflow behaviour, monitoring |
@@ -35,7 +36,7 @@ Master catalog. Maintained by LLM agents.
 | [[github-actions-docker]] | CI/CD workflow for Docker Hub build+push automation |
 | [[github-actions-ppa]] | GitHub Actions workflow: source package build, signing, multi-series, FTP upload with passive mode and retry |
 | [[github-actions-mysql-version-monitor]] | Weekly MySQL version monitor: auto-PR with vendor header update and full release cycle trigger |
-| [[pinboard-architecture]] | Pinboard (Symfony 8) stack, aggregation logic, docker compose |
+| [[pinboard-architecture]] | Pinboard (Symfony 8), aggregation, UTC storage, complete date buckets, source-engine repair, docker compose |
 | [[debian-ppa-packaging]] | Debian/PPA packaging: debian/ structure, rules, versioning, Build-Depends, rapidjson |
 | [[appstream-metainfo-packaging]] | Author/License in Discover/GNOME Software via AppStream metainfo `<pkgname>` binding; per-package metainfo; release auto-refresh |
 | [[mysql-postinst-patterns]] | postinst/prerm: auth cascade, plugin-load-add, MySQL 8.0 syntax pitfalls |
