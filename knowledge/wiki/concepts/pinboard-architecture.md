@@ -7,8 +7,9 @@ related:
   - wiki/concepts/pinba-data-flow.md
   - wiki/concepts/docker-build-strategy.md
   - wiki/concepts/docker-tag-strategy.md
+  - wiki/concepts/engine-row-references.md
 confidence: high
-updated: 2026-07-16
+updated: 2026-10-17
 ---
 
 # Pinboard Architecture
@@ -107,6 +108,36 @@ where `N = count * (1 - 0.90)`. Simple offset-based approximation, not a window 
 
 As of July 16, 2026, the shared `hostname` / `server_name` dimensions in the
 engine and Pinboard-managed aggregate tables are standardized on `varchar(64)`.
+
+## Storage Time and Chart Buckets
+
+Stored report/detail timestamps are UTC. Aggregation must explicitly construct
+its PHP timestamps, retention cutoffs and notification lookbacks in UTC.
+Doctrine's PDO MySQL connection initializes every session with
+`SET SESSION time_zone = '+00:00'`, so `FROM_UNIXTIME()` detail inserts follow
+the same convention without depending on installed database timezone tables.
+`DateTimeUtils` converts storage UTC to the configured server timezone for
+display. PHP's default timezone and `TZ` can therefore remain local for display.
+Previously local-time writes were interpreted as UTC, causing an extra display
+offset. Historical values cannot be converted safely without knowing which
+writer timezone and deployment interval produced them.
+
+Hourly and four-hour chart groups use `date(created_at)` plus the existing
+hour expression. Grouping by `day(created_at)` alone can combine distinct
+months, including partial boundary days inside a one-month lookback. Error
+status series use straight segments with visible points, avoiding spline
+undershoot between nonnegative observations.
+
+## Repairing Source Table Engines
+
+`Version20260309173000` must inspect all eleven managed source tables before
+skipping repair; one correct report table does not prove the tag tables are
+correct. The original repair also recreates missing managed tables.
+`Version20261017120000` revisits previously migrated installations and converts
+existing non-PINBA `ipm_pinba_*` base tables with `ALTER TABLE ... ENGINE=PINBA`.
+It preserves their column definitions/comments and leaves healthy sources and
+historical report tables untouched. Repeat execution on a healthy schema
+plans no SQL. These migrations require the PINBA engine to be available.
 
 ## Key Configuration Variables
 

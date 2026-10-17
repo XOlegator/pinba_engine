@@ -5,7 +5,7 @@ sources: []
 related:
   - wiki/index.md
 confidence: high
-updated: 2026-07-15
+updated: 2026-10-17
 ---
 
 # Activity Log
@@ -859,3 +859,20 @@ production-usability review of the Docker images, discovery that the published
   percentile variants, drives them via `send_pinba_packet.py`, asserts
   `index_value <=> key` and `0 < p90 <= p95 <= p99`), wired into both MariaDB
   CI jobs. New concept page: [[report-percentile-field-mapping]].
+
+## 2026-10-17 — Discovery: filesort references and Pinboard storage contracts
+
+- Reproduced request sorting corruption on MariaDB 11.8 with forced row-reference
+  filesort; the ordinary sort could still return correct values. Documented the
+  physical-slot reference contract and the final-slot wraparound error in
+  [[engine-row-references]]. Added data-driven request/timer sort regression
+  coverage, including expiration and wraparound with small pools.
+- Confirmed the PHP/database local-time writer mismatch with Pinboard's UTC
+  reader. Updated [[pinboard-architecture]] with UTC connection initialization,
+  retention/notification cutoffs and the limits of historical timestamp repair.
+- Verified source-table repair against a mixed PINBA/InnoDB schema on a disposable
+  server: checking a single correct report misses incorrect tag tables; the
+  follow-up conversion repairs only incorrect sources and is idempotent.
+- Confirmed cross-month group collisions using two partial boundary-day samples
+  within a one-month interval. Recorded complete date grouping and straight
+  error-status chart segments in [[pinboard-architecture]]. Updated [[index]].
