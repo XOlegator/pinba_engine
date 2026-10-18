@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.12.0](https://github.com/XOlegator/pinba_engine/compare/v2.11.8...v2.12.0) (2026-10-18)
+
+
+### Features
+
+* **engine:** harden ingestion, memory ownership and runtime diagnostics ([#106](https://github.com/XOlegator/pinba_engine/issues/106)) ([7496e39](https://github.com/XOlegator/pinba_engine/commit/7496e397346bd018352507787493f52ebfe1b154))
+
 ## [2.11.8](https://github.com/XOlegator/pinba_engine/compare/v2.11.7...v2.11.8) (2026-10-17)
 
 
