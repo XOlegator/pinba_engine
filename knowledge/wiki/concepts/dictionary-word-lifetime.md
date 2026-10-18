@@ -96,7 +96,12 @@ monotonic and never reused within one initialization. An ordered live-ID index
 supports scans across collected holes; exact lookups and saved row references
 continue to identify the requested ID. Tag hash indexes no longer advertise
 ordered or reverse iteration. Registry lookups use `words_lock`; collection also
-holds `collector_lock` to exclude borrowed-pointer users and report construction.
+holds `collector_lock` to exclude borrowed-pointer users and report construction;
+this is only sound because every report registration path takes `collector_lock`
+shared (see [[runtime-diagnostics]]).
+
+Raw-copy moves the staging word references into the raw record instead of
+retaining and releasing them; timer merging borrows words from the raw record.
 
 These are **not engine-wide memory limits**. Pools, decoded trees, report keys,
 hash buckets and allocator RSS have separate costs. Word collection and optional

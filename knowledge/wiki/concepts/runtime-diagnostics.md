@@ -40,8 +40,17 @@ Report-job buffers are prepared before raw/report updates or expiration. Failed
 admission cannot create ghost report rows; failed expiration defers the entire
 operation without advancing the ring. Expiration retains the collector write
 lock until subtraction completes, preventing concurrent report creation from
-outgrowing preflight buffers. Timing and SQL latency measurements must include
-this locking behavior.
+outgrowing preflight buffers. This relies on an invariant: **every report
+registration path holds `collector_lock` shared** before taking its registry
+write lock (`HANDLE_*_REPORT` in `info()`, `report_info`, and the tag-report
+index scans). A registration path that takes only `tag_reports_lock`/
+`base_reports_lock` can append a report between preflight and dispatch and
+overflow the job buffer; review new report kinds against this rule. Timing and
+SQL latency measurements must include this locking behavior.
+
+UDP collectors accumulate their counters per `recvmmsg` batch and publish them
+once before releasing the pool lock; per-datagram atomics on the shared metric
+array contend across collector threads.
 
 Dictionary accounting includes structs and both owned string copies. Staging,
 pool and report struct gauges describe known backing allocations, not complete

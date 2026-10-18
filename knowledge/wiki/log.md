@@ -1085,3 +1085,24 @@ matrix, independent SQL/count/sum checks, persistent-driver timing and CPU/RSS
 measurement boundaries. Documented legacy info-time precision and the distinction
 between paced regression evidence, optional GC modes and saturation/competitor
 claims. Machine-specific JSON remains outside committed documentation.
+
+## 2026-10-18 — Review of PR #106: registration locking and hot-path cost
+
+**Action:** Reviewed the modernization branch for regressions and compatibility.
+
+**Key findings documented:**
+- Tag-report creation from index scans and `report_info` creation in `info()`
+  held only their registry lock. Report-job buffers are preflighted under the
+  exclusive `collector_lock` and the registry locks are then released, so a
+  concurrent SELECT could grow the array and overflow the buffer; the same
+  window let opt-in tag GC free a descriptor during report construction. All
+  registration paths now take `collector_lock` shared.
+- The collector hot path went from one to about six shared atomic RMWs per
+  datagram; counters are now published once per `recvmmsg` batch. Staging word
+  references move to raw records instead of retain/release pairs.
+- `histogram_max_time` keeps strtod-style prefix parsing (`10s` → 10) so
+  existing table COMMENTs keep opening; range validation stays.
+- Pre-existing: `rtag2_report` looked up `params[0]` twice and stayed empty.
+
+**Pages updated:** `concepts/runtime-diagnostics.md`,
+`concepts/dictionary-word-lifetime.md`.
