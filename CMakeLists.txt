@@ -25,6 +25,7 @@ option(PINBA_WITH_BENCHMARKS "Build benchmarks" OFF)
 option(PINBA_FETCH_DEPENDENCIES "Download test/benchmark dependencies when not installed" ON)
 option(PINBA_DOWNLOAD_MYSQL_SOURCE "Download MySQL source headers when no local source tree is found" OFF)
 option(PINBA_ENABLE_SANITIZERS "Enable ASan/UBSan for debug hardening" OFF)
+option(PINBA_ENABLE_TEST_FAILURES "Enable disposable-server init failure injection" OFF)
 option(
   PINBA_LINK_MYSQL_CLIENT
   "Link the plugin against the MySQL/MariaDB client library. The server \
@@ -516,6 +517,9 @@ target_link_libraries(
   PRIVATE pinba_project_options pinba_includes ${MYSQL_LIBRARY} ${M_LIBRARY}
           Threads::Threads ${Protobuf_LIBRARIES})
 target_include_directories(pinba_engine PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+if(PINBA_ENABLE_TEST_FAILURES)
+  target_compile_definitions(pinba_engine PRIVATE PINBA_ENABLE_TEST_FAILURES)
+endif()
 
 if(PINBA_DB_FLAVOR STREQUAL "mariadb")
   # src/ ships MySQL's my_config.h; MariaDB's my_global.h pulls <my_config.h> and

@@ -26,7 +26,7 @@ Master catalog. Maintained by LLM agents.
 | [[dictionary-word-lifetime]] | Counted dictionary ownership across staging/raw/report selectors, periodic reclamation, DDL registration, and limits |
 | [[hash-memory-access]] | Alignment/alias-safe xxHash reads, preserved legacy hashes, and sanitizer regressions |
 | [[mysql-plugin-abi]] | **Critical**: 8.0 vs 8.4 ABI incompatibility, implications |
-| [[mysql-plugin-install]] | INSTALL PLUGIN lifecycle, reinstall procedure |
+| [[mysql-plugin-install]] | Partial-init cleanup, eventfd shutdown/readiness, RENAME ownership, failed INSTALL and reinstall regressions |
 | [[mysql-plugin-migration-80-to-84]] | Porting checklist: ABI, build requirements, OS paths, OL9 builder rule |
 | [[php-pinba-configuration]] | php.ini settings, deployment scenarios, silent failure |
 | [[php-extension-api]] | Complete PHP function reference: timer lifecycle, request tags, overrides |

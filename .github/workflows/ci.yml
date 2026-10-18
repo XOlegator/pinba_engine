@@ -232,6 +232,9 @@ jobs:
           python3 -B scripts/dictionary_lifetime_test.py --mysql-client=mariadb \
             --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
             --mysql-option=--user=pinba
+          python3 -B scripts/lifecycle_test.py --mysql-client=mariadb \
+            --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
+            --mysql-option=--user=pinba
 
       - name: Dump MariaDB error log on failure
         if: failure()
@@ -553,6 +556,9 @@ jobs:
             | sudo tee /etc/mysql/mariadb.conf.d/zz-pinba-regression.cnf >/dev/null
           sudo systemctl restart mariadb
           python3 -B scripts/dictionary_lifetime_test.py --mysql-client=mariadb \
+            --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
+            --mysql-option=--user=pinba
+          python3 -B scripts/lifecycle_test.py --mysql-client=mariadb \
             --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
             --mysql-option=--user=pinba
 

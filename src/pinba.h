@@ -88,6 +88,8 @@ void *pinba_collector_main(void *arg);
 void *pinba_stats_main(void *arg);
 int pinba_collector_init(const pinba_daemon_settings &settings);
 void pinba_collector_shutdown();
+void pinba_request_shutdown();
+void pinba_wait_for_shutdown(int64_t microseconds);
 int pinba_get_processors_number();
 
 int pinba_get_time_interval();

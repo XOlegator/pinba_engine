@@ -379,7 +379,7 @@ static inline int pinba_parse_params(TABLE *table, unsigned char type, PINBA_SHA
   int num = 0, c_num = 0;
   int parse_only = 0;
   unsigned char tmp_hv_type;
-  char report_kind;
+  char report_kind = PINBA_BASE_REPORT_KIND;
 
   if (type == PINBA_TABLE_HISTOGRAM_VIEW) {
     len = table->s->comment.length - 3;
@@ -397,6 +397,7 @@ static inline int pinba_parse_params(TABLE *table, unsigned char type, PINBA_SHA
   } else {
     len = table->s->comment.length;
     str_copy = strdup(table->s->comment.str);
+    pinba_get_table_type(str_copy, len, &report_kind);
   }
 
   if (!share) {
@@ -493,7 +494,7 @@ static inline int pinba_parse_params(TABLE *table, unsigned char type, PINBA_SHA
     if (p < end) {
       do {
         equal = strchr(p, '=');
-        if (!equal) {
+        if (!equal || equal >= (comma ? comma : end)) {
           num = -1;
           goto out;
         }
@@ -501,7 +502,7 @@ static inline int pinba_parse_params(TABLE *table, unsigned char type, PINBA_SHA
           share->cond_names = (char **)realloc(share->cond_names, (c_num + 1) * sizeof(char *));
           share->cond_names[c_num] = strndup(p, equal - p);
           share->cond_values = (char **)realloc(share->cond_values, (c_num + 1) * sizeof(char *));
-          share->cond_values[c_num] = strndup(equal + 1, comma - equal - 1);
+          share->cond_values[c_num] = strndup(equal + 1, (comma ? comma : end) - equal - 1);
           c_num++;
         }
         p = comma ? comma + 1 : end;
@@ -660,7 +661,13 @@ static int pinba_engine_init(void *p) /* {{{ */
   settings.address = address_var;
   settings.cpu_start = cpu_start_var;
 
-  if (pinba_collector_init(settings) != P_SUCCESS) {
+  try {
+    if (pinba_collector_init(settings) != P_SUCCESS) {
+      DBUG_RETURN(1);
+    }
+  } catch (const std::exception &error) {
+    pinba_error(P_ERROR, "collector initialization failed: %s", error.what());
+    pinba_collector_shutdown();
     DBUG_RETURN(1);
   }
 
@@ -2213,27 +2220,22 @@ int ha_pinba::close(void) /* {{{ */
 
 int ha_pinba::rename_table(const char *from, const char *to) /* {{{ */
 {
-  pinba_std_report *std;
-
   pthread_mutex_lock(&D->share_mutex);
-  std = (pinba_std_report *)pinba_map_get(D->reports_to_tables, from);
-  if (!std) {
-    /* we're not aware of a report until you do a SELECT from it, so it's ok */
-    pthread_mutex_unlock(&D->share_mutex);
-    return 0;
+  auto *index = static_cast<char *>(pinba_map_get(D->tables_to_reports, from));
+  if (index) {
+    auto *tables = static_cast<pinba_report_tables *>(pinba_map_get(D->reports_to_tables, index));
+    if (pinba_map_get(D->tables_to_reports, to)) {
+      pthread_mutex_unlock(&D->share_mutex);
+      return HA_ERR_INTERNAL_ERROR;
+    }
+    if (tables) {
+      const void *type = pinba_map_get(tables->tables, from);
+      pinba_map_delete(tables->tables, from);
+      tables->tables = pinba_map_add(tables->tables, to, type);
+    }
+    pinba_map_delete(D->tables_to_reports, from);
+    D->tables_to_reports = pinba_map_add(D->tables_to_reports, to, index);
   }
-
-  if (pinba_map_get(D->reports_to_tables, to) != nullptr) {
-    pthread_mutex_unlock(&D->share_mutex);
-    pinba_error(
-        P_WARNING,
-        "non-empty table value in table-to-reports hash, this is an internal error, please report");
-    return HA_ERR_INTERNAL_ERROR;
-  }
-
-  pinba_map_delete(D->reports_to_tables, from);
-
-  D->reports_to_tables = pinba_map_add(D->reports_to_tables, to, std);
   pthread_mutex_unlock(&D->share_mutex);
   return 0;
 }

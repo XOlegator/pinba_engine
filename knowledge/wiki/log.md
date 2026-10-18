@@ -996,3 +996,25 @@ production-usability review of the Docker images, discovery that the published
   Semantic rejects are counted even when an entire batch is rejected.
 - Added [[request-structure-validation]], updated [[index]], and wired the SQL
   regression into both existing MariaDB CI jobs. No production services changed.
+
+## 2026-10-18 — C04: partial startup, shutdown, and DDL registration
+
+- Unified partial-init cleanup with normal shutdown, tracking initialized locks
+  and started workers. Added a startup readiness handshake and atomic shutdown.
+  RAII receive buffers/epoll descriptors and eventfd-based wakeup replace thread
+  cancellation; data/stats waits also wake immediately on shutdown.
+- Fixed RENAME to update table-to-report and alias bindings, initialized comment
+  report-kind classification and removed null-pointer subtraction in condition
+  parsing. Verified that unsupported ALTER COMMENT is rejected without losing
+  the existing report. Query cancellation leaves the engine usable.
+- Guarded failed timer-pool growth and preserved initialized timer reservations
+  on tag-buffer allocation failure. Decode allocation and partial std::thread
+  construction failures no longer escape through legacy startup paths.
+- A test-only build exercises ten partial-init failure stages, successful retry
+  in the same server, three real bind failures, and stable fd/thread counts.
+  The full exercised UDP/SQL suite passes ASan/UBSan and shuts down cleanly.
+  A 2000-second gathering period also shuts down immediately via eventfd.
+- All 92 unit tests pass, including a child-process RLIMIT_NPROC regression
+  verifying that kernel refusal to create threads returns nullptr. Documented
+  [[mysql-plugin-install]], updated [[index]], and added the ordinary lifecycle
+  regression to both MariaDB CI jobs. Failure injection defaults to OFF.

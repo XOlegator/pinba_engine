@@ -25,6 +25,8 @@
 
 #include <cstring>
 #include <algorithm>
+#include <climits>
+#include <new>
 
 namespace {
 
@@ -209,17 +211,19 @@ void pinba__request__init(Pinba__Request *message) {
 Pinba__Request *pinba__request__unpack(ProtobufCAllocator * /*allocator*/,
                                        size_t len,
                                        const uint8_t *data) {
-    if (!data || len == 0) {
+    if (!data || len == 0 || len > INT_MAX) {
         return nullptr;
     }
 
-    Pinba::Request proto;
-    if (!proto.ParseFromArray(data, static_cast<int>(len))) {
+    try {
+        Pinba::Request proto;
+        if (!proto.ParseFromArray(data, static_cast<int>(len))) {
+            return nullptr;
+        }
+        return convert_request(proto).release();
+    } catch (const std::bad_alloc &) {
         return nullptr;
     }
-
-    auto request = convert_request(proto);
-    return request.release();
 }
 
 void pinba__request__free_unpacked(Pinba__Request *message,

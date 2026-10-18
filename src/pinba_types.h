@@ -354,7 +354,9 @@ typedef struct _pinba_daemon { /* {{{ */
   pthread_rwlock_t stats_lock;
   void *tables_to_reports;
   void *reports_to_tables;
-  int in_shutdown;
+  std::atomic<bool> in_shutdown{false};
+  std::atomic<unsigned int> workers_ready{0};
+  int shutdown_event_fd = -1;
   pthread_cond_t data_job_posted;
   pthread_mutex_t data_job_mutex;
   int data_job_flag;

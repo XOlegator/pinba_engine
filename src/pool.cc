@@ -18,6 +18,7 @@
 
 #include "pinba.h"
 #include "pinba_dictionary.h"
+#include "pinba_test_hooks.h"
 
 /* generic pool functions */
 
@@ -292,7 +293,9 @@ int timer_pool_add(int timers_cnt) /* {{{ */
 
     pinba_error(P_WARNING, "growing timer_pool to %d", timer_pool->size + more);
 
-    pinba_pool_grow(timer_pool, more);
+    if (pinba_pool_grow(timer_pool, more) != P_SUCCESS) {
+      return -1;
+    }
 
     if (timer_pool->out > timer_pool->in) {
       int prev_request_id = -1;
@@ -499,6 +502,7 @@ void *pinba_stats_main(void *arg) /* {{{ */
 
   packets_job_data_arr = (struct packets_job_data *)pinba_malloc_or_log(
       sizeof(struct packets_job_data) * D->thread_pool->size, "stats worker job buffer");
+  if (pinba_test_init_failure("stats_buffers")) goto cleanup;
   barrier1 = (thread_pool_barrier_t *)pinba_malloc_or_log(sizeof(*barrier1), "stats barrier1");
   barrier2 = (thread_pool_barrier_t *)pinba_malloc_or_log(sizeof(*barrier2), "stats barrier2");
   barrier3 = (thread_pool_barrier_t *)pinba_malloc_or_log(sizeof(*barrier3), "stats barrier3");
@@ -513,6 +517,7 @@ void *pinba_stats_main(void *arg) /* {{{ */
   th_pool_barrier_init(barrier4);
   barriers_initialized = 1;
 
+  D->workers_ready.fetch_add(1);
   gettimeofday(&launch, nullptr);
 
   for (;;) {
@@ -717,7 +722,7 @@ void *pinba_stats_main(void *arg) /* {{{ */
     timersub(&launch, &tv1, &tv1);
 
     if (LIKELY(tv1.tv_sec >= 0 && tv1.tv_usec >= 0)) {
-      usleep(tv1.tv_sec * 1000000 + tv1.tv_usec);
+      pinba_wait_for_shutdown(static_cast<int64_t>(tv1.tv_sec) * 1000000 + tv1.tv_usec);
     } else { /* we were locked too long: run right now, but re-schedule next launch */
       gettimeofday(&launch, nullptr);
       tv1.tv_sec = D->settings.stats_gathering_period / 1000000;
@@ -726,6 +731,7 @@ void *pinba_stats_main(void *arg) /* {{{ */
     }
   }
 cleanup:
+  pinba_request_shutdown();
   free(rep_job_data_arr);
   free(tag_rep_job_data_arr);
   free(rtag_rep_job_data_arr);

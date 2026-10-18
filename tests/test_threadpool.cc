@@ -26,6 +26,11 @@
 
 #include <gtest/gtest.h>
 
+#ifdef __linux__
+#include <sys/resource.h>
+#include <unistd.h>
+#endif
+
 #include <atomic>
 #include <cstdlib>
 
@@ -182,3 +187,24 @@ TEST(ThreadPool, BarrierEndWaitsAndDestroys) {
 }
 
 }  // namespace
+
+#ifdef __linux__
+TEST(ThreadPoolCreationFailure, ReturnsNullWhenKernelRejectsThreads) {
+  if (geteuid() == 0) {
+    GTEST_SKIP() << "RLIMIT_NPROC does not restrict root";
+  }
+  // Apply the limit only inside the death-test child. The parent and unrelated
+  // user processes keep their limits; the kernel rejects this child's threads.
+  ASSERT_EXIT(
+      {
+        rlimit limit{};
+        if (getrlimit(RLIMIT_NPROC, &limit) != 0) _exit(2);
+        limit.rlim_cur = 0;
+        if (setrlimit(RLIMIT_NPROC, &limit) != 0) _exit(3);
+        auto *pool = th_pool_create(2);
+        if (pool) th_pool_destroy(pool);
+        _exit(pool ? 1 : 0);
+      },
+      ::testing::ExitedWithCode(0), "");
+}
+#endif
