@@ -93,6 +93,10 @@ void pinba_wait_for_shutdown(int64_t microseconds);
 int pinba_get_processors_number();
 
 int pinba_get_time_interval();
+// Caller holds collector_lock exclusively; report arrays can only shrink.
+bool pinba_prepare_report_jobs(reports_job_data **base, unsigned int *base_size,
+                               reports_job_data **rtag, unsigned int *rtag_size,
+                               reports_job_data **tag, unsigned int *tag_size);
 int pinba_process_stats_packet(const unsigned char *buffer, int buffer_len);
 
 void pinba_eat_udp(pinba_socket *socket, size_t thread_num);

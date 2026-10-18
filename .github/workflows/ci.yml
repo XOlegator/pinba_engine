@@ -243,6 +243,9 @@ jobs:
           python3 -B scripts/lifecycle_test.py --mysql-client=mariadb \
             --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
             --mysql-option=--user=pinba
+          python3 -B scripts/runtime_metrics_test.py --mysql-client=mariadb \
+            --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
+            --mysql-option=--user=pinba
 
       - name: Dump MariaDB error log on failure
         if: failure()
@@ -575,6 +578,9 @@ jobs:
             --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
             --mysql-option=--user=pinba
           python3 -B scripts/lifecycle_test.py --mysql-client=mariadb \
+            --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
+            --mysql-option=--user=pinba
+          python3 -B scripts/runtime_metrics_test.py --mysql-client=mariadb \
             --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
             --mysql-option=--user=pinba
 

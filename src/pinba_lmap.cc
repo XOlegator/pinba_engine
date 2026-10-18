@@ -16,6 +16,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <new>
 #include <unordered_map>
 
 typedef std::unordered_map<uint64_t, const void *> sparse_hash_t;
@@ -188,3 +190,15 @@ size_t pinba_lmap_count(void *map_report) /* {{{ */
   return map->size();
 }
 /* }}} */
+
+bool pinba_lmap_try_add(void **storage, uint64_t index, const void *value) noexcept {
+  try {
+    if (*storage) return static_cast<pinba_lmap *>(*storage)->data_add(index, value) == 0;
+    auto map = std::make_unique<pinba_lmap>();
+    if (map->data_add(index, value) != 0) return false;
+    *storage = map.release();
+    return true;
+  } catch (const std::bad_alloc &) {
+    return false;
+  }
+}

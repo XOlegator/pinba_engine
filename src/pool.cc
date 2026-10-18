@@ -18,6 +18,7 @@
 
 #include "pinba.h"
 #include "pinba_dictionary.h"
+#include "pinba_runtime.h"
 #include "pinba_test_hooks.h"
 
 /* generic pool functions */
@@ -95,6 +96,10 @@ int pinba_pool_grow(pinba_pool *p, size_t more) /* {{{ */
     return P_FAILURE;
   }
   p->data = new_data;
+  if (strncmp(p->name, "per_thread_", 11) == 0) {
+    pinba_count(pinba_metric::staging_slots, more);
+    pinba_count(pinba_metric::staging_bytes, more * p->element_size);
+  }
   p->size = new_size;
 
   if (p->size == more) {
@@ -142,6 +147,10 @@ void pinba_pool_destroy(pinba_pool *p) /* {{{ */
       p->dtor(p);
     }
 
+    if (strncmp(p->name, "per_thread_", 11) == 0) {
+      pinba_counter(pinba_metric::staging_slots).fetch_sub(p->size);
+      pinba_counter(pinba_metric::staging_bytes).fetch_sub(p->size * p->element_size);
+    }
     free(p->data);
     p->data = nullptr;
   }
@@ -368,6 +377,7 @@ void update_reports_func(void *job_data) /* {{{ */
 {
   struct reports_job_data *d = (struct reports_job_data *)job_data;
   unsigned int i, tmp_id;
+  uint64_t matched = 0;
   pinba_pool *request_pool = &D->request_pool;
   pinba_stats_record *record;
   pinba_report_update_function *func;
@@ -379,7 +389,10 @@ void update_reports_func(void *job_data) /* {{{ */
     tmp_id = tmp_id - request_pool->size;
   }
 
+  const auto lock_started = pinba_now_ns();
   pthread_rwlock_wrlock(&report->lock);
+  pinba_count(pinba_metric::report_lock_wait_ns, pinba_now_ns() - lock_started);
+  const pinba_metric_duration duration{pinba_metric::report_update_ns};
   if (d->add) {
     func = report->add_func;
     if (report->start.tv_sec == 0) {
@@ -398,9 +411,14 @@ void update_reports_func(void *job_data) /* {{{ */
     record = REQ_POOL(request_pool) + tmp_id;
 
     CHECK_REPORT_CONDITIONS_CONTINUE(report, record);
+    matched++;
     func(tmp_id, report, record);
   }
 
+  pinba_count(d->add ? pinba_metric::report_add_candidates : pinba_metric::report_delete_candidates,
+              d->count);
+  pinba_count(d->add ? pinba_metric::report_add_filtered : pinba_metric::report_delete_filtered,
+              d->count - matched);
   pinba_report_add_rusage(report, &rusage_data);
   report->time_interval = pinba_get_time_interval();
   pthread_rwlock_unlock(&report->lock);
@@ -529,6 +547,14 @@ void *pinba_stats_main(void *arg) /* {{{ */
     }
 
     pthread_rwlock_wrlock(&D->collector_lock);
+    if (pinba_test_init_failure("expiration_job_buffers") ||
+        !pinba_prepare_report_jobs(&rep_job_data_arr, &base_reports_alloc, &rtag_rep_job_data_arr,
+                                   &rtag_reports_alloc, &tag_rep_job_data_arr,
+                                   &tag_reports_alloc)) {
+      pinba_count(pinba_metric::expiration_deferred);
+      pthread_rwlock_unlock(&D->collector_lock);
+      goto sleep;
+    }
     /* make sure we don't store any OLD data */
     from.tv_sec = launch.tv_sec - D->settings.stats_history;
     from.tv_usec = launch.tv_usec;
@@ -539,10 +565,8 @@ void *pinba_stats_main(void *arg) /* {{{ */
     pinba_request_pool_delete_old(from, &deleted_timer_cnt, &rtags_cnt);
 
     new_request_id = request_pool->out;
-    pthread_rwlock_unlock(&D->collector_lock);
-
-    /* relock for reading */
-    pthread_rwlock_rdlock(&D->collector_lock);
+    // Keep the write lock through subtraction: no new report may outgrow the
+    // preflight buffers after raw expiration has already advanced the ring.
 
     {
       unsigned int i, accounted, job_size, num;
@@ -559,16 +583,7 @@ void *pinba_stats_main(void *arg) /* {{{ */
 
         /* update base reports - one report per thread */
         pthread_rwlock_rdlock(&D->base_reports_lock);
-        if (base_reports_alloc < D->base_reports_arr.size) {
-          if (UNLIKELY(pinba_ensure_reports_job_capacity(&rep_job_data_arr, &base_reports_alloc,
-                                                         D->base_reports_arr.size,
-                                                         "base report job buffer") != P_SUCCESS)) {
-            pinba_error(P_WARNING, "out of memory while extending base report job buffer");
-            pthread_rwlock_unlock(&D->base_reports_lock);
-            pthread_rwlock_unlock(&D->collector_lock);
-            goto sleep;
-          }
-        }
+
         if (base_reports_alloc > 0) {
           memset(rep_job_data_arr, 0, sizeof(struct reports_job_data) * base_reports_alloc);
         }
@@ -589,16 +604,6 @@ void *pinba_stats_main(void *arg) /* {{{ */
         if (rtags_cnt) {
           /* update rtag reports - one report per thread */
           pthread_rwlock_rdlock(&D->rtag_reports_lock);
-          if (rtag_reports_alloc < D->rtag_reports_arr.size) {
-            if (UNLIKELY(pinba_ensure_reports_job_capacity(
-                             &rtag_rep_job_data_arr, &rtag_reports_alloc, D->rtag_reports_arr.size,
-                             "rtag report job buffer") != P_SUCCESS)) {
-              pinba_error(P_WARNING, "out of memory while extending rtag report job buffer");
-              pthread_rwlock_unlock(&D->rtag_reports_lock);
-              pthread_rwlock_unlock(&D->collector_lock);
-              goto sleep;
-            }
-          }
 
           if (rtag_reports_alloc > 0) {
             memset(rtag_rep_job_data_arr, 0, sizeof(struct reports_job_data) * rtag_reports_alloc);
@@ -626,18 +631,6 @@ void *pinba_stats_main(void *arg) /* {{{ */
 
           pthread_rwlock_rdlock(&D->timer_lock);
           pthread_rwlock_rdlock(&D->tag_reports_lock);
-
-          if (tag_reports_alloc < D->tag_reports_arr.size) {
-            if (UNLIKELY(pinba_ensure_reports_job_capacity(
-                             &tag_rep_job_data_arr, &tag_reports_alloc, D->tag_reports_arr.size,
-                             "tag report job buffer") != P_SUCCESS)) {
-              pinba_error(P_WARNING, "out of memory while extending tag report job buffer");
-              pthread_rwlock_unlock(&D->tag_reports_lock);
-              pthread_rwlock_unlock(&D->timer_lock);
-              pthread_rwlock_unlock(&D->collector_lock);
-              goto sleep;
-            }
-          }
 
           if (tag_reports_alloc > 0) {
             memset(tag_rep_job_data_arr, 0, sizeof(struct reports_job_data) * tag_reports_alloc);
@@ -693,6 +686,7 @@ void *pinba_stats_main(void *arg) /* {{{ */
 
         // Report deletion jobs and timer clearing have finished. The inactive
         // raw records no longer expose their borrowed tag/timer word pointers.
+        pinba_count(pinba_metric::raw_expired, num);
         unsigned int expired_id = prev_request_id;
         for (unsigned int n = 0; n < num; n++) {
           pinba_record_release_words(REQ_POOL(request_pool) + expired_id);

@@ -21,9 +21,7 @@
 #include "pinba.h"
 #include "pinba_lmap.h"
 #include "pinba_map.h"
-
-static std::atomic<uint64_t> g_tags_created{0};
-static std::atomic<uint64_t> g_tags_reused{0};
+#include "pinba_runtime.h"
 
 void pinba_tag_dtor(pinba_tag *tag) /* {{{ */
 {
@@ -68,13 +66,15 @@ pinba_tag *pinba_tag_lookup_or_create_locked(const char *name, size_t len) /* {{
 
   pinba_tag *tag = (pinba_tag *)pinba_map_get(D->tag.name_index, (char *)name);
   if (tag) {
-    g_tags_reused.fetch_add(1, std::memory_order_relaxed);
+    pinba_count(pinba_metric::tags_reused);
     return tag;
   }
 
   /* upgrade lock */
   pthread_rwlock_unlock(&D->words_lock);
+  const auto wait_started = pinba_now_ns();
   pthread_rwlock_wrlock(&D->words_lock);
+  pinba_count(pinba_metric::words_write_wait_ns, pinba_now_ns() - wait_started);
 
   tag = (pinba_tag *)pinba_map_get(D->tag.name_index, (char *)name);
   if (!tag) {
@@ -86,14 +86,19 @@ pinba_tag *pinba_tag_lookup_or_create_locked(const char *name, size_t len) /* {{
       tag->name_len = copied;
       tag->hash = 0;
 
-      D->tag.table = pinba_lmap_add(D->tag.table, tag_id, tag);
-      D->tag.name_index = pinba_map_add(D->tag.name_index, tag->name, tag);
-      g_tags_created.fetch_add(1, std::memory_order_relaxed);
+      if (!pinba_map_try_add(&D->tag.name_index, tag->name, tag) ||
+          !pinba_lmap_try_add(&D->tag.table, tag_id, tag)) {
+        pinba_map_delete(D->tag.name_index, tag->name);
+        free(tag);
+        tag = nullptr;
+      } else {
+        pinba_count(pinba_metric::tags_created);
+      }
     } else {
       pinba_warning("failed to allocate memory for a new tag");
     }
   } else {
-    g_tags_reused.fetch_add(1, std::memory_order_relaxed);
+    pinba_count(pinba_metric::tags_reused);
   }
 
   pthread_rwlock_unlock(&D->words_lock);
@@ -105,8 +110,8 @@ pinba_tag *pinba_tag_lookup_or_create_locked(const char *name, size_t len) /* {{
 pinba_tag_metrics_snapshot pinba_tag_metrics_get(void) /* {{{ */
 {
   pinba_tag_metrics_snapshot snapshot;
-  snapshot.tags_created = g_tags_created.load(std::memory_order_relaxed);
-  snapshot.tags_reused = g_tags_reused.load(std::memory_order_relaxed);
+  snapshot.tags_created = pinba_count_get(pinba_metric::tags_created);
+  snapshot.tags_reused = pinba_count_get(pinba_metric::tags_reused);
   return snapshot;
 }
 /* }}} */

@@ -481,6 +481,7 @@ set(PINBA_SOURCES
     src/main.cc
     src/data.cc
     src/pinba_dictionary.cc
+    src/pinba_runtime.cc
     src/pool.cc
     src/tags.cc
     src/threadpool.cc

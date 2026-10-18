@@ -25,5 +25,6 @@ int pinba_lmap_delete(void *map_report, uint64_t index);
 void pinba_lmap_destroy(void *data);
 void *pinba_lmap_create();
 size_t pinba_lmap_count(void *map_report);
+bool pinba_lmap_try_add(void **storage, uint64_t index, const void *value) noexcept;
 
 #endif /* HAVE_PINBA_LMAP_H */

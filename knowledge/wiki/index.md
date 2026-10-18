@@ -11,12 +11,13 @@ updated: 2026-10-18
 
 Master catalog. Maintained by LLM agents.
 
-## Concepts (34 articles)
+## Concepts (35 articles)
 
 | Article | Key Topic |
 |---------|-----------|
 | [[pinba-data-flow]] | End-to-end pipeline: PHP → UDP → pool → SQL |
 | [[request-structure-validation]] | Flattened timer validation, storage bounds, compact skipping and decoded-tree reclamation |
+| [[runtime-diagnostics]] | Native-width SHOW counters, datagram/Request accounting, known memory bounds and allocation-failure preflight |
 | [[report-percentile-field-mapping]] | fetch_row hardcoded field indices, report3 p90 off-by-one (2013→2.11.5), SQL regression test |
 | [[histogram-boundary-semantics]] | Saturating upper-edge buckets, weighted add/delete, unit and UDP/SQL regression coverage |
 | [[fractional-percentile-grammar]] | Opt-in p= decimal selectors, exact weighted ranks, legacy parsing and histogram configuration validation |

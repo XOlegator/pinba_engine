@@ -29,6 +29,7 @@
 
 #include "pinba.h"
 #include "pinba_dictionary.h"
+#include "pinba_runtime.h"
 
 #if defined(PINBA_ENGINE_DEBUG_ON) && !defined(DBUG_ON)
 #undef DBUG_OFF
@@ -6038,32 +6039,31 @@ inline int ha_pinba::status_fetch_row(unsigned char *) /* {{{ */
       switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* current_temp_pool_size */
           (*field)->set_notnull();
-          pthread_rwlock_rdlock(&D->data_lock);
-          (*field)->store((long)0);
-          pthread_rwlock_unlock(&D->data_lock);
+          (*field)->store(static_cast<long>(
+              std::min<uint64_t>(pinba_count_get(pinba_metric::staging_slots), INT_MAX)));
           break;
         case 1: /* current_timer_pool_size */
           (*field)->set_notnull();
           pthread_rwlock_rdlock(&D->timer_lock);
-          (*field)->store((long)D->timer_pool.size);
+          (*field)->store(static_cast<long>(std::min<size_t>(D->timer_pool.size, INT_MAX)));
           pthread_rwlock_unlock(&D->timer_lock);
           break;
         case 2: /* lost_tmp_records */
           (*field)->set_notnull();
           pthread_rwlock_rdlock(&D->stats_lock);
-          (*field)->store((long)D->stats.lost_tmp_records);
+          (*field)->store(static_cast<long>(std::min<size_t>(D->stats.lost_tmp_records, INT_MAX)));
           pthread_rwlock_unlock(&D->stats_lock);
           break;
         case 3: /* invalid_packets */
           (*field)->set_notnull();
-          pthread_rwlock_rdlock(&D->stats_lock);
-          (*field)->store((long)D->stats.invalid_packets);
-          pthread_rwlock_unlock(&D->stats_lock);
+          (*field)->store(static_cast<long>(
+              std::min<uint64_t>(pinba_count_get(pinba_metric::udp_decode_errors), INT_MAX)));
           break;
         case 4: /* invalid_request_data */
           (*field)->set_notnull();
           pthread_rwlock_rdlock(&D->stats_lock);
-          (*field)->store((long)D->stats.invalid_request_data);
+          (*field)->store(
+              static_cast<long>(std::min<size_t>(D->stats.invalid_request_data, INT_MAX)));
           pthread_rwlock_unlock(&D->stats_lock);
           break;
         case 5: /* build string */
@@ -6076,7 +6076,8 @@ inline int ha_pinba::status_fetch_row(unsigned char *) /* {{{ */
         case 6: /* dictionary size */
           (*field)->set_notnull();
           pthread_rwlock_rdlock(&D->words_lock);
-          (*field)->store((long)pinba_map_count(D->dictionary));
+          (*field)->store(
+              static_cast<long>(std::min<size_t>(pinba_map_count(D->dictionary), INT_MAX)));
           pthread_rwlock_unlock(&D->words_lock);
           break;
       }
@@ -9267,13 +9268,36 @@ static SYS_VAR *system_variables[] = {MYSQL_SYSVAR(port),
 
 struct st_mysql_storage_engine pinba_storage_engine = {MYSQL_HANDLERTON_INTERFACE_VERSION};
 
-static SHOW_VAR pinba_status_vars[] = {
+template <pinba_metric metric>
 #ifdef MARIADB_BASE_VERSION
-    {"Pinba_engine_version", (char *)PINBA_ENGINE_VERSION, SHOW_CHAR}, {NullS, NullS, SHOW_LONG}};
+static int pinba_show_metric(MYSQL_THD, SHOW_VAR *variable, void *buffer, system_status_var *,
+                             enum enum_var_type)
 #else
-    {"Pinba_engine_version", (char *)PINBA_ENGINE_VERSION, SHOW_CHAR, SHOW_SCOPE_GLOBAL},
-    {NullS, NullS, SHOW_LONG, SHOW_SCOPE_GLOBAL}};
+static int pinba_show_metric(MYSQL_THD, SHOW_VAR *variable, char *buffer)
 #endif
+{
+  const uint64_t value = pinba_metric_value(metric);
+  memcpy(buffer, &value, sizeof(value));
+  variable->type = SHOW_LONGLONG;
+  variable->value = static_cast<char *>(buffer);
+  return 0;
+}
+
+#ifdef MARIADB_BASE_VERSION
+#define PINBA_STATUS_ENTRY(id, name) \
+  {"Pinba_" #name, reinterpret_cast<char *>(pinba_show_metric<pinba_metric::id>), SHOW_FUNC},
+static SHOW_VAR pinba_status_vars[] = {
+    {"Pinba_engine_version", (char *)PINBA_ENGINE_VERSION, SHOW_CHAR},
+    PINBA_RUNTIME_METRICS(PINBA_STATUS_ENTRY){NullS, NullS, SHOW_LONG}};
+#else
+#define PINBA_STATUS_ENTRY(id, name)                                                         \
+  {"Pinba_" #name, reinterpret_cast<char *>(pinba_show_metric<pinba_metric::id>), SHOW_FUNC, \
+   SHOW_SCOPE_GLOBAL},
+static SHOW_VAR pinba_status_vars[] = {
+    {"Pinba_engine_version", (char *)PINBA_ENGINE_VERSION, SHOW_CHAR, SHOW_SCOPE_GLOBAL},
+    PINBA_RUNTIME_METRICS(PINBA_STATUS_ENTRY){NullS, NullS, SHOW_LONG, SHOW_SCOPE_GLOBAL}};
+#endif
+#undef PINBA_STATUS_ENTRY
 
 #ifdef MARIADB_BASE_VERSION
 maria_declare_plugin(pinba) /* {{{ */

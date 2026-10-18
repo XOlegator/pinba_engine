@@ -57,6 +57,8 @@ def main():
     # Collection can lag logical expiration by one second.
     time.sleep(1.1)
     baseline = scalar("SELECT dictionary_size FROM status")
+    filtered_rows = query("SHOW GLOBAL STATUS LIKE 'Pinba_report_add_filtered'")
+    filtered_before = int(filtered_rows[0][1]) if filtered_rows else None
     marker = "d" + uuid.uuid4().hex[:16]
     names = [marker + str(i) for i in range(3)]
     tables = []
@@ -160,6 +162,8 @@ def main():
                     raise failures[0]
                 print(f"PASS: window {window + 1}, unique values reclaimed with active reports")
 
+            if filtered_before is not None:
+                assert int(query("SHOW GLOBAL STATUS LIKE 'Pinba_report_add_filtered'")[0][1]) > filtered_before
             send("keep")
             wait_for(lambda: scalar(f"SELECT req_count FROM {conditional}") == 1,
                      "condition selector lost its identity after expiration")

@@ -7,6 +7,7 @@
 
 #include "pinba_dictionary.h"
 #include "pinba_map.h"
+#include "pinba_runtime.h"
 
 namespace {
 
@@ -151,3 +152,23 @@ TEST_F(PinbaDictionary, ConcurrentInternLookupReleaseAndCollection) {
 }
 
 }  // namespace
+
+TEST(PinbaRuntime, KeepsNativeWidthCountersAndConcurrentHighWatermarks) {
+  pinba_runtime_reset();
+  const uint64_t large = uint64_t{1} << 40;
+  pinba_count(pinba_metric::udp_bytes, large);
+  EXPECT_EQ(pinba_count_get(pinba_metric::udp_bytes), large);
+  std::vector<std::thread> workers;
+  for (int i = 0; i < 4; i++) {
+    workers.emplace_back([&] {
+      for (int n = 0; n < 1000; n++) {
+        const auto value = pinba_counter(pinba_metric::queue_live).fetch_add(1) + 1;
+        pinba_peak(pinba_metric::queue_peak, value);
+      }
+    });
+  }
+  for (auto &worker : workers) worker.join();
+  EXPECT_EQ(pinba_count_get(pinba_metric::queue_peak), 4000u);
+  pinba_peak(pinba_metric::queue_peak, 1);
+  EXPECT_EQ(pinba_count_get(pinba_metric::queue_peak), 4000u);
+}

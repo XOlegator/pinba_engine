@@ -11,6 +11,7 @@ related:
   - wiki/concepts/pinba-data-flow.md
   - wiki/concepts/engine-row-references.md
   - wiki/concepts/dictionary-word-lifetime.md
+  - wiki/concepts/runtime-diagnostics.md
 confidence: high
 updated: 2026-10-18
 ---
@@ -83,14 +84,18 @@ configuration behavior.
 
 `pinba.status.current_timer_pool_size` reports allocated timer capacity, not
 the number of live timers. `dictionary_size` reports interned string count.
-At the 2.11.8 baseline, `current_temp_pool_size` is a placeholder returning zero;
-it cannot establish that staging buffers are empty.
+The 2.11.8 baseline returned a constant zero for `current_temp_pool_size`. The
+diagnostics correction reports combined decoded/staging backing capacity in
+slots, saturating at INT_MAX for that legacy SQL column. It is not live queue
+occupancy. Native-width counters expose capacity bytes and queued datagrams
+separately; see [[runtime-diagnostics]].
 
 `lost_tmp_records` counts requests rejected when copying staging records into
 the full raw ring. It is not a complete count of every UDP/kernel/staging loss.
-The collector also logs received/dropped/decode counters. Some validation-error
-increments are disabled in the legacy conversion path, so `invalid_packets=0`
-does not prove that every received packet was valid.
+Additive SHOW variables distinguish kernel/queue/raw losses, decode errors and
+semantic validation reasons. Legacy `invalid_packets` now reports decode errors;
+`invalid_request_data` counts structurally invalid Request nodes, including
+descendants. Zero decode errors alone does not establish semantic validity.
 
 Restart clears all engine-resident statistics. Pinboard persists its own
 historical snapshots separately. See [[pinba-data-flow]] and

@@ -1045,3 +1045,26 @@ production-usability review of the Docker images, discovery that the published
   sanitizer server. Updated [[request-structure-validation]] catalog wording
   and [[index]]. This correction is separate from the diagnostics feature so
   subsequent performance baselines include the same decoded-tree lifetime.
+
+## 2026-10-18 — C03: stage accounting and observable allocation failures
+
+- Added native-width SHOW counters for socket datagrams/bytes, decode/validation,
+  staging/admission, expiration, dictionary lifecycle, known allocations, stage
+  timing and update-lock waits. Kernel overflow sampling and effective SO_RCVBUF
+  distinguish socket delivery from application-stage losses.
+- Fixed uncounted recvmmsg tail losses at a full queue. Controlled mixed raw-copy
+  failures now compact worker reservations and update physical IDs/generation
+  counters together, without exposing inactive holes. Checked dictionary/tag
+  index insertion cleans up owned keys and values when allocation fails.
+- Preflight report-job buffers before admission and expiration. Failed admission
+  cannot leave partial report additions; failed expiration leaves the ring intact
+  and is explicitly deferred. Expiration holds the collector write lock through
+  subtraction; its SQL latency belongs in workload measurements.
+- All 96 unit tests pass. Real UDP/SQL checks verify exact datagram/Request balance,
+  malformed reasons, native-width helpers and gauges, plus controlled mixed copy,
+  report-buffer and expiration failures under ASan/UBSan. Queue ownership returns
+  to zero. Existing complete exercised SQL/lifecycle regressions also pass.
+- Documented public counters and limitations in `docs/diagnostics.md` and
+  [[runtime-diagnostics]], updated [[pinba-pool-model]] and [[index]]. Known bytes
+  deliberately exclude unmeasured container/row/allocator allocations; no RSS
+  or complete per-report allocator attribution is inferred from struct sizes.
