@@ -107,7 +107,8 @@ a name limit can remain exhausted until shutdown.
 
 Costs include atomic ownership, reusable raw dictionary pointer buffers,
 linear dictionary sweeps, and an additional ordered ID index only when tag GC
-is enabled. Measure throughput and tail latency with the intended workload.
+is enabled. Measure throughput and tail latency with the intended workload;
+see `scripts/ingest_benchmark.py` and `docs/benchmarking.md`.
 
 ## Verification
 

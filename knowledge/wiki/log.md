@@ -1078,3 +1078,10 @@ pins, non-reused IDs, descriptor GC owners, live scans across ID holes and exact
 row references. Defaults retain persistent tag catalogs and unlimited admission.
 Updated the index. These budgets do not bound process RSS or all engine memory.
 
+## 2026-10-18 — Reproducible workload methodology
+
+Added `workload-validation` and updated the index with the deterministic ingest
+matrix, independent SQL/count/sum checks, persistent-driver timing and CPU/RSS
+measurement boundaries. Documented legacy info-time precision and the distinction
+between paced regression evidence, optional GC modes and saturation/competitor
+claims. Machine-specific JSON remains outside committed documentation.

@@ -52,7 +52,12 @@ See [[mysql-plugin-abi]].
 ### 2. In-Memory Only
 All Pinba data lives in RAM. MySQL restart = data gone. This is by design — it's a monitoring
 buffer, not a database. `pinba_stats_history` (default 900s) controls the window.
-See [[pinba-pool-model]].
+Words now have counted owners and periodic reclamation. Optional UDP dictionary
+word/known-byte/name budgets and descriptor collection preserve unlimited, persistent
+legacy defaults; they are not an engine-wide RSS cap. Native stage counters and a
+deterministic UDP/SQL workload support regression measurements.
+See [[pinba-pool-model]], [[dictionary-word-lifetime]], [[runtime-diagnostics]],
+[[workload-validation]].
 
 ### 3. UDP Fire-and-Forget
 The PHP extension sends metrics asynchronously. Packet loss is acceptable.
