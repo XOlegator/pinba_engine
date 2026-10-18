@@ -1903,13 +1903,16 @@ static inline pinba_rtag_report *pinba_regenerate_rtag2_report(PINBA_SHARE *shar
 
   report = (pinba_rtag_report *)pinba_map_get(D->rtag_reports, share->index);
   if (UNLIKELY(!report)) {
+    if (share->params_num < 2) {
+      return nullptr;
+    }
     word1.reset(pinba_dictionary_lookup(&D->dictionary, &D->words_lock, share->params[0]));
     if (UNLIKELY(!word1)) {
       /* no such tag! */
       return nullptr;
     }
 
-    word2.reset(pinba_dictionary_lookup(&D->dictionary, &D->words_lock, share->params[0]));
+    word2.reset(pinba_dictionary_lookup(&D->dictionary, &D->words_lock, share->params[1]));
     if (UNLIKELY(!word2)) {
       /* no such tag! */
       return nullptr;
