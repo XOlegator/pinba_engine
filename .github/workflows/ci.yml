@@ -195,6 +195,14 @@ jobs:
       - name: Percentile field-mapping test (report2/report3, real data)
         run: MYSQL_CLIENT=mariadb bash scripts/percentile_mapping_test.sh 127.0.0.1 3306 pinba pinba pinba
 
+      - name: Histogram upper-boundary regression (real UDP/SQL)
+        env:
+          MYSQL_PWD: pinba
+        run: >-
+          python3 -B scripts/histogram_boundary_test.py --mysql-client=mariadb
+          --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306
+          --mysql-option=--user=pinba
+
       - name: Row-reference filesort regression (requests and timers)
         env:
           MYSQL_PWD: pinba
@@ -487,6 +495,14 @@ jobs:
 
       - name: Percentile field-mapping test (report2/report3, real data)
         run: MYSQL_CLIENT=mariadb bash scripts/percentile_mapping_test.sh 127.0.0.1 3306 pinba pinba pinba
+
+      - name: Histogram upper-boundary regression (real UDP/SQL)
+        env:
+          MYSQL_PWD: pinba
+        run: >-
+          python3 -B scripts/histogram_boundary_test.py --mysql-client=mariadb
+          --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306
+          --mysql-option=--user=pinba
 
       - name: Row-reference filesort regression (requests and timers)
         env:

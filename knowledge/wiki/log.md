@@ -910,3 +910,13 @@ production-usability review of the Docker images, discovery that the published
 - Updated [[pinba-data-flow]] for staging/capacity and byte limits; removed an
   unsupported numeric packet-loss allowance. Updated [[index]]. Historical raw
   sources remain unchanged. The review document in docs remains uncommitted.
+
+## 2026-10-18 — Discovery and fix: histogram upper-edge bucket
+
+- Reproduced the exact-maximum bucket-zero error using the real updater in unit
+  tests, including a weighted timer. Corrected the comparison and rounding
+  fallback to saturate at the final bucket; interior values remain unchanged.
+- Verified all 79 unit tests, MySQL 8.0 and MariaDB 11.8 builds, and actual UDP
+  histogram counts/p100 on a disposable MariaDB. Added the SQL regression to
+  existing MariaDB CI checks. Documented [[histogram-boundary-semantics]] and
+  updated [[index]]. No production service was used.

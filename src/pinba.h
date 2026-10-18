@@ -445,12 +445,13 @@ static inline void pinba_update_histogram(pinba_std_report *report, void **histo
     return;
   }
 
-  if (time_value > report->histogram_max_time) {
+  if (time_value >= report->histogram_max_time) {
     slot_num = D->settings.histogram_size - 1;
   } else {
     slot_num = time_value / report->histogram_segment;
     if (slot_num > D->settings.histogram_size - 1) {
-      slot_num = 0;
+      // Rounding at the upper edge must saturate, never wrap to the first bucket.
+      slot_num = D->settings.histogram_size - 1;
     }
   }
 

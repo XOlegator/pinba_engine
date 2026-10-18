@@ -11,12 +11,13 @@ updated: 2026-10-18
 
 Master catalog. Maintained by LLM agents.
 
-## Concepts (29 articles)
+## Concepts (30 articles)
 
 | Article | Key Topic |
 |---------|-----------|
 | [[pinba-data-flow]] | End-to-end pipeline: PHP → UDP → pool → SQL |
 | [[report-percentile-field-mapping]] | fetch_row hardcoded field indices, report3 p90 off-by-one (2013→2.11.5), SQL regression test |
+| [[histogram-boundary-semantics]] | Saturating upper-edge buckets, weighted add/delete, unit and UDP/SQL regression coverage |
 | [[engine-row-references]] | Filesort position/rnd_pos contract, physical pool slots, request/timer sort regression and wraparound |
 | [[pinba-udp-protocol]] | Protobuf message format, timer parallel arrays, field versions |
 | [[protobuf-runtime-strategy]] | Engine (C++ protobuf + shim) vs extension (protobuf-c); shared `pinba.proto` contract; fields 22/23; drift guard |
