@@ -2,6 +2,7 @@
 #define PINBA_PERCENTILE_H
 
 #include <algorithm>
+#include <cctype>
 #include <charconv>
 #include <climits>
 #include <cmath>
@@ -54,15 +55,16 @@ inline size_t pinba_percentile_rank(size_t count, const pinba_percentile &percen
 }
 
 inline bool pinba_parse_histogram_max(std::string_view text, int &out) {
-  // Preserve positive decimal truncation from the old strtod-to-int path,
-  // while rejecting zero, negative, NaN/Inf and values outside int range.
-  while (!text.empty() && text.front() == ' ') text.remove_prefix(1);
+  // Preserve the old strtod-to-int prefix parsing, so existing COMMENT values
+  // with a trailing suffix (for example "10s") still open, while rejecting
+  // zero, negative, NaN/Inf and values outside int range.
+  while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front())))
+    text.remove_prefix(1);
   if (!text.empty() && text.front() == '+') text.remove_prefix(1);
   if (text.empty()) return false;
   double value = 0;
   const auto result = std::from_chars(text.data(), text.data() + text.size(), value);
-  if (result.ec != std::errc{} || result.ptr != text.data() + text.size() ||
-      !std::isfinite(value) || value < 1 || value > INT_MAX)
+  if (result.ec != std::errc{} || !std::isfinite(value) || value < 1 || value > INT_MAX)
     return false;
   out = static_cast<int>(value);
   return true;

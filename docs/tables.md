@@ -75,8 +75,9 @@ new tables. Existing tables, column positions and client queries are not migrate
 Ranks now use the native count width rather than narrowing to 32 bits.
 
 The optional `histogram_max_time` condition must be finite and within
-`[1, INT_MAX]` seconds. Existing positive decimal truncation to whole seconds is
-preserved. Invalid configurations are rejected before report construction.
+`[1, INT_MAX]` seconds. Existing parsing is preserved: the leading number is
+used, decimals are truncated to whole seconds and a trailing suffix such as
+`10s` is ignored. Invalid configurations are rejected before report construction.
 
 ```sql
 CREATE TABLE `report_by_hostname_p95` (

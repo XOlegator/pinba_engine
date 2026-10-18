@@ -88,9 +88,13 @@ TEST(PinbaPercentiles, LegacyFloatFloorRanksRemainUnchanged) {
 
 TEST(PinbaPercentiles, RejectsHistogramConfigThatWouldCreateInvalidBuckets) {
   int maximum = 0;
-  for (const char *invalid : {"0", "-1", "0.5", "NaN", "inf", "1e999", "2147483648", "10junk"}) {
+  for (const char *invalid :
+       {"", "s10", "0", "-1", "0.5", "0s", "NaN", "inf", "1e999", "2147483648"}) {
     EXPECT_FALSE(pinba_parse_histogram_max(invalid, maximum)) << invalid;
   }
   ASSERT_TRUE(pinba_parse_histogram_max("10.5", maximum));
+  EXPECT_EQ(maximum, 10);
+  // Legacy strtod prefix parsing: existing COMMENT suffixes keep opening.
+  ASSERT_TRUE(pinba_parse_histogram_max(" 10s", maximum));
   EXPECT_EQ(maximum, 10);
 }
