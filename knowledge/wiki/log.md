@@ -1034,3 +1034,14 @@ production-usability review of the Docker images, discovery that the published
   checks pass with the complete exercised ASan/UBSan SQL/lifecycle suite and clean
   shutdown. Documented [[fractional-percentile-grammar]], public table syntax,
   and updated [[index]].
+
+## 2026-10-18 — Follow-up: decoded-tree batch reclamation
+
+- Runtime-accounting regression development exposed an early read-pool length
+  reset left in C01. Valid batches consequently skipped decoded-tree destruction.
+  Removed that obsolete reset/free block; the ownership cleanup now destroys
+  roots before resetting the queue bounds. Structural/timer/SQL results are
+  unchanged, and queued/completed tree accounting now balances on a disposable
+  sanitizer server. Updated [[request-structure-validation]] catalog wording
+  and [[index]]. This correction is separate from the diagnostics feature so
+  subsequent performance baselines include the same decoded-tree lifetime.

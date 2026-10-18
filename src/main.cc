@@ -1391,25 +1391,6 @@ void *pinba_data_main(void *) /* {{{ */
     }
     pthread_rwlock_unlock(&D->collector_lock);
 
-    for (i = 0; i < D->thread_pool->size; i++) {
-      pinba_pool *temp_request_pool = D->current_read_pool + i;
-
-      temp_request_pool->in = 0;
-      temp_request_pool->out = 0;
-    }
-    /*
-        th_pool_barrier_start(barrier6);
-        for (i = 0; i < D->thread_pool->size; i++) {
-          pinba_pool *temp_request_pool = D->per_thread_request_pool[!D->pool_num] + i;
-
-          if (temp_request_pool->in == 0) {
-            break;
-          }
-          job_data_arr[i].thread_num = i;
-          th_pool_dispatch(D->thread_pool, barrier6, free_data_func, &(job_data_arr[i]));
-        }
-        th_pool_barrier_wait(barrier6);
-    */
     if (lost_tmp_records > 0) {
       pthread_rwlock_wrlock(&D->stats_lock);
       D->stats.lost_tmp_records += lost_tmp_records;
