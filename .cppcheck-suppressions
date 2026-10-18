@@ -10,6 +10,7 @@ syntaxError:tests/test_pinba_map.cc
 syntaxError:tests/test_threadpool.cc
 syntaxError:tests/test_pinba_histogram.cc
 syntaxError:tests/test_pinba_dictionary.cc
+syntaxError:tests/test_xxhash.cc
 
 // new (std::nothrow) T{} value-initializes the object; all fields are
 // zero/default-constructed. cppcheck incorrectly flags the pointer variable

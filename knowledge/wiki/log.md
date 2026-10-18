@@ -955,3 +955,29 @@ production-usability review of the Docker images, discovery that the published
   `cmake-lint` command also belongs to a different package, so the comparison used
   the intended `cmakelint` implementation. These unrelated checks are not reported
   as clean or suppressed as part of the dictionary change.
+
+## 2026-10-18 — Follow-up: portable hash loads and reproducible CMake lint
+
+- Reproduced the vendored xxHash alignment error with a new unit regression
+  before changing the implementation. Replaced 32/64-bit typed loads with
+  fixed-size `memcpy` and removed external byte-buffer integer casts. Frozen
+  hash pairs, offsets 0–7, all short lengths, exact allocation tails, and
+  streaming block/tail boundaries preserve legacy outputs.
+- All 89 unit tests pass in release and ASan/UBSan/LeakSanitizer builds. The
+  complete exercised UDP/SQL suite now passes ASan/UBSan, including histogram,
+  dictionary, legacy report smoke, percentile mapping, and row references;
+  the disposable MariaDB shuts down normally. Alignment checks remain enabled;
+  the mixed-host MEM_ROOT manual-poisoning limitation still applies.
+- Builds cover MySQL 8.0/8.4 and MariaDB 10.11/11.8. Cppcheck passes with the
+  existing per-file GoogleTest macro-parser workaround also applied to the new
+  regression file. The compiler and sanitizers compile and exercise that file.
+  On the checked optimized x86-64 build, one-shot XXH32/XXH64 contain no calls
+  to `memcpy`; this is a code-generation observation, not a throughput benchmark.
+- Corrected the CMake pre-commit hook to use pinned `cmakelint==1.4.3` in an
+  isolated Python environment instead of the incompatible `cmakelang` command.
+  Resolved the 21 existing indent/command-case warnings without weakening
+  rules or changing build configuration. Full pre-commit passes.
+- Documented [[hash-memory-access]], updated [[cmake-build-system]],
+  [[dictionary-word-lifetime]], and [[index]]. Marked completed and partially
+  completed research proposals in the uncommitted analysis document; unapproved
+  validation, metrics, cardinality limits and fractional percentiles remain open.

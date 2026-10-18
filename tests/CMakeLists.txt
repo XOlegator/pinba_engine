@@ -15,6 +15,7 @@ set(PINBA_TEST_SOURCES
     test_pinba_engine.cc
     test_pinba_histogram.cc
     test_pinba_dictionary.cc
+    test_xxhash.cc
     test_error_system.cc
     test_logging_system.cc
     test_monitoring_system.cc

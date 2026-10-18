@@ -11,7 +11,7 @@ updated: 2026-10-18
 
 Master catalog. Maintained by LLM agents.
 
-## Concepts (31 articles)
+## Concepts (32 articles)
 
 | Article | Key Topic |
 |---------|-----------|
@@ -23,6 +23,7 @@ Master catalog. Maintained by LLM agents.
 | [[protobuf-runtime-strategy]] | Engine (C++ protobuf + shim) vs extension (protobuf-c); shared `pinba.proto` contract; fields 22/23; drift guard |
 | [[pinba-pool-model]] | Fixed request ring vs growable timer/staging pools, dropping new requests, capacity and monitoring limits |
 | [[dictionary-word-lifetime]] | Counted dictionary ownership across staging/raw/report selectors, periodic reclamation, DDL registration, and limits |
+| [[hash-memory-access]] | Alignment/alias-safe xxHash reads, preserved legacy hashes, and sanitizer regressions |
 | [[mysql-plugin-abi]] | **Critical**: 8.0 vs 8.4 ABI incompatibility, implications |
 | [[mysql-plugin-install]] | INSTALL PLUGIN lifecycle, reinstall procedure |
 | [[mysql-plugin-migration-80-to-84]] | Porting checklist: ABI, build requirements, OS paths, OL9 builder rule |
@@ -32,7 +33,7 @@ Master catalog. Maintained by LLM agents.
 | [[php-extension-test-infrastructure]] | Coverage (gcov→Codecov), JUnit, ASan/UBSan via instrumented PHP (RTLD_DEEPBIND), `tools/run-tests.sh`; bugs found |
 | [[php-extension-packaging]] | Debian packaging for PHP extensions: php-pinba source, php{X.Y}-pinba binaries |
 | [[php-version-monitoring]] | Automated PHP version discovery: weekly cron, php.net parsing, PR gate |
-| [[cmake-build-system]] | Presets, MySQL headers sourcing, Ubuntu 24.04 deps |
+| [[cmake-build-system]] | Presets, MySQL headers sourcing, dependencies, and pinned CMake lint environment |
 | [[docker-build-strategy]] | Multi-stage build, builder-OS-matches-runtime rule, GLIBCXX incident, multi-arch, smoke test |
 | [[docker-tag-strategy]] | Docker Hub naming: rolling channels (8.0/8.4/mariadb-*), version-suffixed tags, all tags mutable → digest pinning; old `8.4-lts*` dead |
 | [[github-actions-docker]] | CI/CD workflow for Docker Hub build+push automation |

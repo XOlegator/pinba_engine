@@ -89,7 +89,7 @@ For static analysis, use the generated compile database:
 pre-commit run --all-files
 ```
 
-Pre-commit also references `clang-format`, `cppcheck`, `cmake-lint`, and `hadolint`; install these locally when working on relevant files.
+Pre-commit also references `clang-format`, `cppcheck`, and `hadolint`; install these locally when working on relevant files. The CMake hook installs pinned `cmakelint` in its own Python environment; the separate `cmake-lint` executable from `cmakelang` is not interchangeable.
 
 ## Branching and Pull Requests
 

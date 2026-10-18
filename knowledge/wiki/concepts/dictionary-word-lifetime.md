@@ -7,6 +7,7 @@ related:
   - wiki/concepts/pinba-data-flow.md
   - wiki/concepts/engine-row-references.md
   - wiki/concepts/histogram-boundary-semantics.md
+  - wiki/concepts/hash-memory-access.md
 confidence: high
 updated: 2026-10-18
 ---
@@ -119,7 +120,9 @@ checks still active. Unit tests keep normal poisoning and LeakSanitizer enabled;
 the host-server run disables leak reporting for the uninstrumented server.
 
 The focused dictionary and histogram paths pass ASan/UBSan. Extending that run
-to all legacy report regressions also exposes an unrelated alignment diagnostic
-in vendored `xxhash.c` (`XXH_readLE64_align` on an unaligned report key). The
-ordinary full SQL suite passes, but that observation is not a claim that the
-entire legacy engine is UBSan-clean.
+to legacy reports originally exposed an alignment diagnostic in vendored
+`xxhash.c` (`XXH_readLE64_align` on an unaligned report key). The follow-up
+correction replaces integer/struct loads with fixed-size `memcpy`, preserving
+legacy hashes; see [[hash-memory-access]]. Sanitizer results cover the exercised
+paths and do not prove that every untested engine path is free of undefined
+behavior.

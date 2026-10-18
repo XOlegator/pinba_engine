@@ -37,7 +37,7 @@ if(HEAD_CONTENTS MATCHES "ref")
   string(REPLACE "ref: " "" HEAD_REF "${HEAD_CONTENTS}")
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git/${HEAD_REF}")
     file(READ "${CMAKE_CURRENT_SOURCE_DIR}/.git/${HEAD_REF}" HEAD_HASH
-         LIMIT 1024)
+      LIMIT 1024)
     string(STRIP "${HEAD_HASH}" HEAD_HASH)
   endif()
 else()
