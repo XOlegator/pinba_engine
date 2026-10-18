@@ -2555,12 +2555,16 @@ int ha_pinba::read_index_first(unsigned char *buf, uint active_index) /* {{{ */
         char index[PINBA_SCRIPT_NAME_SIZE + 1] = {0};
         pinba_tag_report *report;
 
+        // Registration grows tag_reports_arr; collector_lock orders it against
+        // the ingest/expiration job-buffer preflight and descriptor GC.
+        pthread_rwlock_rdlock(&D->collector_lock);
         pthread_rwlock_wrlock(&D->tag_reports_lock);
         report = pinba_get_tag_report(share);
 
         if (!report) {
           report = pinba_regenerate_tag_report(share);
         }
+        pthread_rwlock_unlock(&D->collector_lock);
 
         if (this_index[active_index].str.val) {
           free(this_index[active_index].str.val);
@@ -2603,12 +2607,16 @@ int ha_pinba::read_index_first(unsigned char *buf, uint active_index) /* {{{ */
         char index[PINBA_SCRIPT_NAME_SIZE + 1] = {0};
         pinba_tag_report *report;
 
+        // Registration grows tag_reports_arr; collector_lock orders it against
+        // the ingest/expiration job-buffer preflight and descriptor GC.
+        pthread_rwlock_rdlock(&D->collector_lock);
         pthread_rwlock_wrlock(&D->tag_reports_lock);
         report = pinba_get_tag_report(share);
 
         if (!report) {
           report = pinba_regenerate_tag2_report(share);
         }
+        pthread_rwlock_unlock(&D->collector_lock);
 
         if (this_index[active_index].str.val) {
           free(this_index[active_index].str.val);
@@ -2651,12 +2659,16 @@ int ha_pinba::read_index_first(unsigned char *buf, uint active_index) /* {{{ */
         char index[PINBA_SCRIPT_NAME_SIZE + 1] = {0};
         pinba_tag_report *report;
 
+        // Registration grows tag_reports_arr; collector_lock orders it against
+        // the ingest/expiration job-buffer preflight and descriptor GC.
+        pthread_rwlock_rdlock(&D->collector_lock);
         pthread_rwlock_wrlock(&D->tag_reports_lock);
         report = pinba_get_tag_report(share);
 
         if (!report) {
           report = pinba_regenerate_tag_report2(share);
         }
+        pthread_rwlock_unlock(&D->collector_lock);
 
         if (this_index[active_index].str.val) {
           free(this_index[active_index].str.val);
@@ -2699,12 +2711,16 @@ int ha_pinba::read_index_first(unsigned char *buf, uint active_index) /* {{{ */
         char index[PINBA_SCRIPT_NAME_SIZE + 1] = {0};
         pinba_tag_report *report;
 
+        // Registration grows tag_reports_arr; collector_lock orders it against
+        // the ingest/expiration job-buffer preflight and descriptor GC.
+        pthread_rwlock_rdlock(&D->collector_lock);
         pthread_rwlock_wrlock(&D->tag_reports_lock);
         report = pinba_get_tag_report(share);
 
         if (!report) {
           report = pinba_regenerate_tag2_report2(share);
         }
+        pthread_rwlock_unlock(&D->collector_lock);
 
         if (this_index[active_index].str.val) {
           free(this_index[active_index].str.val);
@@ -2747,12 +2763,16 @@ int ha_pinba::read_index_first(unsigned char *buf, uint active_index) /* {{{ */
         char index[PINBA_SCRIPT_NAME_SIZE + 1] = {0};
         pinba_tag_report *report;
 
+        // Registration grows tag_reports_arr; collector_lock orders it against
+        // the ingest/expiration job-buffer preflight and descriptor GC.
+        pthread_rwlock_rdlock(&D->collector_lock);
         pthread_rwlock_wrlock(&D->tag_reports_lock);
         report = pinba_get_tag_report(share);
 
         if (!report) {
           report = pinba_regenerate_tagN_report(share);
         }
+        pthread_rwlock_unlock(&D->collector_lock);
 
         if (this_index[active_index].str.val) {
           free(this_index[active_index].str.val);
@@ -2795,12 +2815,16 @@ int ha_pinba::read_index_first(unsigned char *buf, uint active_index) /* {{{ */
         char index[PINBA_SCRIPT_NAME_SIZE + 1] = {0};
         pinba_tag_report *report;
 
+        // Registration grows tag_reports_arr; collector_lock orders it against
+        // the ingest/expiration job-buffer preflight and descriptor GC.
+        pthread_rwlock_rdlock(&D->collector_lock);
         pthread_rwlock_wrlock(&D->tag_reports_lock);
         report = pinba_get_tag_report(share);
 
         if (!report) {
           report = pinba_regenerate_tagN_report2(share);
         }
+        pthread_rwlock_unlock(&D->collector_lock);
 
         if (this_index[active_index].str.val) {
           free(this_index[active_index].str.val);
@@ -9084,9 +9108,11 @@ int ha_pinba::info(uint) /* {{{ */
       pthread_rwlock_unlock(&D->base_reports_lock);
 
       if (!report) {
+        pthread_rwlock_rdlock(&D->collector_lock);
         pthread_rwlock_wrlock(&D->base_reports_lock);
         report = pinba_regenerate_report_info(share);
         pthread_rwlock_unlock(&D->base_reports_lock);
+        pthread_rwlock_unlock(&D->collector_lock);
       }
 
       stats.records = 0;
