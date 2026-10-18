@@ -4,7 +4,7 @@ type: index
 sources: []
 related: []
 confidence: high
-updated: 2026-10-17
+updated: 2026-10-18
 ---
 
 # Pinba Engine — Knowledge Base Index
@@ -20,7 +20,7 @@ Master catalog. Maintained by LLM agents.
 | [[engine-row-references]] | Filesort position/rnd_pos contract, physical pool slots, request/timer sort regression and wraparound |
 | [[pinba-udp-protocol]] | Protobuf message format, timer parallel arrays, field versions |
 | [[protobuf-runtime-strategy]] | Engine (C++ protobuf + shim) vs extension (protobuf-c); shared `pinba.proto` contract; fields 22/23; drift guard |
-| [[pinba-pool-model]] | Cyclic buffer memory model, overflow behaviour, monitoring |
+| [[pinba-pool-model]] | Fixed request ring vs growable timer/staging pools, dropping new requests, capacity and monitoring limits |
 | [[mysql-plugin-abi]] | **Critical**: 8.0 vs 8.4 ABI incompatibility, implications |
 | [[mysql-plugin-install]] | INSTALL PLUGIN lifecycle, reinstall procedure |
 | [[mysql-plugin-migration-80-to-84]] | Porting checklist: ABI, build requirements, OS paths, OL9 builder rule |
@@ -84,6 +84,14 @@ raw/docs/
   mysql-80-to-84-migration.md
   github-actions-docker-workflow.md
 ```
+
+## External Research Records
+
+- [Badoo Pinba2](https://github.com/badoo/pinba2) and
+  [Anton Pinba2](https://github.com/anton-povarov/pinba2) were reviewed on
+  2026-10-18. Shared protobuf clients do not imply SQL compatibility: Pinba2
+  lacks the raw tables used by Pinboard. Anton's August 2026 research branch
+  is separate from released functionality. See [[log]] for the review record.
 
 ## Knowledge Gaps (candidates for next ingest)
 

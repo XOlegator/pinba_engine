@@ -5,75 +5,81 @@ sources:
   - raw/repos/tony2001-pinba-engine-readme.md
   - raw/repos/tony2001-pinba-engine-changelog.md
   - raw/docs/pinba-engine-mysql-sysvars.md
+  - https://github.com/XOlegator/pinba_engine/blob/1ec531f5c51de444b7e931cbf1a5406c042ce34b/src/pool.cc
+  - https://github.com/XOlegator/pinba_engine/blob/1ec531f5c51de444b7e931cbf1a5406c042ce34b/src/main.cc
 related:
   - wiki/concepts/pinba-data-flow.md
-  - wiki/concepts/pinba-engine-internals.md
+  - wiki/concepts/engine-row-references.md
 confidence: high
-updated: 2026-05-23
+updated: 2026-10-18
 ---
 
 # Pinba Pool Memory Model
 
-## Core Design: Fixed Cyclic Buffers
+## Storage is a mix of fixed and growable pools
 
-All data storage in Pinba is in pre-allocated fixed-size cyclic buffers.
-- **Allocated at init**, never grown, never freed until shutdown
-- **Newer records overwrite older ones** when the buffer is full
-- **No dynamic allocation** during normal operation — predictable memory usage
+The generic `pinba_pool` tracks capacity, growth increment, optional limit, and
+`in`/`out` positions. `pinba_pool_grow()` reallocates storage and, for a wrapped
+ring, moves its live tail. It is incorrect to describe all Pinba memory as
+preallocated, fixed-size, or allocation-free during ingestion.
 
-## Pool Hierarchy
+| Storage | Capacity and full-pool behavior |
+|---------|---------------------------------|
+| Raw request ring | Configured by `pinba_request_pool_size`; normal ingestion does not grow it. One slot is reserved to distinguish full from empty. If insufficient slots are free, **new requests are dropped** and `lost_tmp_records` increases; live oldest records are not silently overwritten |
+| Timer ring | `pinba_timer_pool_size` is the initial capacity. `timer_pool_add()` grows it when a request needs more room, preserving live timers and adjusting affected request offsets |
+| Per-worker decoded-packet buffers | Two alternating sets of linear buffers; initialized by `pinba_temp_pool_size`, grown by `pinba_pool_push()`, optionally capped by `pinba_temp_pool_size_limit` |
+| Per-worker temporary records | Growable staging pools used after decoding, including expansion of nested requests. Their counts are reset after transfer |
+| Reports, tag arrays, dictionaries | Separately allocated memory; request-ring capacity alone is not an engine-wide memory budget |
 
-```
-UDP socket
-    │ (per-thread reader threads, see pinba_data_job_size)
-    ▼
-Per-thread Temporary Pools  [pinba_temp_pool_size = 10000 records each]
-    │ (every pinba_stats_gathering_period = 10ms)
-    ▼ locked merge
-Main Request Pool           [pinba_request_pool_size = 1,000,000 records]
-    │
-    ├─► Timer Pool          [pinba_timer_pool_size = 100,000 timers]
-    │
-    └─► In-memory Reports   (indexed views over the main pool)
-```
+The timer growth increment is `PINBA_TIMER_POOL_GROW_SIZE` (2,621,440 slots),
+possibly increased for a large incoming batch. This can produce substantial
+capacity growth; the initial timer size is not a maximum. Per-slot tag arrays
+are also reallocated as needed. Expiration frees logical records, not necessarily
+their backing allocation or allocator-resident RSS.
 
-## What Happens When Pools Are Full
+## Ingestion and expiration
 
-| Pool | Overflow Behaviour |
-|------|--------------------|
-| Temp pool | Packet is **dropped** → `lost_tmp_records` counter in `status` table |
-| Main pool | Oldest records are silently overwritten |
-| Timer pool | Oldest timers silently overwritten |
+UDP readers decode protobuf into one set of per-worker packet buffers. The data
+thread swaps read/write sets, builds temporary records, copies accepted records
+to the raw request ring, adds timers, and updates incremental reports. Work is
+coordinated with collector/timer/report locks and worker barriers.
 
-There is no backpressure to PHP — UDP is fire-and-forget.
+The stats thread expires requests older than `pinba_stats_history`, removes
+their contributions from reports, clears their timers, and advances ring
+positions. There is no backpressure to PHP: UDP send success does not guarantee
+ingestion.
 
-## Key System Variables
+## Configuration defaults
 
-| Variable | Default | Effect |
-|----------|---------|--------|
-| `pinba_request_pool_size` | 1,000,000 | Main buffer capacity |
-| `pinba_timer_pool_size` | 100,000 | Timer buffer capacity |
-| `pinba_temp_pool_size` | 10,000 | Per-thread ingest buffer |
-| `pinba_stats_gathering_period` | 10,000 μs | Main pool lock frequency |
-| `pinba_stats_history` | 900 s | How long records remain before overwrite |
-| `pinba_data_job_size` | 2,048 | Queue depth before processing starts |
+Verified against the system-variable declarations in `src/ha_pinba.cc`:
 
-## Data Loss Scenarios
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `pinba_request_pool_size` | 1,000,000 | Fixed request-ring slots, including its reserved slot |
+| `pinba_timer_pool_size` | 100,000 | Initial timer-ring capacity |
+| `pinba_temp_pool_size` | 10,000 | Initial slots per staging pool, per worker |
+| `pinba_temp_pool_size_limit` | 0 | No growth limit by default |
+| `pinba_stats_gathering_period` | 10,000 microseconds | Scheduled collection/expiration cadence, not a guarantee under contention |
+| `pinba_stats_history` | 900 seconds | Expiration window |
+| `pinba_data_job_size` | 2,048 | Declared packet-processing batch setting; not total queue capacity |
 
-1. **Normal**: records expire after `pinba_stats_history` (expected, by design)
-2. **MySQL restart**: entire pool cleared (expected, monitoring data is transient)
-3. **Temp pool overflow** (`lost_tmp_records > 0`): too many requests per second, increase `pinba_temp_pool_size`
-4. **Main pool overflow**: too many unique requests in history window, increase `pinba_request_pool_size`
+Worker count is derived from online processors, with a fallback for small or
+unavailable counts. Total staging memory therefore scales with worker count,
+not just one configured pool size.
 
-## Monitoring Pool Health
+## Monitoring limitations
 
-```sql
-SELECT current_temp_pool_size, current_timer_pool_size,
-       lost_tmp_records, invalid_packets
-FROM pinba.status;
-```
+`pinba.status.current_timer_pool_size` reports allocated timer capacity, not
+the number of live timers. `dictionary_size` reports interned string count.
+At the 2.11.8 baseline, `current_temp_pool_size` is a placeholder returning zero;
+it cannot establish that staging buffers are empty.
 
-- `lost_tmp_records > 0`: packet loss, increase temp pool
-- `invalid_packets > 0`: malformed UDP data or wrong protobuf format
+`lost_tmp_records` counts requests rejected when copying staging records into
+the full raw ring. It is not a complete count of every UDP/kernel/staging loss.
+The collector also logs received/dropped/decode counters. Some validation-error
+increments are disabled in the legacy conversion path, so `invalid_packets=0`
+does not prove that every received packet was valid.
 
-See: [[pinba-data-flow]], [[pinba-engine-internals]]
+Restart clears all engine-resident statistics. Pinboard persists its own
+historical snapshots separately. See [[pinba-data-flow]] and
+[[engine-row-references]] for live raw-table behavior.

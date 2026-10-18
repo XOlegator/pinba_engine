@@ -5,7 +5,7 @@ sources: []
 related:
   - wiki/index.md
 confidence: high
-updated: 2026-10-17
+updated: 2026-10-18
 ---
 
 # Activity Log
@@ -876,3 +876,37 @@ production-usability review of the Docker images, discovery that the published
 - Confirmed cross-month group collisions using two partial boundary-day samples
   within a one-month interval. Recorded complete date grouping and straight
   error-status chart segments in [[pinboard-architecture]]. Updated [[index]].
+
+## 2026-10-18 — Discovery: Pinba2 fork history and compatibility review
+
+- Reviewed pinned Badoo and Anton Pinba2 source histories, TODOs, release notes,
+  all public issues and PRs, ordinary and inline review comments. Badoo master
+  remains at its September 2021 commit; Anton master includes the December 2024
+  build refresh and December 2025 README changes. Anton's August 2026 research
+  branch contains documents and benchmark tools, not released core changes.
+- Confirmed that shared protobuf clients do not imply SQL compatibility: Pinba2
+  lacks the raw request/timer tables used by Pinboard. Identified reusable ideas
+  around packet validation, dictionary lifetime, contention, IPv6, fractional
+  percentiles, and report observability, distinguishing reverted experiments.
+- Static inspection of engine 2.11.8 found missing flattened timer-tag length
+  checks, tag-offset advancement on skipped timers, dictionary retention until
+  shutdown, and a histogram upper-bound bucket error. Runtime crash reproduction
+  and end-to-end competitor benchmarks were not performed; no CVE or production
+  exploitability claim is made.
+- Recorded evidence, limitations, and unapproved proposals in
+  `docs/pinba2-forks-analysis-2026-10-18.md`, outside the wiki. No implementation,
+  generated outputs, raw knowledge sources, or service state was changed. Updated
+  [[index]] with the research artifact; no commits were created.
+
+## 2026-10-18 — Audit: current release, pool semantics, and delivery channels
+
+- Rechecked CMake, pool initialization/growth, ingestion saturation, expiration,
+  status field implementations, and the Docker publishing matrix against the
+  2.11.8 baseline. Updated [[overview]] and [[pinba-pool-model]]: request-ring
+  saturation drops new records, while timer and staging pools grow dynamically.
+- Removed stale 2.6.1/current-tag claims and the assumption that every channel
+  copies a shared protobuf library. Documented monitoring limitations and the
+  distinction between capacity and live record count.
+- Updated [[pinba-data-flow]] for staging/capacity and byte limits; removed an
+  unsupported numeric packet-loss allowance. Updated [[index]]. Historical raw
+  sources remain unchanged. The review document in docs remains uncommitted.
