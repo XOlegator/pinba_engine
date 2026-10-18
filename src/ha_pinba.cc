@@ -28,6 +28,8 @@
 #include <sql/table.h>
 
 #include "pinba.h"
+#include "pinba_dictionary.h"
+#include "pinba_runtime.h"
 
 #if defined(PINBA_ENGINE_DEBUG_ON) && !defined(DBUG_ON)
 #undef DBUG_OFF
@@ -84,6 +86,14 @@ static PSI_memory_key pinba_key_memory_share;
 #define pinba_free(a, b) my_free(a)
 
 /* Global variables */
+static unsigned long long ingest_dictionary_words_limit_var = 0;
+static unsigned long long ingest_dictionary_bytes_limit_var = 0;
+static unsigned long long tag_names_limit_var = 0;
+#ifdef MARIADB_BASE_VERSION
+static my_bool tag_gc_enabled_var = false;
+#else
+static bool tag_gc_enabled_var = false;
+#endif
 static int port_var = 0;
 static char *address_var = nullptr;
 static int data_pool_size_var = 0;
@@ -378,7 +388,7 @@ static inline int pinba_parse_params(TABLE *table, unsigned char type, PINBA_SHA
   int num = 0, c_num = 0;
   int parse_only = 0;
   unsigned char tmp_hv_type;
-  char report_kind;
+  char report_kind = PINBA_BASE_REPORT_KIND;
 
   if (type == PINBA_TABLE_HISTOGRAM_VIEW) {
     len = table->s->comment.length - 3;
@@ -396,6 +406,7 @@ static inline int pinba_parse_params(TABLE *table, unsigned char type, PINBA_SHA
   } else {
     len = table->s->comment.length;
     str_copy = strdup(table->s->comment.str);
+    pinba_get_table_type(str_copy, len, &report_kind);
   }
 
   if (!share) {
@@ -492,15 +503,23 @@ static inline int pinba_parse_params(TABLE *table, unsigned char type, PINBA_SHA
     if (p < end) {
       do {
         equal = strchr(p, '=');
-        if (!equal) {
+        if (!equal || equal >= (comma ? comma : end)) {
           num = -1;
           goto out;
+        }
+        if (std::string_view(p, equal - p) == "histogram_max_time") {
+          int maximum;
+          if (!pinba_parse_histogram_max(
+                  std::string_view(equal + 1, (comma ? comma : end) - equal - 1), maximum)) {
+            num = -1;
+            goto out;
+          }
         }
         if (!parse_only) {
           share->cond_names = (char **)realloc(share->cond_names, (c_num + 1) * sizeof(char *));
           share->cond_names[c_num] = strndup(p, equal - p);
           share->cond_values = (char **)realloc(share->cond_values, (c_num + 1) * sizeof(char *));
-          share->cond_values[c_num] = strndup(equal + 1, comma - equal - 1);
+          share->cond_values[c_num] = strndup(equal + 1, (comma ? comma : end) - equal - 1);
           c_num++;
         }
         p = comma ? comma + 1 : end;
@@ -513,12 +532,19 @@ static inline int pinba_parse_params(TABLE *table, unsigned char type, PINBA_SHA
     share->cond_num = c_num;
   }
 
-  /* percentiles are just ints separated by commas: <report_name>:<params>:<conditions>:75,25 */
+  /* Legacy integer prefixes stay unchanged; p= explicitly selects exact decimal ranks. */
 
   if (colon[2]) {
-    int value;
     p = colon[2] + 1;
     end = str_copy + len;
+    const bool fractional = strncmp(p, "p=", 2) == 0;
+    if (fractional) {
+      p += 2;
+      if (p == end) {
+        num = -1;
+        goto out;
+      }
+    }
 
     if (p < end) {
       comma = strchr(p, ',');
@@ -527,16 +553,31 @@ static inline int pinba_parse_params(TABLE *table, unsigned char type, PINBA_SHA
           *comma = '\0';
         }
 
-        value = atoi(p);
-        if (value <= 0 || value > 100) {
-          num = -1;
-          goto out;
+        pinba_percentile percentile{};
+        if (fractional) {
+          if (!pinba_parse_fractional_percentile(p, percentile) || (comma && comma + 1 == end)) {
+            num = -1;
+            goto out;
+          }
+        } else {
+          const long value =
+              strtol(p, nullptr, 10);  // Preserve legacy prefix parsing, including 99.9 -> 99.
+          if (value <= 0 || value > 100) {
+            num = -1;
+            goto out;
+          }
+          percentile.value = value;
         }
 
         if (!parse_only) {
-          share->percentiles =
-              (int *)realloc(share->percentiles, (share->percentiles_num + 1) * sizeof(int));
-          share->percentiles[share->percentiles_num] = value;
+          auto *values = static_cast<pinba_percentile *>(
+              realloc(share->percentiles, (share->percentiles_num + 1) * sizeof(pinba_percentile)));
+          if (!values) {
+            num = -1;
+            goto out;
+          }
+          share->percentiles = values;
+          share->percentiles[share->percentiles_num] = percentile;
           share->percentiles_num++;
         }
         p = comma ? comma + 1 : end;
@@ -578,7 +619,7 @@ static inline int pinba_parse_conditions(PINBA_SHARE *share, pinba_std_report *r
       report->flags |= PINBA_REPORT_CONDITIONAL;
       report->cond.max_time = strtod(share->cond_values[i], nullptr);
     } else if (strcmp(share->cond_names[i], "histogram_max_time") == 0) {
-      report->histogram_max_time = strtod(share->cond_values[i], nullptr);
+      pinba_parse_histogram_max(share->cond_values[i], report->histogram_max_time);
       report->histogram_segment =
           (float)report->histogram_max_time / (float)D->settings.histogram_size;
     } else if (strlen(share->cond_names[i]) > PINBA_TAG_PARAM_PREFIX_LEN &&
@@ -637,6 +678,10 @@ static int pinba_engine_init(void *p) /* {{{ */
   init_pinba_psi_keys();
 #endif
 
+  settings.ingest_dictionary_words_limit = ingest_dictionary_words_limit_var;
+  settings.ingest_dictionary_bytes_limit = ingest_dictionary_bytes_limit_var;
+  settings.tag_names_limit = tag_names_limit_var;
+  settings.tag_gc_enabled = tag_gc_enabled_var;
   settings.stats_history = stats_history_var;
   settings.stats_gathering_period = stats_gathering_period_var;
   settings.request_pool_size = request_pool_size_var;
@@ -659,7 +704,13 @@ static int pinba_engine_init(void *p) /* {{{ */
   settings.address = address_var;
   settings.cpu_start = cpu_start_var;
 
-  if (pinba_collector_init(settings) != P_SUCCESS) {
+  try {
+    if (pinba_collector_init(settings) != P_SUCCESS) {
+      DBUG_RETURN(1);
+    }
+  } catch (const std::exception &error) {
+    pinba_error(P_ERROR, "collector initialization failed: %s", error.what());
+    pinba_collector_shutdown();
     DBUG_RETURN(1);
   }
 
@@ -743,7 +794,7 @@ static inline int pinba_tags_to_string(pinba_word **tag_names, pinba_word **tag_
 /* }}} */
 
 static inline float pinba_histogram_value(pinba_std_report *report, void *data,
-                                          unsigned int percent_value) /* {{{ */
+                                          size_t percent_value) /* {{{ */
 {
   size_t i, num;
   float rem;
@@ -773,6 +824,21 @@ static inline float pinba_histogram_value(pinba_std_report *report, void *data,
 
 static inline void pinba_table_to_report_dtor(const char *table_name) /* {{{ */
 {
+  // Constructors hold their report registry before share_mutex. Follow the
+  // same order while detaching a table, including when other reports are being
+  // created concurrently. Destruction below uses the already-held registries.
+  struct registry_guard {
+    registry_guard() {
+      pthread_rwlock_wrlock(&D->base_reports_lock);
+      pthread_rwlock_wrlock(&D->rtag_reports_lock);
+      pthread_rwlock_wrlock(&D->tag_reports_lock);
+    }
+    ~registry_guard() {
+      pthread_rwlock_unlock(&D->tag_reports_lock);
+      pthread_rwlock_unlock(&D->rtag_reports_lock);
+      pthread_rwlock_unlock(&D->base_reports_lock);
+    }
+  } registries;
   pinba_report_tables *tables;
   pinba_std_report *std;
   char *index;
@@ -785,9 +851,14 @@ static inline void pinba_table_to_report_dtor(const char *table_name) /* {{{ */
     return;
   }
 
+  // The table owns this index copy. Detach it even for an inactive report;
+  // leaving it in the map causes reuse/double-free after DROP and shutdown.
+  pinba_map_delete(D->tables_to_reports, table_name);
+
   tables = (pinba_report_tables *)pinba_map_get(D->reports_to_tables, index);
   if (!tables) {
     /* we're not aware of a report until you do a SELECT from it, so it's ok */
+    free(index);
     pthread_mutex_unlock(&D->share_mutex);
     return;
   }
@@ -795,6 +866,12 @@ static inline void pinba_table_to_report_dtor(const char *table_name) /* {{{ */
   pinba_map_delete(tables->tables, table_name);
 
   if (!tables->std) {
+    if (pinba_map_count(tables->tables) == 0) {
+      pinba_map_delete(D->reports_to_tables, index);
+      pinba_map_destroy(tables->tables);
+      free(tables);
+    }
+    free(index);
     pthread_mutex_unlock(&D->share_mutex);
     /* this is also kind of ok, since we actually create reports only when there is any data */
     return;
@@ -808,26 +885,34 @@ static inline void pinba_table_to_report_dtor(const char *table_name) /* {{{ */
     pthread_rwlock_unlock(&std->lock);
 
     pinba_map_delete(D->reports_to_tables, index);
-    free(index);
+    pinba_map_destroy(tables->tables);
+    free(tables);
 
     switch (std->report_kind) {
       case PINBA_BASE_REPORT_KIND: {
         pinba_report *report = (pinba_report *)std;
-        pinba_report_dtor(report, 1);
+        pinba_map_delete(D->base_reports, std->index);
+        pinba_array_delete(&D->base_reports_arr, report);
+        pinba_report_dtor(report, 0);
       } break;
       case PINBA_TAG_REPORT_KIND: {
         pinba_tag_report *report = (pinba_tag_report *)std;
-        pinba_tag_report_dtor(report, 1);
+        pinba_map_delete(D->tag_reports, std->index);
+        pinba_array_delete(&D->tag_reports_arr, report);
+        pinba_tag_report_dtor(report, 0);
       } break;
       case PINBA_RTAG_REPORT_KIND: {
         pinba_rtag_report *report = (pinba_rtag_report *)std;
-        pinba_rtag_report_dtor(report, 1);
+        pinba_map_delete(D->rtag_reports, std->index);
+        pinba_array_delete(&D->rtag_reports_arr, report);
+        pinba_rtag_report_dtor(report, 0);
       } break;
     }
   } else {
     /* unlock and go ahead */
     pthread_rwlock_unlock(&std->lock);
   }
+  free(index);
   pthread_mutex_unlock(&D->share_mutex);
   return;
 }
@@ -970,7 +1055,7 @@ static inline pinba_tag_report *pinba_regenerate_tag_info(PINBA_SHARE *share) /*
     pinba_tag *tag;
     /* no such report */
 
-    tag = (pinba_tag *)pinba_map_get(D->tag.name_index, share->params[0]);
+    tag = pinba_tag_get_by_name(share->params[0]);
     if (UNLIKELY(!tag)) {
       /* no such tag! */
       return nullptr;
@@ -1027,12 +1112,12 @@ static inline pinba_tag_report *pinba_regenerate_tag2_info(PINBA_SHARE *share) /
     pinba_tag *tag1, *tag2;
 
     /* no such report */
-    tag1 = (pinba_tag *)pinba_map_get(D->tag.name_index, share->params[0]);
+    tag1 = pinba_tag_get_by_name(share->params[0]);
     if (UNLIKELY(!tag1)) {
       return nullptr;
     }
 
-    tag2 = (pinba_tag *)pinba_map_get(D->tag.name_index, share->params[1]);
+    tag2 = pinba_tag_get_by_name(share->params[1]);
     if (UNLIKELY(!tag2)) {
       return nullptr;
     }
@@ -1089,7 +1174,7 @@ static inline pinba_tag_report *pinba_regenerate_tag_report(PINBA_SHARE *share) 
     pinba_tag *tag;
 
     /* no such report */
-    tag = (pinba_tag *)pinba_map_get(D->tag.name_index, share->params[0]);
+    tag = pinba_tag_get_by_name(share->params[0]);
     if (UNLIKELY(!tag)) {
       /* no such tag! */
       return nullptr;
@@ -1147,12 +1232,12 @@ static inline pinba_tag_report *pinba_regenerate_tag2_report(PINBA_SHARE *share)
     pinba_tag *tag1, *tag2;
 
     /* no such report */
-    tag1 = (pinba_tag *)pinba_map_get(D->tag.name_index, share->params[0]);
+    tag1 = pinba_tag_get_by_name(share->params[0]);
     if (UNLIKELY(!tag1)) {
       return nullptr;
     }
 
-    tag2 = (pinba_tag *)pinba_map_get(D->tag.name_index, share->params[1]);
+    tag2 = pinba_tag_get_by_name(share->params[1]);
     if (UNLIKELY(!tag2)) {
       return nullptr;
     }
@@ -1210,7 +1295,7 @@ static inline pinba_tag_report *pinba_regenerate_tag_report2(PINBA_SHARE *share)
     pinba_tag *tag;
 
     /* no such report */
-    tag = (pinba_tag *)pinba_map_get(D->tag.name_index, share->params[0]);
+    tag = pinba_tag_get_by_name(share->params[0]);
     if (UNLIKELY(!tag)) {
       /* no such tag! */
       return nullptr;
@@ -1268,13 +1353,13 @@ static inline pinba_tag_report *pinba_regenerate_tag2_report2(PINBA_SHARE *share
     pinba_tag *tag1, *tag2;
     /* no such report */
 
-    tag1 = (pinba_tag *)pinba_map_get(D->tag.name_index, share->params[0]);
+    tag1 = pinba_tag_get_by_name(share->params[0]);
     if (UNLIKELY(!tag1)) {
       /* no such tag! */
       return nullptr;
     }
 
-    tag2 = (pinba_tag *)pinba_map_get(D->tag.name_index, share->params[1]);
+    tag2 = pinba_tag_get_by_name(share->params[1]);
     if (UNLIKELY(!tag2)) {
       /* no such tag! */
       return nullptr;
@@ -1340,7 +1425,7 @@ static inline pinba_tag_report *pinba_regenerate_tagN_info(PINBA_SHARE *share) /
     }
 
     for (i = 0; i < share->params_num; i++) {
-      tag = (pinba_tag *)pinba_map_get(D->tag.name_index, share->params[i]);
+      tag = pinba_tag_get_by_name(share->params[i]);
       if (UNLIKELY(!tag)) {
         /* no such tag! */
         free(tag_id);
@@ -1420,7 +1505,7 @@ static inline pinba_tag_report *pinba_regenerate_tagN_report(PINBA_SHARE *share)
     }
 
     for (i = 0; i < share->params_num; i++) {
-      tag = (pinba_tag *)pinba_map_get(D->tag.name_index, share->params[i]);
+      tag = pinba_tag_get_by_name(share->params[i]);
       if (UNLIKELY(!tag)) {
         /* no such tag! */
         free(tag_id);
@@ -1500,7 +1585,7 @@ static inline pinba_tag_report *pinba_regenerate_tagN_report2(PINBA_SHARE *share
     }
 
     for (i = 0; i < share->params_num; i++) {
-      tag = (pinba_tag *)pinba_map_get(D->tag.name_index, share->params[i]);
+      tag = pinba_tag_get_by_name(share->params[i]);
       if (UNLIKELY(!tag)) {
         /* no such tag! */
         free(tag_id);
@@ -1566,11 +1651,11 @@ static inline pinba_tag_report *pinba_regenerate_tagN_report2(PINBA_SHARE *share
 static inline pinba_rtag_report *pinba_regenerate_rtag_info(PINBA_SHARE *share) /* {{{ */
 {
   pinba_rtag_report *report;
-  pinba_word *word;
+  pinba_word_owner word;
 
   report = (pinba_rtag_report *)pinba_map_get(D->rtag_reports, share->index);
   if (UNLIKELY(!report)) {
-    word = (pinba_word *)pinba_map_get(D->dictionary, share->params[0]);
+    word.reset(pinba_dictionary_lookup(&D->dictionary, &D->words_lock, share->params[0]));
     if (UNLIKELY(!word)) {
       /* no such tag! */
       return nullptr;
@@ -1595,7 +1680,7 @@ static inline pinba_rtag_report *pinba_regenerate_rtag_info(PINBA_SHARE *share) 
     report->std.time_interval = 1;
     report->std.results_cnt = 0;
     report->results = nullptr;
-    report->tags[0] = word;
+    report->tags[0] = word.release();
     report->tags_cnt = 1;
     report->std.add_func = pinba_update_rtag_info_add;
     report->std.delete_func = pinba_update_rtag_info_delete;
@@ -1621,17 +1706,17 @@ static inline pinba_rtag_report *pinba_regenerate_rtag_info(PINBA_SHARE *share) 
 static inline pinba_rtag_report *pinba_regenerate_rtag2_info(PINBA_SHARE *share) /* {{{ */
 {
   pinba_rtag_report *report;
-  pinba_word *word1, *word2;
+  pinba_word_owner word1, word2;
 
   report = (pinba_rtag_report *)pinba_map_get(D->rtag_reports, share->index);
   if (UNLIKELY(!report)) {
-    word1 = (pinba_word *)pinba_map_get(D->dictionary, share->params[0]);
+    word1.reset(pinba_dictionary_lookup(&D->dictionary, &D->words_lock, share->params[0]));
     if (UNLIKELY(!word1)) {
       /* no such tag! */
       return nullptr;
     }
 
-    word2 = (pinba_word *)pinba_map_get(D->dictionary, share->params[1]);
+    word2.reset(pinba_dictionary_lookup(&D->dictionary, &D->words_lock, share->params[1]));
     if (UNLIKELY(!word2)) {
       /* no such tag! */
       return nullptr;
@@ -1656,9 +1741,9 @@ static inline pinba_rtag_report *pinba_regenerate_rtag2_info(PINBA_SHARE *share)
     report->std.time_interval = 1;
     report->std.results_cnt = 0;
     report->results = nullptr;
-    report->tags[0] = word1;
-    report->tags[1] = word2;
-    report->tags_cnt = 1;
+    report->tags[0] = word1.release();
+    report->tags[1] = word2.release();
+    report->tags_cnt = 2;
     report->std.add_func = pinba_update_rtag2_info_add;
     report->std.delete_func = pinba_update_rtag2_info_delete;
     pthread_rwlock_init(&report->std.lock, nullptr);
@@ -1682,35 +1767,33 @@ static inline pinba_rtag_report *pinba_regenerate_rtag2_info(PINBA_SHARE *share)
 /* rtagN info */
 static inline pinba_rtag_report *pinba_regenerate_rtagN_info(PINBA_SHARE *share) /* {{{ */
 {
+  const unsigned int tags_cnt = share->params_num;
   pinba_rtag_report *report;
   unsigned int i;
-  pinba_word **tags;
+  pinba_words_owner tags(nullptr, pinba_words_releaser{tags_cnt});
 
   report = (pinba_rtag_report *)pinba_map_get(D->rtag_reports, share->index);
   if (UNLIKELY(!report)) {
-    tags = (pinba_word **)malloc(sizeof(void *) * share->params_num);
+    tags.reset((pinba_word **)calloc(tags_cnt, sizeof(pinba_word *)));
     if (!tags) {
       return nullptr;
     }
 
-    for (i = 0; i < share->params_num; i++) {
-      tags[i] = (pinba_word *)pinba_map_get(D->dictionary, share->params[i]);
-      if (UNLIKELY(!tags[i])) {
+    for (i = 0; i < tags_cnt; i++) {
+      tags.get()[i] = pinba_dictionary_lookup(&D->dictionary, &D->words_lock, share->params[i]);
+      if (UNLIKELY(!tags.get()[i])) {
         /* tag not found */
-        free(tags);
         return nullptr;
       }
     }
 
     report = (pinba_rtag_report *)calloc(1, sizeof(pinba_rtag_report));
     if (!report) {
-      free(tags);
       return nullptr;
     }
 
-    report->values = (pinba_word **)malloc(sizeof(pinba_word *) * share->params_num);
+    report->values = (pinba_word **)malloc(sizeof(pinba_word *) * tags_cnt);
     if (!report->values) {
-      free(tags);
       free(report);
       return nullptr;
     }
@@ -1723,16 +1806,16 @@ static inline pinba_rtag_report *pinba_regenerate_rtagN_info(PINBA_SHARE *share)
     report->std.time_interval = 1;
     report->std.results_cnt = 0;
     report->results = nullptr;
-    report->tags = tags;
-    report->tags_cnt = share->params_num;
+    report->tags = tags.release();
+    report->tags_cnt = tags_cnt;
     report->std.add_func = pinba_update_rtagN_info_add;
     report->std.delete_func = pinba_update_rtagN_info_delete;
 
-    report->index =
-        (char *)malloc(PINBA_TAG_VALUE_SIZE * share->params_num + share->params_num + 1);
+    report->index = (char *)malloc(PINBA_TAG_VALUE_SIZE * tags_cnt + tags_cnt + 1);
     if (!report->index) {
       pinba_std_report_dtor(report);
       free(report->values);
+      pinba_words_release(report->tags, report->tags_cnt);
       free(report->tags);
       free(report);
       return nullptr;
@@ -1760,11 +1843,11 @@ static inline pinba_rtag_report *pinba_regenerate_rtagN_info(PINBA_SHARE *share)
 static inline pinba_rtag_report *pinba_regenerate_rtag_report(PINBA_SHARE *share) /* {{{ */
 {
   pinba_rtag_report *report;
-  pinba_word *word;
+  pinba_word_owner word;
 
   report = (pinba_rtag_report *)pinba_map_get(D->rtag_reports, share->index);
   if (UNLIKELY(!report)) {
-    word = (pinba_word *)pinba_map_get(D->dictionary, share->params[0]);
+    word.reset(pinba_dictionary_lookup(&D->dictionary, &D->words_lock, share->params[0]));
     if (UNLIKELY(!word)) {
       /* no such tag! */
       return nullptr;
@@ -1790,7 +1873,7 @@ static inline pinba_rtag_report *pinba_regenerate_rtag_report(PINBA_SHARE *share
     report->std.time_interval = 1;
     report->std.results_cnt = 0;
     report->results = nullptr;
-    report->tags[0] = word;
+    report->tags[0] = word.release();
     report->tags_cnt = 1;
     report->std.add_func = pinba_update_rtag_report_add;
     report->std.delete_func = pinba_update_rtag_report_delete;
@@ -1816,17 +1899,20 @@ static inline pinba_rtag_report *pinba_regenerate_rtag_report(PINBA_SHARE *share
 static inline pinba_rtag_report *pinba_regenerate_rtag2_report(PINBA_SHARE *share) /* {{{ */
 {
   pinba_rtag_report *report;
-  pinba_word *word1, *word2;
+  pinba_word_owner word1, word2;
 
   report = (pinba_rtag_report *)pinba_map_get(D->rtag_reports, share->index);
   if (UNLIKELY(!report)) {
-    word1 = (pinba_word *)pinba_map_get(D->dictionary, share->params[0]);
+    if (share->params_num < 2) {
+      return nullptr;
+    }
+    word1.reset(pinba_dictionary_lookup(&D->dictionary, &D->words_lock, share->params[0]));
     if (UNLIKELY(!word1)) {
       /* no such tag! */
       return nullptr;
     }
 
-    word2 = (pinba_word *)pinba_map_get(D->dictionary, share->params[0]);
+    word2.reset(pinba_dictionary_lookup(&D->dictionary, &D->words_lock, share->params[1]));
     if (UNLIKELY(!word2)) {
       /* no such tag! */
       return nullptr;
@@ -1852,9 +1938,9 @@ static inline pinba_rtag_report *pinba_regenerate_rtag2_report(PINBA_SHARE *shar
     report->std.time_interval = 1;
     report->std.results_cnt = 0;
     report->results = nullptr;
-    report->tags[0] = word1;
-    report->tags[1] = word2;
-    report->tags_cnt = 1;
+    report->tags[0] = word1.release();
+    report->tags[1] = word2.release();
+    report->tags_cnt = 2;
     report->std.add_func = pinba_update_rtag2_report_add;
     report->std.delete_func = pinba_update_rtag2_report_delete;
     pthread_rwlock_init(&report->std.lock, nullptr);
@@ -1878,35 +1964,33 @@ static inline pinba_rtag_report *pinba_regenerate_rtag2_report(PINBA_SHARE *shar
 /* rtagN report */
 static inline pinba_rtag_report *pinba_regenerate_rtagN_report(PINBA_SHARE *share) /* {{{ */
 {
+  const unsigned int tags_cnt = share->params_num;
   pinba_rtag_report *report;
   unsigned int i;
-  pinba_word **tags;
+  pinba_words_owner tags(nullptr, pinba_words_releaser{tags_cnt});
 
   report = (pinba_rtag_report *)pinba_map_get(D->rtag_reports, share->index);
   if (UNLIKELY(!report)) {
-    tags = (pinba_word **)malloc(sizeof(void *) * share->params_num);
+    tags.reset((pinba_word **)calloc(tags_cnt, sizeof(pinba_word *)));
     if (!tags) {
       return nullptr;
     }
 
-    for (i = 0; i < share->params_num; i++) {
-      tags[i] = (pinba_word *)pinba_map_get(D->dictionary, share->params[i]);
-      if (UNLIKELY(!tags[i])) {
+    for (i = 0; i < tags_cnt; i++) {
+      tags.get()[i] = pinba_dictionary_lookup(&D->dictionary, &D->words_lock, share->params[i]);
+      if (UNLIKELY(!tags.get()[i])) {
         /* tag not found */
-        free(tags);
         return nullptr;
       }
     }
 
     report = (pinba_rtag_report *)calloc(1, sizeof(pinba_rtag_report));
     if (!report) {
-      free(tags);
       return nullptr;
     }
 
-    report->values = (pinba_word **)malloc(sizeof(pinba_word *) * share->params_num);
+    report->values = (pinba_word **)malloc(sizeof(pinba_word *) * tags_cnt);
     if (!report->values) {
-      free(tags);
       free(report);
       return nullptr;
     }
@@ -1920,16 +2004,16 @@ static inline pinba_rtag_report *pinba_regenerate_rtagN_report(PINBA_SHARE *shar
     report->std.time_interval = 1;
     report->std.results_cnt = 0;
     report->results = nullptr;
-    report->tags = tags;
-    report->tags_cnt = share->params_num;
+    report->tags = tags.release();
+    report->tags_cnt = tags_cnt;
     report->std.add_func = pinba_update_rtagN_report_add;
     report->std.delete_func = pinba_update_rtagN_report_delete;
 
-    report->index =
-        (char *)malloc(PINBA_TAG_VALUE_SIZE * share->params_num + share->params_num + 1);
+    report->index = (char *)malloc(PINBA_TAG_VALUE_SIZE * tags_cnt + tags_cnt + 1);
     if (!report->index) {
       pinba_std_report_dtor(report);
       free(report->values);
+      pinba_words_release(report->tags, report->tags_cnt);
       free(report->tags);
       free(report);
       return nullptr;
@@ -2148,20 +2232,23 @@ int ha_pinba::open(const char *name, int mode, uint test_if_locked,
   } else {
     void *dummy;
 
-    if (report_tables->std) {
-      pthread_rwlock_wrlock(&report_tables->std->lock);
-      report_tables->std->use_cnt++;
-      pthread_rwlock_unlock(&report_tables->std->lock);
-    }
-
     dummy = pinba_map_get(report_tables->tables, name);
     if (!dummy) {
+      // Count SQL tables sharing a report, not cached handler instances.
+      if (report_tables->std) {
+        pthread_rwlock_wrlock(&report_tables->std->lock);
+        report_tables->std->use_cnt++;
+        pthread_rwlock_unlock(&report_tables->std->lock);
+      }
       report_tables->tables =
           pinba_map_add(report_tables->tables, name, pinba_table_type_to_ptr(share->table_type));
     }
   }
-  index_copy = strdup(share->index);
-  D->tables_to_reports = pinba_map_add(D->tables_to_reports, name, (void *)index_copy);
+  index_copy = (char *)pinba_map_get(D->tables_to_reports, name);
+  if (!index_copy) {
+    index_copy = strdup(share->index);
+    D->tables_to_reports = pinba_map_add(D->tables_to_reports, name, (void *)index_copy);
+  }
 
   pthread_mutex_unlock(&D->share_mutex);
 
@@ -2173,33 +2260,29 @@ int ha_pinba::open(const char *name, int mode, uint test_if_locked,
 int ha_pinba::close(void) /* {{{ */
 {
   DBUG_ENTER("ha_pinba::close");
+  release_tag_cursor();
   DBUG_RETURN(free_share(share));
 }
 /* }}} */
 
 int ha_pinba::rename_table(const char *from, const char *to) /* {{{ */
 {
-  pinba_std_report *std;
-
   pthread_mutex_lock(&D->share_mutex);
-  std = (pinba_std_report *)pinba_map_get(D->reports_to_tables, from);
-  if (!std) {
-    /* we're not aware of a report until you do a SELECT from it, so it's ok */
-    pthread_mutex_unlock(&D->share_mutex);
-    return 0;
+  auto *index = static_cast<char *>(pinba_map_get(D->tables_to_reports, from));
+  if (index) {
+    auto *tables = static_cast<pinba_report_tables *>(pinba_map_get(D->reports_to_tables, index));
+    if (pinba_map_get(D->tables_to_reports, to)) {
+      pthread_mutex_unlock(&D->share_mutex);
+      return HA_ERR_INTERNAL_ERROR;
+    }
+    if (tables) {
+      const void *type = pinba_map_get(tables->tables, from);
+      pinba_map_delete(tables->tables, from);
+      tables->tables = pinba_map_add(tables->tables, to, type);
+    }
+    pinba_map_delete(D->tables_to_reports, from);
+    D->tables_to_reports = pinba_map_add(D->tables_to_reports, to, index);
   }
-
-  if (pinba_map_get(D->reports_to_tables, to) != nullptr) {
-    pthread_mutex_unlock(&D->share_mutex);
-    pinba_error(
-        P_WARNING,
-        "non-empty table value in table-to-reports hash, this is an internal error, please report");
-    return HA_ERR_INTERNAL_ERROR;
-  }
-
-  pinba_map_delete(D->reports_to_tables, from);
-
-  D->reports_to_tables = pinba_map_add(D->reports_to_tables, to, std);
   pthread_mutex_unlock(&D->share_mutex);
   return 0;
 }
@@ -2219,6 +2302,7 @@ int ha_pinba::delete_table(const char *name) /* {{{ */
 int ha_pinba::index_init(uint keynr, bool) /* {{{ */
 {
   DBUG_ENTER("ha_pinba::index_init");
+  release_tag_cursor();
   active_index = keynr;
 
   if (active_index >= PINBA_MAX_KEYS) {
@@ -2311,6 +2395,7 @@ int ha_pinba::rnd_init(bool) /* {{{ */
   int i;
 
   DBUG_ENTER("ha_pinba::rnd_init");
+  release_tag_cursor();
 
   for (i = 0; i < PINBA_MAX_KEYS; i++) {
     memset(&this_index[i], 0, sizeof(pinba_index_st));
@@ -2332,6 +2417,7 @@ int ha_pinba::rnd_init(bool) /* {{{ */
 int ha_pinba::rnd_end() /* {{{ */
 {
   DBUG_ENTER("ha_pinba::rnd_end");
+  release_tag_cursor();
 
   switch (share->table_type) {
     case PINBA_TABLE_REQUEST:
@@ -2386,7 +2472,6 @@ int ha_pinba::read_index_first(unsigned char *buf, uint active_index) /* {{{ */
 {
   DBUG_ENTER("ha_pinba::read_index_first");
   int ret = HA_ERR_INTERNAL_ERROR;
-  size_t index_value = 0;
   pinba_pool *p = &D->request_pool;
   pinba_pool *timer_pool = &D->timer_pool;
 
@@ -2426,15 +2511,7 @@ int ha_pinba::read_index_first(unsigned char *buf, uint active_index) /* {{{ */
       break;
     case PINBA_TABLE_TAG:
       if (active_index == 0) {
-        pinba_tag *tag;
-
-        tag = (pinba_tag *)pinba_lmap_first(D->tag.table, &index_value);
-        if (!tag) {
-          ret = HA_ERR_END_OF_FILE;
-          goto failure;
-        }
-
-        this_index[active_index].ival = index_value;
+        this_index[active_index].ival = 0;
         this_index[active_index].position = 0;
 
         ret = tags_fetch_row(buf, this_index[active_index].ival, &(this_index[active_index].ival));
@@ -2448,12 +2525,16 @@ int ha_pinba::read_index_first(unsigned char *buf, uint active_index) /* {{{ */
           this_index[active_index].str.len = 0;
         }
 
-        tag = (pinba_tag *)pinba_map_first(D->tag.name_index, index);
+        pthread_rwlock_rdlock(&D->collector_lock);
+        tag = pinba_tag_next_name(index, sizeof(index), true);
+        pin_tag_cursor(tag);
+        pthread_rwlock_unlock(&D->collector_lock);
         if (!tag) {
           ret = HA_ERR_END_OF_FILE;
           goto failure;
         }
 
+        free(this_index[active_index].str.val);
         this_index[active_index].str.len = strlen(index);
         this_index[active_index].str.val = strdup(index);
         ret = tags_fetch_row_by_name(buf, this_index[active_index].str.val);
@@ -2477,12 +2558,16 @@ int ha_pinba::read_index_first(unsigned char *buf, uint active_index) /* {{{ */
         char index[PINBA_SCRIPT_NAME_SIZE + 1] = {0};
         pinba_tag_report *report;
 
+        // Registration grows tag_reports_arr; collector_lock orders it against
+        // the ingest/expiration job-buffer preflight and descriptor GC.
+        pthread_rwlock_rdlock(&D->collector_lock);
         pthread_rwlock_wrlock(&D->tag_reports_lock);
         report = pinba_get_tag_report(share);
 
         if (!report) {
           report = pinba_regenerate_tag_report(share);
         }
+        pthread_rwlock_unlock(&D->collector_lock);
 
         if (this_index[active_index].str.val) {
           free(this_index[active_index].str.val);
@@ -2525,12 +2610,16 @@ int ha_pinba::read_index_first(unsigned char *buf, uint active_index) /* {{{ */
         char index[PINBA_SCRIPT_NAME_SIZE + 1] = {0};
         pinba_tag_report *report;
 
+        // Registration grows tag_reports_arr; collector_lock orders it against
+        // the ingest/expiration job-buffer preflight and descriptor GC.
+        pthread_rwlock_rdlock(&D->collector_lock);
         pthread_rwlock_wrlock(&D->tag_reports_lock);
         report = pinba_get_tag_report(share);
 
         if (!report) {
           report = pinba_regenerate_tag2_report(share);
         }
+        pthread_rwlock_unlock(&D->collector_lock);
 
         if (this_index[active_index].str.val) {
           free(this_index[active_index].str.val);
@@ -2573,12 +2662,16 @@ int ha_pinba::read_index_first(unsigned char *buf, uint active_index) /* {{{ */
         char index[PINBA_SCRIPT_NAME_SIZE + 1] = {0};
         pinba_tag_report *report;
 
+        // Registration grows tag_reports_arr; collector_lock orders it against
+        // the ingest/expiration job-buffer preflight and descriptor GC.
+        pthread_rwlock_rdlock(&D->collector_lock);
         pthread_rwlock_wrlock(&D->tag_reports_lock);
         report = pinba_get_tag_report(share);
 
         if (!report) {
           report = pinba_regenerate_tag_report2(share);
         }
+        pthread_rwlock_unlock(&D->collector_lock);
 
         if (this_index[active_index].str.val) {
           free(this_index[active_index].str.val);
@@ -2621,12 +2714,16 @@ int ha_pinba::read_index_first(unsigned char *buf, uint active_index) /* {{{ */
         char index[PINBA_SCRIPT_NAME_SIZE + 1] = {0};
         pinba_tag_report *report;
 
+        // Registration grows tag_reports_arr; collector_lock orders it against
+        // the ingest/expiration job-buffer preflight and descriptor GC.
+        pthread_rwlock_rdlock(&D->collector_lock);
         pthread_rwlock_wrlock(&D->tag_reports_lock);
         report = pinba_get_tag_report(share);
 
         if (!report) {
           report = pinba_regenerate_tag2_report2(share);
         }
+        pthread_rwlock_unlock(&D->collector_lock);
 
         if (this_index[active_index].str.val) {
           free(this_index[active_index].str.val);
@@ -2669,12 +2766,16 @@ int ha_pinba::read_index_first(unsigned char *buf, uint active_index) /* {{{ */
         char index[PINBA_SCRIPT_NAME_SIZE + 1] = {0};
         pinba_tag_report *report;
 
+        // Registration grows tag_reports_arr; collector_lock orders it against
+        // the ingest/expiration job-buffer preflight and descriptor GC.
+        pthread_rwlock_rdlock(&D->collector_lock);
         pthread_rwlock_wrlock(&D->tag_reports_lock);
         report = pinba_get_tag_report(share);
 
         if (!report) {
           report = pinba_regenerate_tagN_report(share);
         }
+        pthread_rwlock_unlock(&D->collector_lock);
 
         if (this_index[active_index].str.val) {
           free(this_index[active_index].str.val);
@@ -2717,12 +2818,16 @@ int ha_pinba::read_index_first(unsigned char *buf, uint active_index) /* {{{ */
         char index[PINBA_SCRIPT_NAME_SIZE + 1] = {0};
         pinba_tag_report *report;
 
+        // Registration grows tag_reports_arr; collector_lock orders it against
+        // the ingest/expiration job-buffer preflight and descriptor GC.
+        pthread_rwlock_rdlock(&D->collector_lock);
         pthread_rwlock_wrlock(&D->tag_reports_lock);
         report = pinba_get_tag_report(share);
 
         if (!report) {
           report = pinba_regenerate_tagN_report2(share);
         }
+        pthread_rwlock_unlock(&D->collector_lock);
 
         if (this_index[active_index].str.val) {
           free(this_index[active_index].str.val);
@@ -2832,7 +2937,7 @@ int ha_pinba::read_row_by_key(unsigned char *buf, uint active_index, const unsig
       if (active_index == 0) {
         memset(&(this_index[active_index].ival), 0, sizeof(this_index[active_index].ival));
         memcpy(&(this_index[active_index].ival), key, key_len);
-        ret = tags_fetch_row(buf, this_index[active_index].ival, &(this_index[0].position));
+        ret = tags_fetch_row(buf, this_index[active_index].ival, &(this_index[0].position), exact);
         this_index[active_index].ival = this_index[0].position;
       } else if (active_index == 1) {
         memset(&(this_index[active_index]), 0, sizeof(this_index[active_index]));
@@ -2963,6 +3068,9 @@ int ha_pinba::read_row_by_pos(unsigned char *buf, my_off_t position) /* {{{ */
     case PINBA_TABLE_TIMER:
       ret = timers_fetch_row(buf, position, nullptr, 1);
       break;
+    case PINBA_TABLE_TAG:
+      ret = tags_fetch_row(buf, position, nullptr, true);
+      break;
     default:
       ret = HA_ERR_INTERNAL_ERROR;
       goto failure;
@@ -3023,12 +3131,16 @@ int ha_pinba::read_next_row(unsigned char *buf, uint active_index, bool by_key) 
 
         snprintf(index, sizeof(index), "%s", this_index[active_index].str.val);
 
-        tag = (pinba_tag *)pinba_map_next(D->tag.name_index, index);
+        pthread_rwlock_rdlock(&D->collector_lock);
+        tag = pinba_tag_next_name(index, sizeof(index), false);
+        pin_tag_cursor(tag);
+        pthread_rwlock_unlock(&D->collector_lock);
         if (!tag) {
           ret = HA_ERR_END_OF_FILE;
           goto failure;
         }
 
+        free(this_index[active_index].str.val);
         this_index[active_index].str.len = strlen(index);
         this_index[active_index].str.val = strdup(index);
         ret = tags_fetch_row_by_name(buf, index);
@@ -3678,7 +3790,8 @@ inline int ha_pinba::timers_fetch_row_by_request_id(unsigned char *, size_t inde
 }
 /* }}} */
 
-inline int ha_pinba::tags_fetch_row(unsigned char *, size_t index, size_t *new_index) /* {{{ */
+inline int ha_pinba::tags_fetch_row(unsigned char *, size_t index, size_t *new_index,
+                                    bool exact) /* {{{ */
 {
   Field **field;
   pinba_saved_column_map_t old_map;
@@ -3692,11 +3805,14 @@ inline int ha_pinba::tags_fetch_row(unsigned char *, size_t index, size_t *new_i
     *new_index = index;
   }
 
-  tag = pinba_tag_get_by_id(index);
+  tag = pinba_tag_get_after(index, exact);
   if (!tag) {
     pthread_rwlock_unlock(&D->collector_lock);
-    DBUG_RETURN(HA_ERR_END_OF_FILE);
+    DBUG_RETURN(exact ? HA_ERR_KEY_NOT_FOUND : HA_ERR_END_OF_FILE);
   }
+  index = tag->id;
+  current_row_position = index;
+  pin_tag_cursor(tag);
 
   old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
@@ -3742,6 +3858,8 @@ inline int ha_pinba::tags_fetch_row_by_name(unsigned char *, char *name) /* {{{ 
     pthread_rwlock_unlock(&D->collector_lock);
     DBUG_RETURN(HA_ERR_KEY_NOT_FOUND);
   }
+  current_row_position = tag->id;
+  pin_tag_cursor(tag);
 
   old_map = PINBA_TMP_USE_ALL_COLUMNS(table, table->write_set);
 
@@ -3908,15 +4026,16 @@ inline int ha_pinba::tag_values_fetch_by_timer_id(unsigned char *) /* {{{ */
 }
 /* }}} */
 
-#define REPORT_PERCENTILE_FIELD(last_field_num, data, cnt)                                  \
-  if (PINBA_FIELD_INDEX(*field) > (last_field_num) &&                                       \
-      PINBA_FIELD_INDEX(*field) <= (last_field_num) + share->percentiles_num) {             \
-    int p_num = PINBA_FIELD_INDEX(*field) - (last_field_num) - 1;                           \
-    (*field)->set_notnull();                                                                \
-    (*field)->store(pinba_histogram_value((pinba_std_report *)report, data,                 \
-                                          cnt * ((float)share->percentiles[p_num] / 100))); \
-  } else {                                                                                  \
-    (*field)->set_null();                                                                   \
+#define REPORT_PERCENTILE_FIELD(last_field_num, data, cnt)                               \
+  if (PINBA_FIELD_INDEX(*field) > (last_field_num) &&                                    \
+      PINBA_FIELD_INDEX(*field) <= (last_field_num) + share->percentiles_num) {          \
+    int p_num = PINBA_FIELD_INDEX(*field) - (last_field_num) - 1;                        \
+    (*field)->set_notnull();                                                             \
+    (*field)->store(                                                                     \
+        pinba_histogram_value((pinba_std_report *)report, data,                          \
+                              pinba_percentile_rank((cnt), share->percentiles[p_num]))); \
+  } else {                                                                               \
+    (*field)->set_null();                                                                \
   }
 
 #define REPORT_FETCH_TOP_BLOCK(report_num)                                                    \
@@ -5971,32 +6090,31 @@ inline int ha_pinba::status_fetch_row(unsigned char *) /* {{{ */
       switch (PINBA_FIELD_INDEX(*field)) {
         case 0: /* current_temp_pool_size */
           (*field)->set_notnull();
-          pthread_rwlock_rdlock(&D->data_lock);
-          (*field)->store((long)0);
-          pthread_rwlock_unlock(&D->data_lock);
+          (*field)->store(static_cast<long>(
+              std::min<uint64_t>(pinba_count_get(pinba_metric::staging_slots), INT_MAX)));
           break;
         case 1: /* current_timer_pool_size */
           (*field)->set_notnull();
           pthread_rwlock_rdlock(&D->timer_lock);
-          (*field)->store((long)D->timer_pool.size);
+          (*field)->store(static_cast<long>(std::min<size_t>(D->timer_pool.size, INT_MAX)));
           pthread_rwlock_unlock(&D->timer_lock);
           break;
         case 2: /* lost_tmp_records */
           (*field)->set_notnull();
           pthread_rwlock_rdlock(&D->stats_lock);
-          (*field)->store((long)D->stats.lost_tmp_records);
+          (*field)->store(static_cast<long>(std::min<size_t>(D->stats.lost_tmp_records, INT_MAX)));
           pthread_rwlock_unlock(&D->stats_lock);
           break;
         case 3: /* invalid_packets */
           (*field)->set_notnull();
-          pthread_rwlock_rdlock(&D->stats_lock);
-          (*field)->store((long)D->stats.invalid_packets);
-          pthread_rwlock_unlock(&D->stats_lock);
+          (*field)->store(static_cast<long>(
+              std::min<uint64_t>(pinba_count_get(pinba_metric::udp_decode_errors), INT_MAX)));
           break;
         case 4: /* invalid_request_data */
           (*field)->set_notnull();
           pthread_rwlock_rdlock(&D->stats_lock);
-          (*field)->store((long)D->stats.invalid_request_data);
+          (*field)->store(
+              static_cast<long>(std::min<size_t>(D->stats.invalid_request_data, INT_MAX)));
           pthread_rwlock_unlock(&D->stats_lock);
           break;
         case 5: /* build string */
@@ -6009,7 +6127,8 @@ inline int ha_pinba::status_fetch_row(unsigned char *) /* {{{ */
         case 6: /* dictionary size */
           (*field)->set_notnull();
           pthread_rwlock_rdlock(&D->words_lock);
-          (*field)->store((long)pinba_map_count(D->dictionary));
+          (*field)->store(
+              static_cast<long>(std::min<size_t>(pinba_map_count(D->dictionary), INT_MAX)));
           pthread_rwlock_unlock(&D->words_lock);
           break;
       }
@@ -8930,9 +9049,7 @@ int ha_pinba::delete_all_rows() /* {{{ */
       pthread_rwlock_unlock(&D->rtag_reports_lock);   \
       pthread_rwlock_rdlock(&D->collector_lock);      \
       pthread_rwlock_wrlock(&D->rtag_reports_lock);   \
-      pthread_rwlock_rdlock(&D->words_lock);          \
       report = pinba_regenerate_##__lc_name__(share); \
-      pthread_rwlock_unlock(&D->words_lock);          \
       pthread_rwlock_unlock(&D->rtag_reports_lock);   \
       pthread_rwlock_unlock(&D->collector_lock);      \
       pthread_rwlock_rdlock(&D->rtag_reports_lock);   \
@@ -8973,7 +9090,9 @@ int ha_pinba::info(uint) /* {{{ */
       break;
     case PINBA_TABLE_TAG:
       pthread_rwlock_rdlock(&D->collector_lock);
+      pthread_rwlock_rdlock(&D->words_lock);
       stats.records = pinba_lmap_count(D->tag.table);
+      pthread_rwlock_unlock(&D->words_lock);
       pthread_rwlock_unlock(&D->collector_lock);
       break;
     case PINBA_TABLE_TIMERTAG:
@@ -8992,9 +9111,11 @@ int ha_pinba::info(uint) /* {{{ */
       pthread_rwlock_unlock(&D->base_reports_lock);
 
       if (!report) {
+        pthread_rwlock_rdlock(&D->collector_lock);
         pthread_rwlock_wrlock(&D->base_reports_lock);
         report = pinba_regenerate_report_info(share);
         pthread_rwlock_unlock(&D->base_reports_lock);
+        pthread_rwlock_unlock(&D->collector_lock);
       }
 
       stats.records = 0;
@@ -9183,7 +9304,28 @@ static MYSQL_SYSVAR_UINT(log_level, log_level_var, PLUGIN_VAR_RQCMDARG | PLUGIN_
                          "Set log level", nullptr, nullptr, P_ERROR | P_WARNING | P_NOTICE, 0,
                          INT_MAX, 0);
 
+static MYSQL_SYSVAR_ULONGLONG(ingest_dictionary_words_limit, ingest_dictionary_words_limit_var,
+                              PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+                              "UDP admission limit; zero means unlimited", nullptr, nullptr, 0, 0,
+                              ULLONG_MAX, 0);
+static MYSQL_SYSVAR_ULONGLONG(ingest_dictionary_bytes_limit, ingest_dictionary_bytes_limit_var,
+                              PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+                              "UDP admission limit; zero means unlimited", nullptr, nullptr, 0, 0,
+                              ULLONG_MAX, 0);
+static MYSQL_SYSVAR_ULONGLONG(tag_names_limit, tag_names_limit_var,
+                              PLUGIN_VAR_RQCMDARG | PLUGIN_VAR_READONLY,
+                              "UDP admission limit; zero means unlimited", nullptr, nullptr, 0, 0,
+                              ULLONG_MAX, 0);
+static MYSQL_SYSVAR_BOOL(tag_gc_enabled, tag_gc_enabled_var,
+                         PLUGIN_VAR_OPCMDARG | PLUGIN_VAR_READONLY,
+                         "Collect unowned tag descriptors (opt-in)", nullptr, nullptr, false);
+
 static SYS_VAR *system_variables[] = {MYSQL_SYSVAR(port),
+                                      MYSQL_SYSVAR(ingest_dictionary_words_limit),
+                                      MYSQL_SYSVAR(ingest_dictionary_bytes_limit),
+                                      MYSQL_SYSVAR(tag_names_limit),
+                                      MYSQL_SYSVAR(tag_gc_enabled),
+
                                       MYSQL_SYSVAR(address),
                                       MYSQL_SYSVAR(data_pool_size),
                                       MYSQL_SYSVAR(timer_pool_size),
@@ -9202,13 +9344,36 @@ static SYS_VAR *system_variables[] = {MYSQL_SYSVAR(port),
 
 struct st_mysql_storage_engine pinba_storage_engine = {MYSQL_HANDLERTON_INTERFACE_VERSION};
 
-static SHOW_VAR pinba_status_vars[] = {
+template <pinba_metric metric>
 #ifdef MARIADB_BASE_VERSION
-    {"Pinba_engine_version", (char *)PINBA_ENGINE_VERSION, SHOW_CHAR}, {NullS, NullS, SHOW_LONG}};
+static int pinba_show_metric(MYSQL_THD, SHOW_VAR *variable, void *buffer, system_status_var *,
+                             enum enum_var_type)
 #else
-    {"Pinba_engine_version", (char *)PINBA_ENGINE_VERSION, SHOW_CHAR, SHOW_SCOPE_GLOBAL},
-    {NullS, NullS, SHOW_LONG, SHOW_SCOPE_GLOBAL}};
+static int pinba_show_metric(MYSQL_THD, SHOW_VAR *variable, char *buffer)
 #endif
+{
+  const uint64_t value = pinba_metric_value(metric);
+  memcpy(buffer, &value, sizeof(value));
+  variable->type = SHOW_LONGLONG;
+  variable->value = static_cast<char *>(buffer);
+  return 0;
+}
+
+#ifdef MARIADB_BASE_VERSION
+#define PINBA_STATUS_ENTRY(id, name) \
+  {"Pinba_" #name, reinterpret_cast<char *>(pinba_show_metric<pinba_metric::id>), SHOW_FUNC},
+static SHOW_VAR pinba_status_vars[] = {
+    {"Pinba_engine_version", (char *)PINBA_ENGINE_VERSION, SHOW_CHAR},
+    PINBA_RUNTIME_METRICS(PINBA_STATUS_ENTRY){NullS, NullS, SHOW_LONG}};
+#else
+#define PINBA_STATUS_ENTRY(id, name)                                                         \
+  {"Pinba_" #name, reinterpret_cast<char *>(pinba_show_metric<pinba_metric::id>), SHOW_FUNC, \
+   SHOW_SCOPE_GLOBAL},
+static SHOW_VAR pinba_status_vars[] = {
+    {"Pinba_engine_version", (char *)PINBA_ENGINE_VERSION, SHOW_CHAR, SHOW_SCOPE_GLOBAL},
+    PINBA_RUNTIME_METRICS(PINBA_STATUS_ENTRY){NullS, NullS, SHOW_LONG, SHOW_SCOPE_GLOBAL}};
+#endif
+#undef PINBA_STATUS_ENTRY
 
 #ifdef MARIADB_BASE_VERSION
 maria_declare_plugin(pinba) /* {{{ */
@@ -9251,3 +9416,17 @@ mysql_declare_plugin(pinba) /* {{{ */
 /*
  * vim600: sw=4 ts=4 fdm=marker
  */
+
+void ha_pinba::pin_tag_cursor(pinba_tag *tag) {
+  if (!D->settings.tag_gc_enabled || tag == tag_cursor) return;
+  if (tag) tag->cursor_references.fetch_add(1, std::memory_order_relaxed);
+  release_tag_cursor();
+  tag_cursor = tag;
+}
+
+void ha_pinba::release_tag_cursor() {
+  if (tag_cursor) {
+    tag_cursor->cursor_references.fetch_sub(1, std::memory_order_release);
+    tag_cursor = nullptr;
+  }
+}

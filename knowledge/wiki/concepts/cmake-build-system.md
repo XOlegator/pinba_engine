@@ -7,7 +7,7 @@ related:
   - wiki/concepts/mysql-plugin-abi.md
   - wiki/concepts/docker-build-strategy.md
 confidence: high
-updated: 2026-05-23
+updated: 2026-10-18
 ---
 
 # CMake Build System
@@ -71,8 +71,19 @@ sudo apt-get install -y \
 
 ## Pre-commit Hooks
 
-Project has pre-push hooks: `cppcheck`, `clang-tidy`, `cmake-lint`, `hadolint`.
-Install these locally when working on C/C++ or Dockerfile changes.
-`clang-format` runs on all C/C++ files automatically.
+Pre-commit runs `clang-format`, `hadolint`, file checks, and `cmakelint`;
+`cppcheck` and `clang-tidy` run at the pre-push stage. Install the system C/C++
+and Docker linters locally when working on relevant files.
+
+The CMake hook uses a managed Python environment with `cmakelint==1.4.3` and
+`--linelength=120`. It does not depend on a developer's PATH or a globally
+installed CMake linter. `cmake-lint` from the `cmakelang` package is a different
+tool with different options; substituting it caused a usage error rather than
+a source check. The hook deliberately invokes `cmakelint` and pins its package.
+See the [upstream cmakelint usage](https://github.com/cmake-lint/cmake-lint#usage).
+
+The October 2026 correction also resolves the existing continuation-indent and
+mixed-case command warnings without relaxing lint rules or changing build
+options, dependency versions, or artifact properties.
 
 See: [[mysql-plugin-abi]], [[docker-build-strategy]]

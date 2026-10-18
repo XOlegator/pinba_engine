@@ -31,6 +31,7 @@
 
 #include "pinba.pb-c.h"
 #include "pinba.pb.h"
+#include "pinba_request_validation.h"
 
 namespace {
 
@@ -193,3 +194,48 @@ TEST(PinbaProtobuf, InitResetsFields) {
 }
 
 }  // namespace
+
+TEST(PinbaRequestValidation, RejectsMismatchedFlattenedArraysAndBadIndices) {
+  Pinba__Request request;
+  uint32_t hits[] = {1, 1};
+  uint32_t counts[] = {1, 1};
+  float times[] = {0.01f, 0.02f};
+  uint32_t names[] = {0, 0};
+  uint32_t values[] = {1, 1};
+  request.n_dictionary = 2;
+  request.n_timer_hit_count = request.n_timer_value = request.n_timer_tag_count = 2;
+  request.timer_hit_count = hits;
+  request.timer_value = times;
+  request.timer_tag_count = counts;
+  request.timer_tag_name = names;
+  request.timer_tag_value = values;
+  request.n_timer_tag_name = request.n_timer_tag_value = 2;
+  EXPECT_EQ(pinba_validate_request(request), pinba_request_error::none);
+  request.n_timer_tag_value = 1;
+  EXPECT_EQ(pinba_validate_request(request), pinba_request_error::flattened_tags);
+  request.n_timer_tag_value = 2;
+  counts[0] = 3;
+  EXPECT_EQ(pinba_validate_request(request), pinba_request_error::flattened_tags);
+  counts[0] = 0;
+  EXPECT_EQ(pinba_validate_request(request), pinba_request_error::flattened_tags);
+  counts[0] = 1;
+  values[1] = 2;
+  EXPECT_EQ(pinba_validate_request(request), pinba_request_error::dictionary_index);
+  values[1] = UINT32_MAX;
+  EXPECT_EQ(pinba_validate_request(request), pinba_request_error::dictionary_index);
+}
+
+TEST(PinbaRequestValidation, BoundsStorageAndSignedHistogramWeights) {
+  Pinba__Request request;
+  request.n_timer_hit_count = request.n_timer_value = request.n_timer_tag_count = USHRT_MAX + 1u;
+  EXPECT_EQ(pinba_validate_request(request), pinba_request_error::representation_limit);
+  uint32_t hits = UINT32_MAX, count = 1;
+  request.n_dictionary = 2;
+  request.n_timer_hit_count = request.n_timer_value = request.n_timer_tag_count = 1;
+  request.timer_hit_count = &hits;
+  request.timer_tag_count = &count;
+  EXPECT_EQ(pinba_validate_request(request), pinba_request_error::representation_limit);
+  hits = 1;
+  count = UINT32_MAX;
+  EXPECT_EQ(pinba_validate_request(request), pinba_request_error::representation_limit);
+}

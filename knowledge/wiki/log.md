@@ -5,7 +5,7 @@ sources: []
 related:
   - wiki/index.md
 confidence: high
-updated: 2026-10-17
+updated: 2026-10-18
 ---
 
 # Activity Log
@@ -876,3 +876,233 @@ production-usability review of the Docker images, discovery that the published
 - Confirmed cross-month group collisions using two partial boundary-day samples
   within a one-month interval. Recorded complete date grouping and straight
   error-status chart segments in [[pinboard-architecture]]. Updated [[index]].
+
+## 2026-10-18 — Discovery: Pinba2 fork history and compatibility review
+
+- Reviewed pinned Badoo and Anton Pinba2 source histories, TODOs, release notes,
+  all public issues and PRs, ordinary and inline review comments. Badoo master
+  remains at its September 2021 commit; Anton master includes the December 2024
+  build refresh and December 2025 README changes. Anton's August 2026 research
+  branch contains documents and benchmark tools, not released core changes.
+- Confirmed that shared protobuf clients do not imply SQL compatibility: Pinba2
+  lacks the raw request/timer tables used by Pinboard. Identified reusable ideas
+  around packet validation, dictionary lifetime, contention, IPv6, fractional
+  percentiles, and report observability, distinguishing reverted experiments.
+- Static inspection of engine 2.11.8 found missing flattened timer-tag length
+  checks, tag-offset advancement on skipped timers, dictionary retention until
+  shutdown, and a histogram upper-bound bucket error. Runtime crash reproduction
+  and end-to-end competitor benchmarks were not performed; no CVE or production
+  exploitability claim is made.
+- Recorded evidence, limitations, and unapproved proposals in
+  `docs/pinba2-forks-analysis-2026-10-18.md`, outside the wiki. No implementation,
+  generated outputs, raw knowledge sources, or service state was changed. Updated
+  [[index]] with the research artifact; no commits were created.
+
+## 2026-10-18 — Audit: current release, pool semantics, and delivery channels
+
+- Rechecked CMake, pool initialization/growth, ingestion saturation, expiration,
+  status field implementations, and the Docker publishing matrix against the
+  2.11.8 baseline. Updated [[overview]] and [[pinba-pool-model]]: request-ring
+  saturation drops new records, while timer and staging pools grow dynamically.
+- Removed stale 2.6.1/current-tag claims and the assumption that every channel
+  copies a shared protobuf library. Documented monitoring limitations and the
+  distinction between capacity and live record count.
+- Updated [[pinba-data-flow]] for staging/capacity and byte limits; removed an
+  unsupported numeric packet-loss allowance. Updated [[index]]. Historical raw
+  sources remain unchanged. The review document in docs remains uncommitted.
+
+## 2026-10-18 — Discovery and fix: histogram upper-edge bucket
+
+- Reproduced the exact-maximum bucket-zero error using the real updater in unit
+  tests, including a weighted timer. Corrected the comparison and rounding
+  fallback to saturate at the final bucket; interior values remain unchanged.
+- Verified all 79 unit tests, MySQL 8.0 and MariaDB 11.8 builds, and actual UDP
+  histogram counts/p100 on a disposable MariaDB. Added the SQL regression to
+  existing MariaDB CI checks. Documented [[histogram-boundary-semantics]] and
+  updated [[index]]. No production service was used.
+
+## 2026-10-18 — Discovery and fix: dictionary ownership across expiration
+
+- Added counted word ownership for staging dictionaries, parent raw records,
+  persistent conditions and request-tag report selectors. Collection removes
+  zero-reference words under the dictionary write lock independently of traffic.
+  Rejected/dropped staging records and duplicate dictionary entries are covered.
+- Fixed timer merge bounds to use accepted staging records rather than datagrams;
+  the distinction is necessary for invalid and nested requests. Corrected report
+  table registration counts and DROP cleanup, which otherwise retained selectors
+  or left a freed index in the table registry for shutdown to free again.
+- Verified repeated history windows, raw wraparound, concurrent SQL readers/DDL,
+  aliases, timer-only, invalid/nested packets and raw-ring saturation on a
+  disposable MariaDB. The original 2.11.8 plugin fails dictionary reclamation;
+  the corrected plugin also passes existing SQL smoke, percentile mapping and
+  row-position checks and exits cleanly.
+- All 86 unit tests pass, including ASan/UBSan/LeakSanitizer runs. Builds cover
+  MySQL 8.0/8.4 and MariaDB 10.11/11.8. The short-window SQL regression is wired
+  into existing MariaDB CI jobs after their normal-retention checks.
+- Documented [[dictionary-word-lifetime]] and updated [[pinba-pool-model]] and
+  [[index]], including the observed MariaDB clamp of the declared zero staging
+  limit to 1000. Tag descriptors/IDs and high-water allocations are not collected;
+  the change does not claim a global memory cap or an end-to-end speedup.
+- A sanitizer-instrumented MariaDB plugin exposed zero-length `memset` calls on
+  null empty-job arrays; guarded those calls without changing nonempty work.
+  Focused dictionary/histogram UDP/SQL sanitizer checks pass with mixed-host
+  MEM_ROOT manual poisoning disabled. The wider report sanitizer run reports
+  existing unaligned access in vendored xxHash; this is recorded as a limit of
+  full-engine sanitizer validation, not hidden by disabling alignment checks.
+- Static checks pass cppcheck and formatting. Clang-tidy retains two existing
+  handler dead-store warnings. The full pre-commit run retains 21 pre-existing
+  CMake formatting warnings, confirmed against the master baseline; the installed
+  `cmake-lint` command also belongs to a different package, so the comparison used
+  the intended `cmakelint` implementation. These unrelated checks are not reported
+  as clean or suppressed as part of the dictionary change.
+
+## 2026-10-18 — Follow-up: portable hash loads and reproducible CMake lint
+
+- Reproduced the vendored xxHash alignment error with a new unit regression
+  before changing the implementation. Replaced 32/64-bit typed loads with
+  fixed-size `memcpy` and removed external byte-buffer integer casts. Frozen
+  hash pairs, offsets 0–7, all short lengths, exact allocation tails, and
+  streaming block/tail boundaries preserve legacy outputs.
+- All 89 unit tests pass in release and ASan/UBSan/LeakSanitizer builds. The
+  complete exercised UDP/SQL suite now passes ASan/UBSan, including histogram,
+  dictionary, legacy report smoke, percentile mapping, and row references;
+  the disposable MariaDB shuts down normally. Alignment checks remain enabled;
+  the mixed-host MEM_ROOT manual-poisoning limitation still applies.
+- Builds cover MySQL 8.0/8.4 and MariaDB 10.11/11.8. Cppcheck passes with the
+  existing per-file GoogleTest macro-parser workaround also applied to the new
+  regression file. The compiler and sanitizers compile and exercise that file.
+  On the checked optimized x86-64 build, one-shot XXH32/XXH64 contain no calls
+  to `memcpy`; this is a code-generation observation, not a throughput benchmark.
+- Corrected the CMake pre-commit hook to use pinned `cmakelint==1.4.3` in an
+  isolated Python environment instead of the incompatible `cmakelang` command.
+  Resolved the 21 existing indent/command-case warnings without weakening
+  rules or changing build configuration. Full pre-commit passes.
+- Documented [[hash-memory-access]], updated [[cmake-build-system]],
+  [[dictionary-word-lifetime]], and [[index]]. Marked completed and partially
+  completed research proposals in the uncommitted analysis document; unapproved
+  validation, metrics, cardinality limits and fractional percentiles remain open.
+
+## 2026-10-18 — C01: structural validation and nested ownership
+
+- Added pre-intern validation of flattened timer arrays, indices, signed weights
+  and 16-bit storage limits. Skipped timers consume their input spans and do not
+  leave holes in timer storage or worker reservations.
+- Reworked decoded-tree ownership: the detached read pool owns complete trees
+  through all jobs; staging borrows nodes and processes descendants independently
+  of parent validation. Fixed the invalid-parent/child staging reuse UAF path.
+- The previous plugin fails the real skipped-timer tag regression. The corrected
+  plugin passes that regression and the existing complete exercised UDP/SQL suite
+  under ASan/UBSan, with clean test-server shutdown. All 91 unit tests pass.
+  Semantic rejects are counted even when an entire batch is rejected.
+- Added [[request-structure-validation]], updated [[index]], and wired the SQL
+  regression into both existing MariaDB CI jobs. No production services changed.
+
+## 2026-10-18 — C04: partial startup, shutdown, and DDL registration
+
+- Unified partial-init cleanup with normal shutdown, tracking initialized locks
+  and started workers. Added a startup readiness handshake and atomic shutdown.
+  RAII receive buffers/epoll descriptors and eventfd-based wakeup replace thread
+  cancellation; data/stats waits also wake immediately on shutdown.
+- Fixed RENAME to update table-to-report and alias bindings, initialized comment
+  report-kind classification and removed null-pointer subtraction in condition
+  parsing. Verified that unsupported ALTER COMMENT is rejected without losing
+  the existing report. Query cancellation leaves the engine usable.
+- Guarded failed timer-pool growth and preserved initialized timer reservations
+  on tag-buffer allocation failure. Decode allocation and partial std::thread
+  construction failures no longer escape through legacy startup paths.
+- A test-only build exercises ten partial-init failure stages, successful retry
+  in the same server, three real bind failures, and stable fd/thread counts.
+  The full exercised UDP/SQL suite passes ASan/UBSan and shuts down cleanly.
+  A 2000-second gathering period also shuts down immediately via eventfd.
+- All 92 unit tests pass, including a child-process RLIMIT_NPROC regression
+  verifying that kernel refusal to create threads returns nullptr. Documented
+  [[mysql-plugin-install]], updated [[index]], and added the ordinary lifecycle
+  regression to both MariaDB CI jobs. Failure injection defaults to OFF.
+
+## 2026-10-18 — C06/F5: explicit fractional selectors and histogram configuration
+
+- Added opt-in `p=` COMMENT selectors with locale-independent complete decimal
+  parsing and exact weighted nearest ranks. Legacy suffixes preserve float/floor
+  ranks and prefix parsing, including `99.9` selecting p99; order and duplicate
+  selectors remain intact. No existing SQL layouts change automatically.
+- Inventoried repository DDL/comments across the engine, extension and Pinboard;
+  no fractional declarations were found. Production DDL was not accessed, so
+  compatibility is ensured by explicit opt-in rather than that inventory alone.
+- Rejected invalid histogram maxima before constructing reports, preserving
+  positive decimal truncation. Removed 32-bit rank narrowing for large counts.
+- All 95 unit tests pass. Actual UDP/SQL weighted p99.9/p99.99 and invalid-DDL
+  checks pass with the complete exercised ASan/UBSan SQL/lifecycle suite and clean
+  shutdown. Documented [[fractional-percentile-grammar]], public table syntax,
+  and updated [[index]].
+
+## 2026-10-18 — Follow-up: decoded-tree batch reclamation
+
+- Runtime-accounting regression development exposed an early read-pool length
+  reset left in C01. Valid batches consequently skipped decoded-tree destruction.
+  Removed that obsolete reset/free block; the ownership cleanup now destroys
+  roots before resetting the queue bounds. Structural/timer/SQL results are
+  unchanged, and queued/completed tree accounting now balances on a disposable
+  sanitizer server. Updated [[request-structure-validation]] catalog wording
+  and [[index]]. This correction is separate from the diagnostics feature so
+  subsequent performance baselines include the same decoded-tree lifetime.
+
+## 2026-10-18 — C03: stage accounting and observable allocation failures
+
+- Added native-width SHOW counters for socket datagrams/bytes, decode/validation,
+  staging/admission, expiration, dictionary lifecycle, known allocations, stage
+  timing and update-lock waits. Kernel overflow sampling and effective SO_RCVBUF
+  distinguish socket delivery from application-stage losses.
+- Fixed uncounted recvmmsg tail losses at a full queue. Controlled mixed raw-copy
+  failures now compact worker reservations and update physical IDs/generation
+  counters together, without exposing inactive holes. Checked dictionary/tag
+  index insertion cleans up owned keys and values when allocation fails.
+- Preflight report-job buffers before admission and expiration. Failed admission
+  cannot leave partial report additions; failed expiration leaves the ring intact
+  and is explicitly deferred. Expiration holds the collector write lock through
+  subtraction; its SQL latency belongs in workload measurements.
+- All 96 unit tests pass. Real UDP/SQL checks verify exact datagram/Request balance,
+  malformed reasons, native-width helpers and gauges, plus controlled mixed copy,
+  report-buffer and expiration failures under ASan/UBSan. Queue ownership returns
+  to zero. Existing complete exercised SQL/lifecycle regressions also pass.
+- Documented public counters and limitations in `docs/diagnostics.md` and
+  [[runtime-diagnostics]], updated [[pinba-pool-model]] and [[index]]. Known bytes
+  deliberately exclude unmeasured container/row/allocator allocations; no RSS
+  or complete per-report allocator attribution is inferred from struct sizes.
+
+## 2026-10-18 — Admission budgets and optional descriptor collection
+
+Cross-checked and extended `dictionary-word-lifetime` against dictionary/tag
+admission, SQL cursor ownership and collector code. Documented opt-in startup
+word/known-byte/name limits, whole-Request preparation refusal, configuration
+pins, non-reused IDs, descriptor GC owners, live scans across ID holes and exact
+row references. Defaults retain persistent tag catalogs and unlimited admission.
+Updated the index. These budgets do not bound process RSS or all engine memory.
+
+## 2026-10-18 — Reproducible workload methodology
+
+Added `workload-validation` and updated the index with the deterministic ingest
+matrix, independent SQL/count/sum checks, persistent-driver timing and CPU/RSS
+measurement boundaries. Documented legacy info-time precision and the distinction
+between paced regression evidence, optional GC modes and saturation/competitor
+claims. Machine-specific JSON remains outside committed documentation.
+
+## 2026-10-18 — Review of PR #106: registration locking and hot-path cost
+
+**Action:** Reviewed the modernization branch for regressions and compatibility.
+
+**Key findings documented:**
+- Tag-report creation from index scans and `report_info` creation in `info()`
+  held only their registry lock. Report-job buffers are preflighted under the
+  exclusive `collector_lock` and the registry locks are then released, so a
+  concurrent SELECT could grow the array and overflow the buffer; the same
+  window let opt-in tag GC free a descriptor during report construction. All
+  registration paths now take `collector_lock` shared.
+- The collector hot path went from one to about six shared atomic RMWs per
+  datagram; counters are now published once per `recvmmsg` batch. Staging word
+  references move to raw records instead of retain/release pairs.
+- `histogram_max_time` keeps strtod-style prefix parsing (`10s` → 10) so
+  existing table COMMENTs keep opening; range validation stays.
+- Pre-existing: `rtag2_report` looked up `params[0]` twice and stayed empty.
+
+**Pages updated:** `concepts/runtime-diagnostics.md`,
+`concepts/dictionary-word-lifetime.md`.

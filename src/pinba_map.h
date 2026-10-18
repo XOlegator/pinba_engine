@@ -27,5 +27,10 @@ int pinba_map_delete(void *map_report, const char *index);
 void pinba_map_destroy(void *data);
 void *pinba_map_create();
 size_t pinba_map_count(void *map_report);
+// Checked admission-path insertion retains existing entries on allocation failure.
+bool pinba_map_try_add(void **storage, const char *index, const void *value) noexcept;
+// Erases while iterating without invalidating the next entry. The predicate may
+// destroy a value when returning true; keys are independently owned by the map.
+size_t pinba_map_delete_if(void *map_report, bool (*predicate)(const void *));
 
 #endif /* HAVE_PINBA_MAP_H */

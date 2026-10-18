@@ -88,9 +88,16 @@ void *pinba_collector_main(void *arg);
 void *pinba_stats_main(void *arg);
 int pinba_collector_init(const pinba_daemon_settings &settings);
 void pinba_collector_shutdown();
+void pinba_request_shutdown();
+void pinba_wait_for_shutdown(int64_t microseconds);
 int pinba_get_processors_number();
 
 int pinba_get_time_interval();
+// Caller holds collector_lock exclusively. Every report registration path holds
+// collector_lock shared, so the report arrays can only shrink until it is released.
+bool pinba_prepare_report_jobs(reports_job_data **base, unsigned int *base_size,
+                               reports_job_data **rtag, unsigned int *rtag_size,
+                               reports_job_data **tag, unsigned int *tag_size);
 int pinba_process_stats_packet(const unsigned char *buffer, int buffer_len);
 
 void pinba_eat_udp(pinba_socket *socket, size_t thread_num);
@@ -101,6 +108,9 @@ void pinba_tag_dtor(pinba_tag *tag);
 int pinba_tag_put(const unsigned char *name);
 pinba_tag *pinba_tag_get_by_name(char *name);
 pinba_tag *pinba_tag_get_by_id(size_t id);
+pinba_tag *pinba_tag_get_after(size_t id, bool exact);
+pinba_tag *pinba_tag_next_name(char *key, size_t capacity, bool first);
+void pinba_collect_unused_tags();
 pinba_tag *pinba_tag_lookup_or_create_locked(const char *name, size_t len);
 
 typedef struct _pinba_tag_metrics_snapshot {
@@ -445,12 +455,13 @@ static inline void pinba_update_histogram(pinba_std_report *report, void **histo
     return;
   }
 
-  if (time_value > report->histogram_max_time) {
+  if (time_value >= report->histogram_max_time) {
     slot_num = D->settings.histogram_size - 1;
   } else {
     slot_num = time_value / report->histogram_segment;
     if (slot_num > D->settings.histogram_size - 1) {
-      slot_num = 0;
+      // Rounding at the upper edge must saturate, never wrap to the first bucket.
+      slot_num = D->settings.histogram_size - 1;
     }
   }
 

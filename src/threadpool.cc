@@ -269,9 +269,14 @@ thread_pool_t *th_pool_create(int num_threads_in_pool) /* {{{ */
     return nullptr;
   }
 
-  pool->threads.reserve(pool->size);
-  for (size_t i = 0; i < pool->size; ++i) {
-    pool->threads.emplace_back(th_do_work, pool);
+  try {
+    pool->threads.reserve(pool->size);
+    for (size_t i = 0; i < pool->size; ++i) {
+      pool->threads.emplace_back(th_do_work, pool);
+    }
+  } catch (const std::exception &) {
+    th_pool_destroy(pool);
+    return nullptr;
   }
 
   return pool;

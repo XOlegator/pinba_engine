@@ -195,6 +195,30 @@ jobs:
       - name: Percentile field-mapping test (report2/report3, real data)
         run: MYSQL_CLIENT=mariadb bash scripts/percentile_mapping_test.sh 127.0.0.1 3306 pinba pinba pinba
 
+      - name: Request validation regression (real UDP/SQL)
+        env:
+          MYSQL_PWD: pinba
+        run: >-
+          python3 -B scripts/request_validation_test.py --mysql-client=mariadb
+          --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306
+          --mysql-option=--user=pinba
+
+      - name: Fractional percentile regression (real UDP/SQL)
+        env:
+          MYSQL_PWD: pinba
+        run: >-
+          python3 -B scripts/fractional_percentile_test.py --mysql-client=mariadb
+          --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306
+          --mysql-option=--user=pinba
+
+      - name: Histogram upper-boundary regression (real UDP/SQL)
+        env:
+          MYSQL_PWD: pinba
+        run: >-
+          python3 -B scripts/histogram_boundary_test.py --mysql-client=mariadb
+          --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306
+          --mysql-option=--user=pinba
+
       - name: Row-reference filesort regression (requests and timers)
         env:
           MYSQL_PWD: pinba
@@ -202,6 +226,49 @@ jobs:
           python3 -B scripts/row_position_test.py --mysql-client=mariadb
           --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306
           --mysql-option=--user=pinba
+
+      - name: Dictionary lifetime regression (disposable CI server)
+        env:
+          MYSQL_PWD: pinba
+        run: |
+          # Use short retention only after the ordinary SQL checks. This is an
+          # isolated CI database; the test exercises natural expiry and capacity
+          # rejection without changing application schemas or defaults.
+          printf '[mysqld]\nloose-pinba-stats-history=3\nloose-pinba-request-pool-size=1000\nloose-pinba-temp-pool-size=50\nloose-pinba-timer-pool-size=1000\n' \
+            | sudo tee /etc/mysql/mariadb.conf.d/zz-pinba-regression.cnf >/dev/null
+          sudo systemctl restart mariadb
+          python3 -B scripts/dictionary_lifetime_test.py --mysql-client=mariadb \
+            --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
+            --mysql-option=--user=pinba
+          python3 -B scripts/lifecycle_test.py --mysql-client=mariadb \
+            --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
+            --mysql-option=--user=pinba
+          python3 -B scripts/runtime_metrics_test.py --mysql-client=mariadb \
+            --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
+            --mysql-option=--user=pinba
+
+      - name: Tag retention, collection and independent admission limits
+        env:
+          MYSQL_PWD: pinba
+        run: |
+          python3 -B scripts/tag_lifetime_test.py --mysql-client=mariadb \
+            --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
+            --mysql-option=--user=pinba
+          # Fresh registries in the disposable CI service; no production defaults change.
+          for mode in gc words bytes names; do
+            config='[mysqld]\nloose-pinba-tag-gc-enabled=1\n'
+            case "$mode" in
+              words) config+='loose-pinba-ingest-dictionary-words-limit=8\n' ;;
+              bytes) config+='loose-pinba-ingest-dictionary-bytes-limit=200\n' ;;
+              names) config+='loose-pinba-tag-names-limit=4\n' ;;
+            esac
+            printf '%b' "$config" \
+              | sudo tee /etc/mysql/mariadb.conf.d/zz-pinba-admission.cnf >/dev/null
+            sudo systemctl restart mariadb
+            python3 -B scripts/tag_lifetime_test.py --mysql-client=mariadb \
+              --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
+              --mysql-option=--user=pinba
+          done
 
       - name: Dump MariaDB error log on failure
         if: failure()
@@ -488,6 +555,30 @@ jobs:
       - name: Percentile field-mapping test (report2/report3, real data)
         run: MYSQL_CLIENT=mariadb bash scripts/percentile_mapping_test.sh 127.0.0.1 3306 pinba pinba pinba
 
+      - name: Request validation regression (real UDP/SQL)
+        env:
+          MYSQL_PWD: pinba
+        run: >-
+          python3 -B scripts/request_validation_test.py --mysql-client=mariadb
+          --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306
+          --mysql-option=--user=pinba
+
+      - name: Fractional percentile regression (real UDP/SQL)
+        env:
+          MYSQL_PWD: pinba
+        run: >-
+          python3 -B scripts/fractional_percentile_test.py --mysql-client=mariadb
+          --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306
+          --mysql-option=--user=pinba
+
+      - name: Histogram upper-boundary regression (real UDP/SQL)
+        env:
+          MYSQL_PWD: pinba
+        run: >-
+          python3 -B scripts/histogram_boundary_test.py --mysql-client=mariadb
+          --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306
+          --mysql-option=--user=pinba
+
       - name: Row-reference filesort regression (requests and timers)
         env:
           MYSQL_PWD: pinba
@@ -495,6 +586,26 @@ jobs:
           python3 -B scripts/row_position_test.py --mysql-client=mariadb
           --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306
           --mysql-option=--user=pinba
+
+      - name: Dictionary lifetime regression (disposable CI server)
+        env:
+          MYSQL_PWD: pinba
+        run: |
+          # Use short retention only after the ordinary SQL checks. This is an
+          # isolated CI database; the test exercises natural expiry and capacity
+          # rejection without changing application schemas or defaults.
+          printf '[mysqld]\nloose-pinba-stats-history=3\nloose-pinba-request-pool-size=1000\nloose-pinba-temp-pool-size=50\nloose-pinba-timer-pool-size=1000\n' \
+            | sudo tee /etc/mysql/mariadb.conf.d/zz-pinba-regression.cnf >/dev/null
+          sudo systemctl restart mariadb
+          python3 -B scripts/dictionary_lifetime_test.py --mysql-client=mariadb \
+            --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
+            --mysql-option=--user=pinba
+          python3 -B scripts/lifecycle_test.py --mysql-client=mariadb \
+            --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
+            --mysql-option=--user=pinba
+          python3 -B scripts/runtime_metrics_test.py --mysql-client=mariadb \
+            --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
+            --mysql-option=--user=pinba
 
       - name: Stop server and collect gcov data
         run: |

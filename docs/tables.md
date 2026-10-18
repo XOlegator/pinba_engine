@@ -54,6 +54,31 @@ report3:::90,95,99
 
 This adds `p90`, `p95`, `p99` columns (one per percentile value) after the standard columns.
 
+Fractional percentiles use an explicit `p=` prefix in the same suffix:
+
+```
+report3:::p=99.9,99.99,100
+tag_info:category::p=99.99,99.9,99.99
+```
+
+Create one trailing column per value, in the requested order; repeated values
+remain separate columns. The new grammar accepts decimal percentages in `(0,100]`
+with at most nine digits after the dot. Signs, whitespace, exponents, NaN/Inf,
+partial tokens and empty entries are rejected. Ranks use exact decimal arithmetic
+and the nearest-rank rule `ceil(observation_count * percentage / 100)`. Timer
+observations use their hit weights. Histogram interpolation and resolution remain
+unchanged; requesting more decimal places does not create more observations.
+
+Existing suffixes keep their legacy float/floor rank and prefix parsing:
+`:::99.9` continues to select p99. Opt into `:::p=99.9` explicitly when creating
+new tables. Existing tables, column positions and client queries are not migrated.
+Ranks now use the native count width rather than narrowing to 32 bits.
+
+The optional `histogram_max_time` condition must be finite and within
+`[1, INT_MAX]` seconds. Existing parsing is preserved: the leading number is
+used, decimals are truncated to whole seconds and a trailing suffix such as
+`10s` is ignored. Invalid configurations are rejected before report construction.
+
 ```sql
 CREATE TABLE `report_by_hostname_p95` (
   -- standard report3 columns ...

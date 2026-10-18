@@ -46,8 +46,9 @@ repos:
 
       - id: cmakelint
         name: cmakelint
-        language: system
-        entry: cmake-lint --linelength=120
+        language: python
+        additional_dependencies: [cmakelint==1.4.3]
+        entry: cmakelint --linelength=120
         files: (^|/)CMakeLists\.txt$|\.cmake$
         exclude: (^|/)\.gitignore\.cmake$|\.cmake\.in$
 

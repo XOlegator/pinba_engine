@@ -4,25 +4,32 @@ type: index
 sources: []
 related: []
 confidence: high
-updated: 2026-10-17
+updated: 2026-10-18
 ---
 
 # Pinba Engine — Knowledge Base Index
 
 Master catalog. Maintained by LLM agents.
 
-## Concepts (29 articles)
+## Concepts (36 articles)
 
 | Article | Key Topic |
 |---------|-----------|
 | [[pinba-data-flow]] | End-to-end pipeline: PHP → UDP → pool → SQL |
+| [[request-structure-validation]] | Flattened timer validation, storage bounds, compact skipping and decoded-tree reclamation |
+| [[workload-validation]] | Deterministic UDP/SQL oracles, persistent client latency, CPU/RSS and comparison limits |
+| [[runtime-diagnostics]] | Native-width SHOW counters, datagram/Request accounting, known memory bounds and allocation-failure preflight |
 | [[report-percentile-field-mapping]] | fetch_row hardcoded field indices, report3 p90 off-by-one (2013→2.11.5), SQL regression test |
+| [[histogram-boundary-semantics]] | Saturating upper-edge buckets, weighted add/delete, unit and UDP/SQL regression coverage |
+| [[fractional-percentile-grammar]] | Opt-in p= decimal selectors, exact weighted ranks, legacy parsing and histogram configuration validation |
 | [[engine-row-references]] | Filesort position/rnd_pos contract, physical pool slots, request/timer sort regression and wraparound |
 | [[pinba-udp-protocol]] | Protobuf message format, timer parallel arrays, field versions |
 | [[protobuf-runtime-strategy]] | Engine (C++ protobuf + shim) vs extension (protobuf-c); shared `pinba.proto` contract; fields 22/23; drift guard |
-| [[pinba-pool-model]] | Cyclic buffer memory model, overflow behaviour, monitoring |
+| [[pinba-pool-model]] | Fixed request ring vs growable timer/staging pools, dropping new requests, capacity and monitoring limits |
+| [[dictionary-word-lifetime]] | Counted word ownership, opt-in admission budgets/tag GC, cursor/report pins and monotonic IDs |
+| [[hash-memory-access]] | Alignment/alias-safe xxHash reads, preserved legacy hashes, and sanitizer regressions |
 | [[mysql-plugin-abi]] | **Critical**: 8.0 vs 8.4 ABI incompatibility, implications |
-| [[mysql-plugin-install]] | INSTALL PLUGIN lifecycle, reinstall procedure |
+| [[mysql-plugin-install]] | Partial-init cleanup, eventfd shutdown/readiness, RENAME ownership, failed INSTALL and reinstall regressions |
 | [[mysql-plugin-migration-80-to-84]] | Porting checklist: ABI, build requirements, OS paths, OL9 builder rule |
 | [[php-pinba-configuration]] | php.ini settings, deployment scenarios, silent failure |
 | [[php-extension-api]] | Complete PHP function reference: timer lifecycle, request tags, overrides |
@@ -30,7 +37,7 @@ Master catalog. Maintained by LLM agents.
 | [[php-extension-test-infrastructure]] | Coverage (gcov→Codecov), JUnit, ASan/UBSan via instrumented PHP (RTLD_DEEPBIND), `tools/run-tests.sh`; bugs found |
 | [[php-extension-packaging]] | Debian packaging for PHP extensions: php-pinba source, php{X.Y}-pinba binaries |
 | [[php-version-monitoring]] | Automated PHP version discovery: weekly cron, php.net parsing, PR gate |
-| [[cmake-build-system]] | Presets, MySQL headers sourcing, Ubuntu 24.04 deps |
+| [[cmake-build-system]] | Presets, MySQL headers sourcing, dependencies, and pinned CMake lint environment |
 | [[docker-build-strategy]] | Multi-stage build, builder-OS-matches-runtime rule, GLIBCXX incident, multi-arch, smoke test |
 | [[docker-tag-strategy]] | Docker Hub naming: rolling channels (8.0/8.4/mariadb-*), version-suffixed tags, all tags mutable → digest pinning; old `8.4-lts*` dead |
 | [[github-actions-docker]] | CI/CD workflow for Docker Hub build+push automation |
@@ -84,6 +91,14 @@ raw/docs/
   mysql-80-to-84-migration.md
   github-actions-docker-workflow.md
 ```
+
+## External Research Records
+
+- [Badoo Pinba2](https://github.com/badoo/pinba2) and
+  [Anton Pinba2](https://github.com/anton-povarov/pinba2) were reviewed on
+  2026-10-18. Shared protobuf clients do not imply SQL compatibility: Pinba2
+  lacks the raw tables used by Pinboard. Anton's August 2026 research branch
+  is separate from released functionality. See [[log]] for the review record.
 
 ## Knowledge Gaps (candidates for next ingest)
 

@@ -25,11 +25,13 @@ option(PINBA_WITH_BENCHMARKS "Build benchmarks" OFF)
 option(PINBA_FETCH_DEPENDENCIES "Download test/benchmark dependencies when not installed" ON)
 option(PINBA_DOWNLOAD_MYSQL_SOURCE "Download MySQL source headers when no local source tree is found" OFF)
 option(PINBA_ENABLE_SANITIZERS "Enable ASan/UBSan for debug hardening" OFF)
-option(PINBA_LINK_MYSQL_CLIENT
-       "Link the plugin against the MySQL/MariaDB client library. The server \
+option(PINBA_ENABLE_TEST_FAILURES "Enable disposable-server init failure injection" OFF)
+option(
+  PINBA_LINK_MYSQL_CLIENT
+  "Link the plugin against the MySQL/MariaDB client library. The server \
 supplies these symbols when it loads the plugin, so disable this when the \
 runtime host does not ship libmysqlclient (e.g. the mysql:8.4 Docker image)"
-       ON)
+  ON)
 
 set(PINBA_DB_FLAVOR "mysql" CACHE STRING "Target server flavor for source headers (mysql or mariadb)")
 set_property(CACHE PINBA_DB_FLAVOR PROPERTY STRINGS mysql mariadb)
@@ -95,10 +97,11 @@ set(
 # of failing the download against the wrong checksum. The download still runs
 # with TLS_VERIFY ON.
 if(PINBA_DEFAULT_MYSQL_SOURCE_VERSION
-   AND NOT PINBA_MYSQL_SOURCE_VERSION STREQUAL PINBA_DEFAULT_MYSQL_SOURCE_VERSION
-   AND PINBA_MYSQL_SOURCE_HASH STREQUAL PINBA_DEFAULT_MYSQL_SOURCE_HASH)
-  message(STATUS "PINBA_MYSQL_SOURCE_VERSION overridden to ${PINBA_MYSQL_SOURCE_VERSION}; "
-                 "ignoring the default source hash recorded for ${PINBA_DEFAULT_MYSQL_SOURCE_VERSION}.")
+    AND NOT PINBA_MYSQL_SOURCE_VERSION STREQUAL PINBA_DEFAULT_MYSQL_SOURCE_VERSION
+    AND PINBA_MYSQL_SOURCE_HASH STREQUAL PINBA_DEFAULT_MYSQL_SOURCE_HASH)
+  message(
+    STATUS "PINBA_MYSQL_SOURCE_VERSION overridden to ${PINBA_MYSQL_SOURCE_VERSION}; "
+    "ignoring the default source hash recorded for ${PINBA_DEFAULT_MYSQL_SOURCE_VERSION}.")
   set(PINBA_MYSQL_SOURCE_HASH "")
 endif()
 
@@ -263,13 +266,13 @@ find_library(
 if(NOT PINBA_LINK_MYSQL_CLIENT)
   set(MYSQL_LIBRARY "")
   message(STATUS "PINBA_LINK_MYSQL_CLIENT=OFF: linking the plugin without a client "
-                 "library (the server resolves the symbols at load time).")
+    "library (the server resolves the symbols at load time).")
 elseif(NOT MYSQL_LIBRARY AND NOT PINBA_DB_FLAVOR STREQUAL "mariadb")
   message(FATAL_ERROR "MySQL client library not found. Install libmysqlclient development files or set MYSQL_LIBRARY.")
 elseif(NOT MYSQL_LIBRARY)
   set(MYSQL_LIBRARY "")
   message(STATUS "MariaDB client library not found; linking the plugin without it "
-                 "(the server resolves the symbols at load time).")
+    "(the server resolves the symbols at load time).")
 endif()
 
 # Derive MYSQL_VERSION_ID from the pinned source version when available — this is the
@@ -284,7 +287,7 @@ if(PINBA_MYSQL_SOURCE_VERSION)
   list(GET _pinba_ver_parts 1 _pinba_ver_minor)
   list(GET _pinba_ver_parts 2 _pinba_ver_patch)
   math(EXPR MYSQL_VERSION_ID
-       "${_pinba_ver_major} * 10000 + ${_pinba_ver_minor} * 100 + ${_pinba_ver_patch}")
+    "${_pinba_ver_major} * 10000 + ${_pinba_ver_minor} * 100 + ${_pinba_ver_patch}")
 else()
   # User-provided source tree (PINBA_MYSQL_SOURCE_DIR set manually): try to read the
   # version from pre-generated headers if they exist.
@@ -477,6 +480,8 @@ set(PINBA_SOURCES
     src/ha_pinba.cc
     src/main.cc
     src/data.cc
+    src/pinba_dictionary.cc
+    src/pinba_runtime.cc
     src/pool.cc
     src/tags.cc
     src/threadpool.cc
@@ -500,18 +505,22 @@ endif()
 
 set_target_properties(
   pinba_engine
-  PROPERTIES OUTPUT_NAME "ha_pinba"
-             PREFIX ""
-             SUFFIX ".so"
-             VERSION ${PROJECT_VERSION}
-             SOVERSION ${PROJECT_VERSION_MAJOR}
-             CXX_VISIBILITY_PRESET ${PINBA_VISIBILITY_PRESET}
-             VISIBILITY_INLINES_HIDDEN ${PINBA_VISIBILITY_INLINES_HIDDEN})
+  PROPERTIES
+    OUTPUT_NAME "ha_pinba"
+    PREFIX ""
+    SUFFIX ".so"
+    VERSION ${PROJECT_VERSION}
+    SOVERSION ${PROJECT_VERSION_MAJOR}
+    CXX_VISIBILITY_PRESET ${PINBA_VISIBILITY_PRESET}
+    VISIBILITY_INLINES_HIDDEN ${PINBA_VISIBILITY_INLINES_HIDDEN})
 target_link_libraries(
   pinba_engine
   PRIVATE pinba_project_options pinba_includes ${MYSQL_LIBRARY} ${M_LIBRARY}
           Threads::Threads ${Protobuf_LIBRARIES})
 target_include_directories(pinba_engine PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
+if(PINBA_ENABLE_TEST_FAILURES)
+  target_compile_definitions(pinba_engine PRIVATE PINBA_ENABLE_TEST_FAILURES)
+endif()
 
 if(PINBA_DB_FLAVOR STREQUAL "mariadb")
   # src/ ships MySQL's my_config.h; MariaDB's my_global.h pulls <my_config.h> and
@@ -533,8 +542,9 @@ if(PINBA_WITH_TESTS)
   add_executable(pinba_test tests/test_simple.cc)
   set_target_properties(pinba_test PROPERTIES OUTPUT_NAME "pinba_test")
   target_link_libraries(
-    pinba_test PRIVATE pinba_project_options pinba_includes ${M_LIBRARY}
-                       Threads::Threads ${Protobuf_LIBRARIES})
+    pinba_test
+    PRIVATE pinba_project_options pinba_includes ${M_LIBRARY}
+            Threads::Threads ${Protobuf_LIBRARIES})
   target_include_directories(pinba_test PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
@@ -551,8 +561,9 @@ if(GIT_FOUND)
   if(GIT_SHA1)
     string(SUBSTRING ${GIT_SHA1} 0 7 GIT_SHORT_SHA1)
     target_compile_definitions(
-      pinba_engine PRIVATE PINBA_GIT_SHA1="${GIT_SHA1}"
-                           PINBA_GIT_SHORT_SHA1="${GIT_SHORT_SHA1}")
+      pinba_engine
+      PRIVATE PINBA_GIT_SHA1="${GIT_SHA1}"
+              PINBA_GIT_SHORT_SHA1="${GIT_SHORT_SHA1}")
   endif()
 endif()
 
@@ -560,13 +571,13 @@ if(PINBA_WITH_TESTS)
   enable_testing()
   find_package(GTest QUIET)
   if(NOT GTest_FOUND AND PINBA_FETCH_DEPENDENCIES)
-    FetchContent_Declare(
+    fetchcontent_declare(
       googletest
       URL https://github.com/google/googletest/archive/refs/tags/v1.15.2.tar.gz
       URL_HASH SHA256=7b42b4d6ed48810c5362c265a17faebe90dc2373c885e5216439d37927f02926
       DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
     set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(googletest)
+    fetchcontent_makeavailable(googletest)
   elseif(NOT GTest_FOUND)
     find_package(GTest REQUIRED)
   endif()
@@ -576,13 +587,13 @@ endif()
 if(PINBA_WITH_BENCHMARKS)
   find_package(benchmark QUIET)
   if(NOT benchmark_FOUND AND PINBA_FETCH_DEPENDENCIES)
-    FetchContent_Declare(
+    fetchcontent_declare(
       googlebenchmark
       URL https://github.com/google/benchmark/archive/refs/tags/v1.9.1.tar.gz
       URL_HASH SHA256=32131c08ee31eeff2c8968d7e874f3cb648034377dfc32a4c377fa8796d84981
       DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
     set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(googlebenchmark)
+    fetchcontent_makeavailable(googlebenchmark)
   elseif(NOT benchmark_FOUND)
     find_package(benchmark REQUIRED)
   endif()

@@ -14,6 +14,9 @@
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
+#include <atomic>
+#include <map>
+
 #include "pinba_limits.h"
 #include "threadpool.h"
 
@@ -106,6 +109,7 @@ typedef struct _struct timeval { /* {{{ */
 typedef struct _pinba_word { /* {{{ */
   char *str;
   unsigned char len;
+  std::atomic<size_t> references{0};
 } pinba_word;
 /* }}} */
 
@@ -150,6 +154,11 @@ typedef struct _pinba_stats_record { /* {{{ */
   size_t counter;
   unsigned short timers_cnt;
   unsigned char active;
+  // Owns the packet dictionary for request tags and all of this request's
+  // timers. Report keys copy strings; persistent report selectors own pins.
+  pinba_word **dictionary_words;
+  unsigned int dictionary_words_count;
+  unsigned int dictionary_words_alloc;
 } pinba_stats_record;
 /* }}} */
 
@@ -186,6 +195,7 @@ typedef struct _pinba_tag { /* {{{ */
   char name[PINBA_TAG_NAME_SIZE];
   unsigned char name_len;
   uint64_t hash;
+  std::atomic<size_t> cursor_references{0};
 } pinba_tag;
 /* }}} */
 
@@ -288,6 +298,10 @@ typedef struct _pinba_daemon_settings { /* {{{ */
   size_t data_job_size;
   size_t histogram_size;
   unsigned int log_level;
+  uint64_t ingest_dictionary_words_limit;
+  uint64_t ingest_dictionary_bytes_limit;
+  uint64_t tag_names_limit;
+  bool tag_gc_enabled;
 } pinba_daemon_settings;
 /* }}} */
 
@@ -331,8 +345,10 @@ typedef struct _pinba_daemon { /* {{{ */
   void *dictionary;
   size_t timertags_cnt;
   struct {
-    void *table;      /* ID -> NAME */
-    void *name_index; /* NAME -> */
+    void *table;                             /* ID -> NAME */
+    void *name_index;                        /* NAME -> */
+    size_t next_id = 0;                      // Never reuse an ID, including after collection.
+    std::map<size_t, pinba_tag *> live_ids;  // Only populated in opt-in GC mode.
   } tag;
   pinba_daemon_settings settings;
   void *base_reports;
@@ -346,7 +362,9 @@ typedef struct _pinba_daemon { /* {{{ */
   pthread_rwlock_t stats_lock;
   void *tables_to_reports;
   void *reports_to_tables;
-  int in_shutdown;
+  std::atomic<bool> in_shutdown{false};
+  std::atomic<unsigned int> workers_ready{0};
+  int shutdown_event_fd = -1;
   pthread_cond_t data_job_posted;
   pthread_mutex_t data_job_mutex;
   int data_job_flag;

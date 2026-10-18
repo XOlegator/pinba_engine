@@ -16,7 +16,7 @@ related:
   - wiki/concepts/copr-rpm-packaging.md
   - wiki/concepts/engine-rpm-packaging.md
 confidence: high
-updated: 2026-07-02
+updated: 2026-10-18
 ---
 
 # Pinba Engine — Knowledge Base Overview
@@ -28,7 +28,9 @@ PHP processes send performance data (request times, memory, timers) via UDP; the
 aggregates, and exposes this data as SQL-queryable virtual tables.
 
 This repository is a **modernized fork** of the original `tony2001/pinba_engine` (MySQL 5.1, 2009-2016),
-updated to support MySQL 8.0 and 8.4 LTS with a CMake+C++23 build system.
+updated to support MySQL 8.0/8.4 and MariaDB 10.11/11.8 with a CMake+C++23 build
+system. The implementation and packaging matrix are authoritative; historical raw
+documents describe earlier releases.
 
 ## System Architecture
 
@@ -42,14 +44,20 @@ Full chain: `PHP pinba extension` → `UDP:30002` → `Pinba Engine (ha_pinba.so
 ## Core Technical Insights
 
 ### 1. The ABI Rule (most critical)
-MySQL 8.0 and 8.4 plugins are **not interchangeable**. The entire dual-build strategy
-(two Dockerfiles, two CMake presets, two Docker Hub tag tracks) exists because of this.
+MySQL 8.0 and 8.4 plugins are **not interchangeable**. MariaDB also needs its own
+flavor and matching server-series headers. Separate builds and image channels
+exist for each supported ABI.
 See [[mysql-plugin-abi]].
 
 ### 2. In-Memory Only
 All Pinba data lives in RAM. MySQL restart = data gone. This is by design — it's a monitoring
 buffer, not a database. `pinba_stats_history` (default 900s) controls the window.
-See [[pinba-pool-model]].
+Words now have counted owners and periodic reclamation. Optional UDP dictionary
+word/known-byte/name budgets and descriptor collection preserve unlimited, persistent
+legacy defaults; they are not an engine-wide RSS cap. Native stage counters and a
+deterministic UDP/SQL workload support regression measurements.
+See [[pinba-pool-model]], [[dictionary-word-lifetime]], [[runtime-diagnostics]],
+[[workload-validation]].
 
 ### 3. UDP Fire-and-Forget
 The PHP extension sends metrics asynchronously. Packet loss is acceptable.
@@ -61,9 +69,10 @@ Timers in the protobuf message use parallel arrays + a shared string dictionary.
 Understanding this is needed to interpret timer data in `timertag` and `timer` tables.
 See [[pinba-udp-protocol]].
 
-### 5. Docker: libprotobuf Must Be Copied
-The MySQL runtime image doesn't have libprotobuf. The Dockerfile explicitly copies it
-from the builder stage. Missing this breaks the plugin at load time.
+### 5. Docker: protobuf Delivery Depends on the Channel
+Each runtime must have the protobuf implementation used by its plugin build.
+Some channels deliver a shared library; others link protobuf statically. Do not
+assume that copying libprotobuf is the correct solution for every runtime.
 See [[docker-build-strategy]].
 
 ### 6. PPA Publication Is Fully Automated
@@ -110,11 +119,20 @@ One flavor per SRPM (they share `ha_pinba.so` and `Conflicts`); the vendored ser
 
 ## Project Status
 
-Active modernization fork. Current release: **2.6.1**. Both MySQL 8.0 and 8.4 builds are
-tested via Docker and published to Docker Hub (`xolegator/pinba-engine`, tags `8.0`, `8.4-lts`).
-Launchpad PPA (`ppa:xolegator/packages`) is fully automated: packages for `noble` (MySQL 8.0)
-and `resolute` (MySQL 8.4) are published on every GitHub Release and on detected MySQL patch
-version changes. MySQL version drift is tracked and acted upon automatically.
+Active modernization fork. At the 2026-10-18 audit, the released baseline is
+**2.11.8** (`CMakeLists.txt`); this is a dated observation, not a second version
+registry. Builds cover MySQL 8.0/8.4 and MariaDB 10.11/11.8. Docker channels are
+`8.0`, `8.4`, `mariadb-10.11`, and `mariadb-11.8`; `latest` follows `8.4`.
+The old `8.4-lts*` tags are no longer updated. See [[docker-tag-strategy]].
+
+Launchpad PPA and Copr packaging, SQL integration checks, coverage, and CodeQL
+are maintained alongside the plugin. The MySQL version monitor tracks server
+header changes; see [[github-actions-mysql-version-monitor]].
+
+Memory is not bounded solely by the configured raw request count: temporary
+pools and the timer pool can grow, and reports and dictionaries allocate
+dynamically. See [[pinba-pool-model]] for capacity, expiration, and monitoring
+semantics rather than assuming all storage is a fixed ring buffer.
 
 ## Knowledge Gaps
 

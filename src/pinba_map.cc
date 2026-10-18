@@ -17,6 +17,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <memory>
+#include <new>
 #include <unordered_map>
 
 #include "pinba_limits.h"
@@ -67,7 +69,10 @@ int pinba_map::data_add(const char *index, const void *report) /* {{{ */
   if (it != hash_map.end()) {
     it->second = report;
   } else {
-    hash_map[strdup(index)] = report;
+    std::unique_ptr<char, decltype(&free)> key(strdup(index), free);
+    if (!key) return -1;
+    const auto inserted = hash_map.emplace(key.get(), report).second;
+    if (inserted) (void)key.release();
   }
   return 0;
 }
@@ -238,3 +243,34 @@ size_t pinba_map_count(void *map_report) /* {{{ */
   return map->size();
 }
 /* }}} */
+
+size_t pinba_map_delete_if(void *map_report, bool (*predicate)(const void *)) {
+  if (!map_report) {
+    return 0;
+  }
+  auto &entries = static_cast<pinba_map *>(map_report)->hash_map;
+  size_t removed = 0;
+  for (auto it = entries.begin(); it != entries.end();) {
+    if (predicate(it->second)) {
+      char *key = const_cast<char *>(it->first);
+      it = entries.erase(it);
+      free(key);
+      removed++;
+    } else {
+      ++it;
+    }
+  }
+  return removed;
+}
+
+bool pinba_map_try_add(void **storage, const char *index, const void *value) noexcept {
+  try {
+    if (*storage) return static_cast<pinba_map *>(*storage)->data_add(index, value) == 0;
+    auto map = std::make_unique<pinba_map>();
+    if (map->data_add(index, value) != 0) return false;
+    *storage = map.release();
+    return true;
+  } catch (const std::bad_alloc &) {
+    return false;
+  }
+}

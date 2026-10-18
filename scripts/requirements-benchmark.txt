@@ -1,0 +1,2 @@
+# Optional client for scripts/ingest_benchmark.py; never a plugin runtime dependency.
+PyMySQL==1.2.3
