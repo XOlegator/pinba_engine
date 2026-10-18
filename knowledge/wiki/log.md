@@ -981,3 +981,18 @@ production-usability review of the Docker images, discovery that the published
   [[dictionary-word-lifetime]], and [[index]]. Marked completed and partially
   completed research proposals in the uncommitted analysis document; unapproved
   validation, metrics, cardinality limits and fractional percentiles remain open.
+
+## 2026-10-18 — C01: structural validation and nested ownership
+
+- Added pre-intern validation of flattened timer arrays, indices, signed weights
+  and 16-bit storage limits. Skipped timers consume their input spans and do not
+  leave holes in timer storage or worker reservations.
+- Reworked decoded-tree ownership: the detached read pool owns complete trees
+  through all jobs; staging borrows nodes and processes descendants independently
+  of parent validation. Fixed the invalid-parent/child staging reuse UAF path.
+- The previous plugin fails the real skipped-timer tag regression. The corrected
+  plugin passes that regression and the existing complete exercised UDP/SQL suite
+  under ASan/UBSan, with clean test-server shutdown. All 91 unit tests pass.
+  Semantic rejects are counted even when an entire batch is rejected.
+- Added [[request-structure-validation]], updated [[index]], and wired the SQL
+  regression into both existing MariaDB CI jobs. No production services changed.

@@ -29,6 +29,7 @@
 #include "pinba_logging_modern.h"
 #include "pinba_map.h"
 #include "pinba_monitoring_modern.h"
+#include "pinba_request_validation.h"
 
 #ifdef PINBA_ENGINE_HAVE_PTHREAD_SETAFFINITY_NP
 #ifdef __FreeBSD__
@@ -487,7 +488,7 @@ static inline int request_to_record(Pinba__Request *request,
                                     pinba_stats_record_ex *record_ex) /* {{{ */
 {
   pinba_word **tag_names, **tag_values;
-  unsigned int tags_alloc_cnt, timers_cnt, dict_size;
+  unsigned int tags_alloc_cnt, dict_size;
   double req_time, ru_utime, ru_stime, doc_size;
   pinba_stats_record *record = &record_ex->record;
 
@@ -504,31 +505,10 @@ static inline int request_to_record(Pinba__Request *request,
   record->data.tag_values = tag_values;
   record->data.tags_alloc_cnt = tags_alloc_cnt;
 
-  timers_cnt = request->n_timer_hit_count;
-  if (timers_cnt != (unsigned int)request->n_timer_value ||
-      timers_cnt != (unsigned int)request->n_timer_tag_count) {
-    pinba_error(P_WARNING,
-                "malformed data: timer_hit_count_size != timer_value_size || timer_hit_count_size "
-                "!= timer_tag_count_size");
+  if (pinba_validate_request(*request) != pinba_request_error::none) {
     return -1;
   }
-
-  if (request->n_tag_name != request->n_tag_value) {
-    pinba_error(P_WARNING, "malformed data: n_tag_name != n_tag_value");
-    return -1;
-  }
-
   dict_size = request->n_dictionary;
-  if (dict_size == 0) {
-    if (timers_cnt > 0) {
-      pinba_error(P_WARNING, "malformed data: dict_size == 0, but timers_cnt > 0");
-      return -1;
-    }
-    if (request->n_tag_name > 0) {
-      pinba_error(P_WARNING, "malformed data: dict_size == 0, but tags are present");
-      return -1;
-    }
-  }
 
   record_ex->words_cnt = 0;
 
@@ -673,7 +653,7 @@ inline static int _add_timers(pinba_stats_record *record, const pinba_stats_reco
   float timer_value;
   unsigned int i, j, timer_tag_cnt, timer_hit_cnt;
   int tag_value, tag_name;
-  unsigned int ti = 0, tt = 0;
+  size_t tt = 0;
   pinba_word *word_ptr;
   pinba_tag *tag;
   const int dict_size = record_ex->request->n_dictionary;
@@ -697,12 +677,18 @@ inline static int _add_timers(pinba_stats_record *record, const pinba_stats_reco
   }
 
   /* add timers to the timers hash */
-  for (i = 0; i < timers_cnt; i++, ti++) {
-    timer_value = request->timer_value[ti];
-    timer_tag_cnt = request->timer_tag_count[ti];
-    timer_hit_cnt = request->timer_hit_count[ti];
+  for (i = 0; i < timers_cnt; i++) {
+    timer_value = request->timer_value[i];
+    timer_tag_cnt = request->timer_tag_count[i];
+    timer_hit_cnt = request->timer_hit_count[i];
+    const size_t tag_start = tt;
+    tt += timer_tag_cnt;  // Consume input tags even when this timer is skipped.
+    if (!timer_hit_cnt || !timer_tag_cnt) {
+      continue;
+    }
 
-    timer = record_get_timer(timer_pool, record, i);
+    timer = record_get_timer(timer_pool, record, record->timers_cnt);
+    timer->tag_num = 0;
     timer->request_id = request_id;
 
     if (request->n_timer_ru_stime > i) {
@@ -715,16 +701,6 @@ inline static int _add_timers(pinba_stats_record *record, const pinba_stats_reco
       timer->ru_utime = float_to_timeval(pinba_sanitize_time_seconds(request->timer_ru_utime[i]));
     } else {
       timer->ru_utime = null_timeval;
-    }
-
-    if (!timer_hit_cnt) {
-      pinba_debug("timer.hit_count is 0");
-      continue;
-    }
-
-    if (!timer_tag_cnt) {
-      pinba_debug("timer.hit_count is 0");
-      continue;
     }
 
     if (!pinba_is_valid_time_seconds(timer_value)) {
@@ -760,9 +736,9 @@ inline static int _add_timers(pinba_stats_record *record, const pinba_stats_reco
     record->timers_cnt++;
     timer->tag_num = 0;
 
-    for (j = 0; j < timer_tag_cnt; j++, tt++) {
-      tag_value = request->timer_tag_value[tt];
-      tag_name = request->timer_tag_name[tt];
+    for (j = 0; j < timer_tag_cnt; j++) {
+      tag_value = request->timer_tag_value[tag_start + j];
+      tag_name = request->timer_tag_name[tag_start + j];
 
       timer->tag_values[timer->tag_num] = nullptr;
 
@@ -859,83 +835,39 @@ void merge_timers_func(void *job_data) /* {{{ */
 
 static void data_job_func(void *data) /* {{{ */
 {
-  pinba_stats_record_ex *record_ex;
-  int sub_request_num;
-  int current_sub_request;
-  Pinba__Request *parent_request = nullptr;
-  struct data_job_data *d = (struct data_job_data *)data;
+  auto *d = static_cast<data_job_data *>(data);
   pinba_pool *request_pool = D->current_read_pool + d->thread_num;
   pinba_pool *tmp_pool = D->per_thread_tmp_pool + d->thread_num;
-  size_t i;
 
-  for (i = 0; i < request_pool->in; i++) {
-    sub_request_num = -1;
-    current_sub_request = -1;
-    do {
-      Pinba__Request *request;
-
-      if (tmp_pool->in == tmp_pool->size) {
-        int ret;
-
-        ret = pinba_pool_grow(tmp_pool, 0);
-        if (ret != 0) {
-          /* XXX losing packets and leaking memory ! */
-          return;
-        }
-      }
-
-      record_ex = REQ_POOL_EX(tmp_pool) + tmp_pool->in;
-      d->tmp_records = tmp_pool->in + 1;
-      if (record_ex->request && record_ex->can_free) {
-        pinba__request__free_unpacked(record_ex->request, nullptr);
-        record_ex->request = nullptr;
-        record_ex->can_free = 0;
-      }
-
-      if (sub_request_num == -1) {
-        request = REQ_DATA_POOL(request_pool)[request_pool->out];
-        REQ_DATA_POOL(request_pool)[request_pool->out] = nullptr;
-        request_pool->out++;
-        if (UNLIKELY(request == nullptr)) {
-          // d->invalid_packets++;
-          break;
-        }
-
-        if (request->n_timer_hit_count != request->n_timer_value ||
-            request->n_timer_hit_count != request->n_timer_tag_count) {
-          pinba_debug(
-              "internal error: timer_hit_count_size (%d) != timer_value_size (%d) || "
-              "timer_hit_count_size (%d) != timer_tag_count_size (%d)",
-              request->n_timer_hit_count, request->n_timer_value, request->n_timer_hit_count,
-              request->n_timer_tag_count);
-          // d->invalid_packets++;
-          break;
-        }
-
-        sub_request_num = request->n_requests;
-        if (sub_request_num > 0) {
-          parent_request = request;
-          current_sub_request = 0;
-        } else {
-          sub_request_num = -1;
-        }
-        record_ex->request = request;
-        record_ex->can_free = 1;
-      } else {
-        request = parent_request->requests[current_sub_request];
-        record_ex->request = request;
-        record_ex->can_free = 0;
-        current_sub_request++;
-      }
-
-      if (!request || request_to_record(request, record_ex) < 0) {
-        pinba_tmp_release_words(record_ex);
-        //	d->invalid_packets++;
-      } else {
-        timeval_to_pinba_timeval(d->now, record_ex->record.time);
-        tmp_pool->in++;
-      }
-    } while (current_sub_request < sub_request_num);
+  // The read pool owns complete decoded trees until timer/report jobs finish.
+  // Staging slots only borrow nodes: rejecting a parent must not free children.
+  const auto process = [&](auto &&self, Pinba__Request *request) -> void {
+    if (!request) {
+      return;
+    }
+    if (tmp_pool->in == tmp_pool->size && pinba_pool_grow(tmp_pool, 0) != P_SUCCESS) {
+      d->invalid_packets++;
+      return;
+    }
+    auto *record_ex = REQ_POOL_EX(tmp_pool) + tmp_pool->in;
+    d->tmp_records = tmp_pool->in + 1;
+    record_ex->request = request;
+    record_ex->can_free = 0;
+    if (request_to_record(request, record_ex) < 0) {
+      pinba_tmp_release_words(record_ex);
+      d->invalid_packets++;
+    } else {
+      timeval_to_pinba_timeval(d->now, record_ex->record.time);
+      tmp_pool->in++;
+    }
+    // The protobuf parser bounds recursion; every nested Request is checked
+    // independently, including descendants of a structurally invalid parent.
+    for (size_t child = 0; child < request->n_requests; child++) {
+      self(self, request->requests[child]);
+    }
+  };
+  for (size_t i = 0; i < request_pool->in; i++) {
+    process(process, REQ_DATA_POOL(request_pool)[i]);
   }
 }
 /* }}} */
@@ -1034,7 +966,7 @@ static void request_copy_job_func(void *job_data) /* {{{ */
 
     d->rtags_cnt += record->data.tags_cnt;
 
-    d->timers_cnt += temp_record_ex->request->n_timer_hit_count;
+    d->timers_cnt += pinba_stored_timer_count(*temp_record_ex->request);
     d->res_cnt++;
 
     if (tmp_id == (request_pool->size - 1)) {
@@ -1093,7 +1025,7 @@ void *pinba_data_main(void *) /* {{{ */
   gettimeofday(&launch, nullptr);
   for (;;) {
     size_t records_to_copy, timers_added, free_slots, records_created;
-    size_t accounted, invalid_packets = 0, lost_tmp_records = 0, rtags_found;
+    size_t accounted, lost_tmp_records = 0, rtags_found;
     size_t i;
     pinba_pool *pool_tmp;
 
@@ -1396,9 +1328,8 @@ void *pinba_data_main(void *) /* {{{ */
         }
         th_pool_barrier_wait(barrier6);
     */
-    if (invalid_packets > 0 || lost_tmp_records > 0) {
+    if (lost_tmp_records > 0) {
       pthread_rwlock_wrlock(&D->stats_lock);
-      D->stats.invalid_packets += invalid_packets;
       D->stats.lost_tmp_records += lost_tmp_records;
       pthread_rwlock_unlock(&D->stats_lock);
     }
@@ -1408,9 +1339,20 @@ void *pinba_data_main(void *) /* {{{ */
       pinba_pool *tmp_pool = D->per_thread_tmp_pool + i;
       for (size_t n = 0; n < job_data_arr[i].tmp_records; n++) {
         pinba_tmp_release_words(REQ_POOL_EX(tmp_pool) + n);
+        REQ_POOL_EX(tmp_pool)[n].request = nullptr;
       }
+      if (job_data_arr[i].invalid_packets != 0) {
+        pthread_rwlock_wrlock(&D->stats_lock);
+        D->stats.invalid_request_data += job_data_arr[i].invalid_packets;
+        pthread_rwlock_unlock(&D->stats_lock);
+      }
+      job_data_arr[i].invalid_packets = 0;
       job_data_arr[i].tmp_records = 0;
       tmp_pool->in = 0;
+      for (size_t n = 0; n < D->current_read_pool[i].in; n++) {
+        pinba__request__free_unpacked(REQ_DATA_POOL(D->current_read_pool + i)[n], nullptr);
+        REQ_DATA_POOL(D->current_read_pool + i)[n] = nullptr;
+      }
       D->current_read_pool[i].in = 0;
       D->current_read_pool[i].out = 0;
     }
