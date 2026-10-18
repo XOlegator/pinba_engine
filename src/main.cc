@@ -767,7 +767,7 @@ inline static int _add_timers(pinba_stats_record *record, const pinba_stats_reco
   pinba_word *word_ptr;
   pinba_tag *tag;
   const int dict_size = record_ex->request->n_dictionary;
-  pinba_word **temp_words = record_ex->words;  // borrowed from the staging owner
+  pinba_word **temp_words = record->dictionary_words;  // borrowed from the raw owner
   pinba_tag *temp_tags_static[PINBA_TEMP_DICTIONARY_SIZE] = {nullptr};
   pinba_tag **temp_tags_dynamic = nullptr;
   pinba_tag **temp_tags = temp_tags_static;
@@ -1088,10 +1088,13 @@ static void request_copy_job_func(void *job_data) /* {{{ */
       record->data.tags_alloc_cnt = temp_record->data.tags_cnt;
     }
 
+    // Move the staging references instead of retain/release pairs on shared
+    // word cache lines. Timer merging borrows them from the raw record.
     for (n = 0; n < temp_record_ex->words_cnt; n++) {
-      record->dictionary_words[n] = pinba_word_retain(temp_record_ex->words[n]);
-      record->dictionary_words_count++;
+      record->dictionary_words[n] = temp_record_ex->words[n];
+      temp_record_ex->words[n] = nullptr;
     }
+    record->dictionary_words_count = temp_record_ex->words_cnt;
     record->data.tags_cnt = 0;
     for (n = 0; n < temp_record->data.tags_cnt; n++) {
       record->data.tag_names[n] = temp_record->data.tag_names[n];
@@ -1786,29 +1789,43 @@ void pinba_eat_udp(pinba_socket *sock, size_t thread_num) /* {{{ */
           pthread_rwlock_rdlock(&D->per_thread_pools_lock);
           req_pool = D->current_write_pool + thread_num;
 
+          // Collectors share the metric cache lines: accumulate per batch and
+          // publish once instead of several atomic RMWs per datagram.
+          uint64_t bytes = 0, decode_ns = 0, decode_errors = 0, drops = 0, enqueued = 0;
           for (int i = 0; i < num; i++) {
-            pinba_udp_record_receive(1);
-            pinba_count(pinba_metric::udp_bytes, msgs[i].msg_len);
-            pinba_udp_kernel_sample(msgs[i].msg_hdr);
+            bytes += msgs[i].msg_len;
             const auto decode_started = pinba_now_ns();
             auto *request = pinba__request__unpack(
                 nullptr, msgs[i].msg_len,
                 reinterpret_cast<const unsigned char *>(bufs + PINBA_UDP_BUFFER_SIZE * i));
 
-            pinba_count(pinba_metric::udp_decode_ns, pinba_now_ns() - decode_started);
+            decode_ns += pinba_now_ns() - decode_started;
             if (UNLIKELY(request == nullptr)) {
-              pinba_udp_record_decode_error();
+              decode_errors++;
               continue;
             }
 
             if (pinba_pool_push(req_pool, 0, request) != P_SUCCESS) {
               pinba__request__free_unpacked(request, nullptr);
-              pinba_udp_record_drop(1);
+              drops++;
               continue;
             }
+            enqueued++;
+          }
 
-            pinba_count(pinba_metric::udp_enqueued);
-            const auto queued = pinba_counter(pinba_metric::queue_live).fetch_add(1) + 1;
+          // The kernel drop counter is cumulative; the newest datagram suffices.
+          pinba_udp_kernel_sample(msgs[num - 1].msg_hdr);
+          pinba_udp_record_receive(num);
+          pinba_count(pinba_metric::udp_bytes, bytes);
+          pinba_count(pinba_metric::udp_decode_ns, decode_ns);
+          if (decode_errors) pinba_count(pinba_metric::udp_decode_errors, decode_errors);
+          if (drops) pinba_udp_record_drop(drops);
+          if (enqueued) {
+            // Publish before releasing the pool lock: the data thread swaps
+            // pools under the write lock and subtracts only after that.
+            pinba_count(pinba_metric::udp_enqueued, enqueued);
+            const auto queued =
+                pinba_counter(pinba_metric::queue_live).fetch_add(enqueued) + enqueued;
             pinba_peak(pinba_metric::queue_peak, queued);
           }
 
