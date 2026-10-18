@@ -24,6 +24,7 @@
 #include <vector>
 
 #include "pinba.h"
+#include "pinba_dictionary.h"
 #include "pinba_lmap.h"
 #include "pinba_logging_modern.h"
 #include "pinba_map.h"
@@ -409,8 +410,6 @@ void pinba_collector_shutdown(void) /* {{{ */
   pthread_rwlock_destroy(&D->timer_lock);
   pthread_rwlock_destroy(&D->stats_lock);
 
-  pthread_mutex_destroy(&D->share_mutex);
-
   index[0] = '\0';
   for (tag = (pinba_tag *)pinba_map_first(D->tag.name_index, index); tag != nullptr;
        tag = (pinba_tag *)pinba_map_next(D->tag.name_index, index)) {
@@ -421,7 +420,7 @@ void pinba_collector_shutdown(void) /* {{{ */
   for (word = (pinba_word *)pinba_map_first(D->dictionary, index); word != nullptr;
        word = (pinba_word *)pinba_map_next(D->dictionary, index)) {
     free(word->str);
-    free(word);
+    delete word;
   }
 
   index[0] = '\0';
@@ -470,6 +469,7 @@ struct data_job_data {
   struct timeval now;
   unsigned int thread_num;
   size_t invalid_packets;
+  size_t tmp_records;
   size_t timers_cnt;
   size_t rtags_cnt;
   size_t timers_prefix;
@@ -479,44 +479,7 @@ struct data_job_data {
 
 pinba_word *pinba_dictionary_word_get_or_insert_rdlock(char *str, int str_len) /* {{{ */
 {
-  pinba_word *word_ptr;
-  char *copy_str = nullptr;
-
-  if (str_len >= PINBA_TAG_VALUE_SIZE) {
-    copy_str = strndup(str, PINBA_TAG_VALUE_SIZE - 1);
-    str = copy_str;
-    str_len = PINBA_TAG_VALUE_SIZE - 1;
-  }
-
-  word_ptr = (pinba_word *)pinba_map_get(D->dictionary, str);
-  if (UNLIKELY(!word_ptr)) {
-    pthread_rwlock_unlock(&D->words_lock);
-    pthread_rwlock_wrlock(&D->words_lock);
-
-    word_ptr = (pinba_word *)pinba_map_get(D->dictionary, str);
-    if (word_ptr) {
-      pthread_rwlock_unlock(&D->words_lock);
-      pthread_rwlock_rdlock(&D->words_lock);
-      goto race_condition;
-    }
-
-    word_ptr = (pinba_word *)malloc(sizeof(*word_ptr));
-
-    /* insert */
-    word_ptr->len = str_len;
-    word_ptr->str = strdup(str);
-
-    D->dictionary = pinba_map_add(D->dictionary, str, word_ptr);
-    pthread_rwlock_unlock(&D->words_lock);
-    pthread_rwlock_rdlock(&D->words_lock);
-  }
-
-race_condition:
-  if (copy_str) {
-    free(copy_str);
-  }
-
-  return word_ptr;
+  return pinba_dictionary_intern_rdlock(&D->dictionary, &D->words_lock, str, str_len);
 }
 /* }}} */
 
@@ -527,6 +490,8 @@ static inline int request_to_record(Pinba__Request *request,
   unsigned int tags_alloc_cnt, timers_cnt, dict_size;
   double req_time, ru_utime, ru_stime, doc_size;
   pinba_stats_record *record = &record_ex->record;
+
+  pinba_tmp_release_words(record_ex);
 
   /* save the tags */
   tag_names = record->data.tag_names;
@@ -567,16 +532,20 @@ static inline int request_to_record(Pinba__Request *request,
 
   record_ex->words_cnt = 0;
 
-  if (request->n_tag_name > 0) {
+  // The temporary record owns every dictionary word until transfer finishes.
+  // The raw record then keeps the same dictionary alive for both request tags
+  // and timer values; no timer can outlive its parent raw request.
+  if (dict_size > 0) {
     unsigned int i;
 
     if (record_ex->words_alloc < request->n_dictionary) {
-      record_ex->words =
+      auto **words =
           (pinba_word **)realloc(record_ex->words, sizeof(pinba_word *) * request->n_dictionary);
-      if (!record_ex->words) {
+      if (!words) {
         pinba_warning("out of memory when allocating record_ex->words");
         return -1;
       }
+      record_ex->words = words;
       record_ex->words_alloc = request->n_dictionary;
     }
 
@@ -592,10 +561,17 @@ static inline int request_to_record(Pinba__Request *request,
       record_ex->words_cnt++;
 
       record_ex->words[i] = pinba_dictionary_word_get_or_insert_rdlock(str, str_len);
+      if (!record_ex->words[i]) {
+        pthread_rwlock_unlock(&D->words_lock);
+        return -1;
+      }
     }
     /* }}} */
     pthread_rwlock_unlock(&D->words_lock);
+  }
 
+  if (request->n_tag_name > 0) {
+    unsigned int i;
     if (record->data.tags_alloc_cnt < request->n_tag_name) {
       record->data.tag_names = (pinba_word **)realloc(record->data.tag_names,
                                                       request->n_tag_name * sizeof(pinba_word *));
@@ -699,85 +675,26 @@ inline static int _add_timers(pinba_stats_record *record, const pinba_stats_reco
   int tag_value, tag_name;
   unsigned int ti = 0, tt = 0;
   pinba_word *word_ptr;
-  char *str;
   pinba_tag *tag;
-  int dict_size, str_len;
-  pinba_word *temp_words_static[PINBA_TEMP_DICTIONARY_SIZE] = {nullptr};
-  pinba_word **temp_words_dynamic = nullptr;
-  pinba_word **temp_words;
+  const int dict_size = record_ex->request->n_dictionary;
+  pinba_word **temp_words = record_ex->words;  // borrowed from the staging owner
   pinba_tag *temp_tags_static[PINBA_TEMP_DICTIONARY_SIZE] = {nullptr};
   pinba_tag **temp_tags_dynamic = nullptr;
-  pinba_tag **temp_tags;
+  pinba_tag **temp_tags = temp_tags_static;
   Pinba__Request *request = record_ex->request;
 
   record->timers_cnt = 0;
-
-  if (request->n_dictionary > 0 && record_ex->words_cnt == 0) {
-    if (request->n_dictionary > PINBA_TEMP_DICTIONARY_SIZE) {
-      temp_words_dynamic = (pinba_word **)malloc(sizeof(void *) * request->n_dictionary);
-      if (!temp_words_dynamic) {
-        pinba_warning("out of memory when allocating temp words");
-        return 0;
-      }
-      temp_words = temp_words_dynamic;
-
-      temp_tags_dynamic = (pinba_tag **)malloc(sizeof(void *) * request->n_dictionary);
-      if (!temp_tags_dynamic) {
-        pinba_warning("out of memory when allocating temp tags");
-        free(temp_words_dynamic);
-        return 0;
-      }
-      temp_tags = temp_tags_dynamic;
-    } else {
-      temp_words = temp_words_static;
-      temp_tags = temp_tags_static;
+  if (request->n_dictionary > PINBA_TEMP_DICTIONARY_SIZE) {
+    temp_tags_dynamic = (pinba_tag **)calloc(request->n_dictionary, sizeof(pinba_tag *));
+    if (!temp_tags_dynamic) {
+      pinba_warning("out of memory when allocating temp tags");
+      return 0;
     }
-
-    for (i = 0; i < request->n_dictionary; i++) { /* {{{ */
-
-      str = request->dictionary + PINBA_DICTIONARY_ENTRY_SIZE * i;
-      str_len = strlen(str);
-
-      temp_words[i] = nullptr;
-      temp_tags[i] = nullptr;
-
-      temp_tags[i] = (pinba_tag *)pinba_map_get(D->tag.name_index, str);
-
-      temp_words[i] = pinba_dictionary_word_get_or_insert_rdlock(str, str_len);
-    }
-    /* }}} */
-  } else {
-    temp_words = record_ex->words;
-    if (request->n_dictionary > PINBA_TEMP_DICTIONARY_SIZE) {
-      temp_tags_dynamic = (pinba_tag **)malloc(sizeof(void *) * request->n_dictionary);
-      if (!temp_tags_dynamic) {
-        pinba_warning("out of memory when allocating temp tags");
-        return 0;
-      }
-      temp_tags = temp_tags_dynamic;
-    } else {
-      temp_tags = temp_tags_static;
-    }
-
-    for (i = 0; i < request->n_dictionary; i++) { /* {{{ */
-      pinba_word *word = temp_words[i];
-
-      if (!word) {
-        continue;
-      }
-      temp_tags[i] = nullptr;
-
-      tag = (pinba_tag *)pinba_map_get(D->tag.name_index, word->str);
-      if (UNLIKELY(!tag)) {
-        /* do nothing */
-      } else {
-        temp_tags[i] = tag;
-      }
-    }
-    /* }}} */
+    temp_tags = temp_tags_dynamic;
   }
-
-  dict_size = request->n_dictionary;
+  for (unsigned int n = 0; n < request->n_dictionary; n++) {
+    temp_tags[n] = (pinba_tag *)pinba_map_get(D->tag.name_index, temp_words[n]->str);
+  }
 
   /* add timers to the timers hash */
   for (i = 0; i < timers_cnt; i++, ti++) {
@@ -879,10 +796,6 @@ inline static int _add_timers(pinba_stats_record *record, const pinba_stats_reco
     }
   }
 
-  if (temp_words_dynamic) {
-    free(temp_words_dynamic);
-  }
-
   if (temp_tags_dynamic) {
     free(temp_tags_dynamic);
   }
@@ -972,6 +885,7 @@ static void data_job_func(void *data) /* {{{ */
       }
 
       record_ex = REQ_POOL_EX(tmp_pool) + tmp_pool->in;
+      d->tmp_records = tmp_pool->in + 1;
       if (record_ex->request && record_ex->can_free) {
         pinba__request__free_unpacked(record_ex->request, nullptr);
         record_ex->request = nullptr;
@@ -1015,6 +929,7 @@ static void data_job_func(void *data) /* {{{ */
       }
 
       if (!request || request_to_record(request, record_ex) < 0) {
+        pinba_tmp_release_words(record_ex);
         //	d->invalid_packets++;
       } else {
         timeval_to_pinba_timeval(d->now, record_ex->record.time);
@@ -1052,6 +967,9 @@ static void request_copy_job_func(void *job_data) /* {{{ */
     tag_names = record->data.tag_names;
     tag_values = record->data.tag_values;
     tags_alloc_cnt = record->data.tags_alloc_cnt;
+    pinba_record_release_words(record);
+    pinba_word **dictionary_words = record->dictionary_words;
+    const unsigned int dictionary_words_alloc = record->dictionary_words_alloc;
 
     memcpy(record, temp_record, sizeof(pinba_stats_record));
     record->active = 1;
@@ -1060,6 +978,21 @@ static void request_copy_job_func(void *job_data) /* {{{ */
     record->data.tag_names = tag_names;
     record->data.tag_values = tag_values;
     record->data.tags_alloc_cnt = tags_alloc_cnt;
+    record->dictionary_words = dictionary_words;
+    record->dictionary_words_alloc = dictionary_words_alloc;
+    record->dictionary_words_count = 0;
+
+    if (record->dictionary_words_alloc < temp_record_ex->words_cnt) {
+      auto **words = (pinba_word **)realloc(record->dictionary_words,
+                                            temp_record_ex->words_cnt * sizeof(pinba_word *));
+      if (!words) {
+        record->active = 0;
+        record->data.tags_cnt = 0;
+        continue;
+      }
+      record->dictionary_words = words;
+      record->dictionary_words_alloc = temp_record_ex->words_cnt;
+    }
 
     if (record->data.tags_alloc_cnt < temp_record->data.tags_cnt) {
       record->data.tag_names = (pinba_word **)realloc(
@@ -1087,6 +1020,10 @@ static void request_copy_job_func(void *job_data) /* {{{ */
       record->data.tags_alloc_cnt = temp_record->data.tags_cnt;
     }
 
+    for (n = 0; n < temp_record_ex->words_cnt; n++) {
+      record->dictionary_words[n] = pinba_word_retain(temp_record_ex->words[n]);
+      record->dictionary_words_count++;
+    }
     record->data.tags_cnt = 0;
     for (n = 0; n < temp_record->data.tags_cnt; n++) {
       record->data.tag_names[n] = temp_record->data.tag_names[n];
@@ -1151,10 +1088,11 @@ void *pinba_data_main(void *) /* {{{ */
   if (UNLIKELY(!job_data_arr)) {
     goto cleanup;
   }
+  memset(job_data_arr, 0, sizeof(struct data_job_data) * D->thread_pool->size);
 
   gettimeofday(&launch, nullptr);
   for (;;) {
-    size_t stats_records, records_to_copy, timers_added, free_slots, records_created;
+    size_t records_to_copy, timers_added, free_slots, records_created;
     size_t accounted, invalid_packets = 0, lost_tmp_records = 0, rtags_found;
     size_t i;
     pinba_pool *pool_tmp;
@@ -1225,8 +1163,6 @@ void *pinba_data_main(void *) /* {{{ */
       records_to_copy = free_slots;
     }
 
-    stats_records = records_to_copy;
-
     /* process new stats data and update base reports */
     accounted = 0;
     th_pool_barrier_start(barrier2);
@@ -1292,7 +1228,9 @@ void *pinba_data_main(void *) /* {{{ */
       }
     }
 
-    memset(rep_job_data_arr, 0, sizeof(struct reports_job_data) * base_reports_alloc);
+    if (base_reports_alloc > 0) {
+      memset(rep_job_data_arr, 0, sizeof(struct reports_job_data) * base_reports_alloc);
+    }
 
     th_pool_barrier_start(barrier4);
     for (i = 0; i < D->base_reports_arr.size; i++) {
@@ -1332,7 +1270,9 @@ void *pinba_data_main(void *) /* {{{ */
         }
       }
 
-      memset(rtag_rep_job_data_arr, 0, sizeof(struct reports_job_data) * rtag_reports_alloc);
+      if (rtag_reports_alloc > 0) {
+        memset(rtag_rep_job_data_arr, 0, sizeof(struct reports_job_data) * rtag_reports_alloc);
+      }
 
       th_pool_barrier_start(barrier7);
       for (i = 0; i < D->rtag_reports_arr.size; i++) {
@@ -1359,28 +1299,22 @@ void *pinba_data_main(void *) /* {{{ */
 
       timers_added = 0;
       for (i = 0; i < D->thread_pool->size; i++) {
-        pinba_pool *temp_request_pool = D->current_read_pool + i;
-        if (temp_request_pool->in == 0) {
+        if (job_data_arr[i].end == 0) {
           continue;
         }
         job_data_arr[i].timers_prefix = timers_added + timer_pool_in;
         timers_added += job_data_arr[i].timers_cnt;
       }
 
-      records_to_copy = stats_records;
       for (i = 0; i < D->thread_pool->size; i++) {
-        pinba_pool *temp_request_pool = D->current_read_pool + i;
-
-        if (temp_request_pool->in == 0) {
+        if (job_data_arr[i].end == 0) {
           continue;
         }
 
         job_data_arr[i].thread_num = i;
-        job_data_arr[i].end = temp_request_pool->in;
-        if (temp_request_pool->in > records_to_copy) {
-          job_data_arr[i].end = records_to_copy;
-        }
-        records_to_copy -= job_data_arr[i].end;
+        // Keep the accepted staging-record count from request_copy_job_func.
+        // Datagram counts differ after validation failures or nested Requests;
+        // using them can access stale staging slots and their dictionary words.
         th_pool_dispatch(D->thread_pool, barrier3, merge_timers_func, &(job_data_arr[i]));
       }
       th_pool_barrier_wait(barrier3);
@@ -1417,7 +1351,9 @@ void *pinba_data_main(void *) /* {{{ */
         }
       }
 
-      memset(tag_rep_job_data_arr, 0, sizeof(struct reports_job_data) * tag_reports_alloc);
+      if (tag_reports_alloc > 0) {
+        memset(tag_rep_job_data_arr, 0, sizeof(struct reports_job_data) * tag_reports_alloc);
+      }
 
       th_pool_barrier_start(barrier5);
       for (i = 0; i < D->tag_reports_arr.size; i++) {
@@ -1468,6 +1404,16 @@ void *pinba_data_main(void *) /* {{{ */
     }
 
   sleep:
+    for (i = 0; i < D->thread_pool->size; i++) {
+      pinba_pool *tmp_pool = D->per_thread_tmp_pool + i;
+      for (size_t n = 0; n < job_data_arr[i].tmp_records; n++) {
+        pinba_tmp_release_words(REQ_POOL_EX(tmp_pool) + n);
+      }
+      job_data_arr[i].tmp_records = 0;
+      tmp_pool->in = 0;
+      D->current_read_pool[i].in = 0;
+      D->current_read_pool[i].out = 0;
+    }
 
     launch.tv_sec += D->settings.stats_gathering_period / 1000000;
     launch.tv_usec += D->settings.stats_gathering_period % 1000000;

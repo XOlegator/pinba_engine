@@ -238,3 +238,22 @@ size_t pinba_map_count(void *map_report) /* {{{ */
   return map->size();
 }
 /* }}} */
+
+size_t pinba_map_delete_if(void *map_report, bool (*predicate)(const void *)) {
+  if (!map_report) {
+    return 0;
+  }
+  auto &entries = static_cast<pinba_map *>(map_report)->hash_map;
+  size_t removed = 0;
+  for (auto it = entries.begin(); it != entries.end();) {
+    if (predicate(it->second)) {
+      char *key = const_cast<char *>(it->first);
+      it = entries.erase(it);
+      free(key);
+      removed++;
+    } else {
+      ++it;
+    }
+  }
+  return removed;
+}

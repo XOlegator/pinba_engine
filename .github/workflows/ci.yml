@@ -211,6 +211,20 @@ jobs:
           --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306
           --mysql-option=--user=pinba
 
+      - name: Dictionary lifetime regression (disposable CI server)
+        env:
+          MYSQL_PWD: pinba
+        run: |
+          # Use short retention only after the ordinary SQL checks. This is an
+          # isolated CI database; the test exercises natural expiry and capacity
+          # rejection without changing application schemas or defaults.
+          printf '[mysqld]\nloose-pinba-stats-history=3\nloose-pinba-request-pool-size=1000\nloose-pinba-temp-pool-size=50\nloose-pinba-timer-pool-size=1000\n' \
+            | sudo tee /etc/mysql/mariadb.conf.d/zz-pinba-regression.cnf >/dev/null
+          sudo systemctl restart mariadb
+          python3 -B scripts/dictionary_lifetime_test.py --mysql-client=mariadb \
+            --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
+            --mysql-option=--user=pinba
+
       - name: Dump MariaDB error log on failure
         if: failure()
         run: |
@@ -511,6 +525,20 @@ jobs:
           python3 -B scripts/row_position_test.py --mysql-client=mariadb
           --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306
           --mysql-option=--user=pinba
+
+      - name: Dictionary lifetime regression (disposable CI server)
+        env:
+          MYSQL_PWD: pinba
+        run: |
+          # Use short retention only after the ordinary SQL checks. This is an
+          # isolated CI database; the test exercises natural expiry and capacity
+          # rejection without changing application schemas or defaults.
+          printf '[mysqld]\nloose-pinba-stats-history=3\nloose-pinba-request-pool-size=1000\nloose-pinba-temp-pool-size=50\nloose-pinba-timer-pool-size=1000\n' \
+            | sudo tee /etc/mysql/mariadb.conf.d/zz-pinba-regression.cnf >/dev/null
+          sudo systemctl restart mariadb
+          python3 -B scripts/dictionary_lifetime_test.py --mysql-client=mariadb \
+            --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
+            --mysql-option=--user=pinba
 
       - name: Stop server and collect gcov data
         run: |

@@ -14,6 +14,8 @@
    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 
+#include <atomic>
+
 #include "pinba_limits.h"
 #include "threadpool.h"
 
@@ -106,6 +108,7 @@ typedef struct _struct timeval { /* {{{ */
 typedef struct _pinba_word { /* {{{ */
   char *str;
   unsigned char len;
+  std::atomic<size_t> references{0};
 } pinba_word;
 /* }}} */
 
@@ -150,6 +153,11 @@ typedef struct _pinba_stats_record { /* {{{ */
   size_t counter;
   unsigned short timers_cnt;
   unsigned char active;
+  // Owns the packet dictionary for request tags and all of this request's
+  // timers. Report keys copy strings; persistent report selectors own pins.
+  pinba_word **dictionary_words;
+  unsigned int dictionary_words_count;
+  unsigned int dictionary_words_alloc;
 } pinba_stats_record;
 /* }}} */
 

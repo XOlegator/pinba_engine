@@ -920,3 +920,38 @@ production-usability review of the Docker images, discovery that the published
   histogram counts/p100 on a disposable MariaDB. Added the SQL regression to
   existing MariaDB CI checks. Documented [[histogram-boundary-semantics]] and
   updated [[index]]. No production service was used.
+
+## 2026-10-18 — Discovery and fix: dictionary ownership across expiration
+
+- Added counted word ownership for staging dictionaries, parent raw records,
+  persistent conditions and request-tag report selectors. Collection removes
+  zero-reference words under the dictionary write lock independently of traffic.
+  Rejected/dropped staging records and duplicate dictionary entries are covered.
+- Fixed timer merge bounds to use accepted staging records rather than datagrams;
+  the distinction is necessary for invalid and nested requests. Corrected report
+  table registration counts and DROP cleanup, which otherwise retained selectors
+  or left a freed index in the table registry for shutdown to free again.
+- Verified repeated history windows, raw wraparound, concurrent SQL readers/DDL,
+  aliases, timer-only, invalid/nested packets and raw-ring saturation on a
+  disposable MariaDB. The original 2.11.8 plugin fails dictionary reclamation;
+  the corrected plugin also passes existing SQL smoke, percentile mapping and
+  row-position checks and exits cleanly.
+- All 86 unit tests pass, including ASan/UBSan/LeakSanitizer runs. Builds cover
+  MySQL 8.0/8.4 and MariaDB 10.11/11.8. The short-window SQL regression is wired
+  into existing MariaDB CI jobs after their normal-retention checks.
+- Documented [[dictionary-word-lifetime]] and updated [[pinba-pool-model]] and
+  [[index]], including the observed MariaDB clamp of the declared zero staging
+  limit to 1000. Tag descriptors/IDs and high-water allocations are not collected;
+  the change does not claim a global memory cap or an end-to-end speedup.
+- A sanitizer-instrumented MariaDB plugin exposed zero-length `memset` calls on
+  null empty-job arrays; guarded those calls without changing nonempty work.
+  Focused dictionary/histogram UDP/SQL sanitizer checks pass with mixed-host
+  MEM_ROOT manual poisoning disabled. The wider report sanitizer run reports
+  existing unaligned access in vendored xxHash; this is recorded as a limit of
+  full-engine sanitizer validation, not hidden by disabling alignment checks.
+- Static checks pass cppcheck and formatting. Clang-tidy retains two existing
+  handler dead-store warnings. The full pre-commit run retains 21 pre-existing
+  CMake formatting warnings, confirmed against the master baseline; the installed
+  `cmake-lint` command also belongs to a different package, so the comparison used
+  the intended `cmakelint` implementation. These unrelated checks are not reported
+  as clean or suppressed as part of the dictionary change.

@@ -11,7 +11,7 @@ updated: 2026-10-18
 
 Master catalog. Maintained by LLM agents.
 
-## Concepts (30 articles)
+## Concepts (31 articles)
 
 | Article | Key Topic |
 |---------|-----------|
@@ -22,6 +22,7 @@ Master catalog. Maintained by LLM agents.
 | [[pinba-udp-protocol]] | Protobuf message format, timer parallel arrays, field versions |
 | [[protobuf-runtime-strategy]] | Engine (C++ protobuf + shim) vs extension (protobuf-c); shared `pinba.proto` contract; fields 22/23; drift guard |
 | [[pinba-pool-model]] | Fixed request ring vs growable timer/staging pools, dropping new requests, capacity and monitoring limits |
+| [[dictionary-word-lifetime]] | Counted dictionary ownership across staging/raw/report selectors, periodic reclamation, DDL registration, and limits |
 | [[mysql-plugin-abi]] | **Critical**: 8.0 vs 8.4 ABI incompatibility, implications |
 | [[mysql-plugin-install]] | INSTALL PLUGIN lifecycle, reinstall procedure |
 | [[mysql-plugin-migration-80-to-84]] | Porting checklist: ABI, build requirements, OS paths, OL9 builder rule |

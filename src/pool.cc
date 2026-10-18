@@ -17,6 +17,7 @@
 */
 
 #include "pinba.h"
+#include "pinba_dictionary.h"
 
 /* generic pool functions */
 
@@ -213,6 +214,10 @@ void pinba_request_pool_dtor(void *pool) /* {{{ */
 
   for (i = 0; i < p->size; i++) {
     record = REQ_POOL(p) + i;
+    pinba_record_release_words(record);
+    free(record->dictionary_words);
+    record->dictionary_words = nullptr;
+    record->dictionary_words_alloc = 0;
     pinba_stats_record_tags_dtor(record);
   }
 }
@@ -241,6 +246,7 @@ void pinba_per_thread_tmp_pool_dtor(void *pool) /* {{{ */
 
   for (i = 0; i < p->size; i++) {
     record_ex = REQ_POOL_EX(p) + i;
+    pinba_tmp_release_words(record_ex);
     pinba_stats_record_tags_dtor(&record_ex->record);
     if (record_ex->request && record_ex->can_free) {
       pinba__request__free_unpacked(record_ex->request, nullptr);
@@ -487,6 +493,7 @@ void *pinba_stats_main(void *arg) /* {{{ */
   thread_pool_barrier_t *barrier1 = nullptr, *barrier2 = nullptr, *barrier3 = nullptr,
                         *barrier4 = nullptr;
   int barriers_initialized = 0;
+  time_t last_dictionary_collect = 0;
 
   pinba_debug("starting up stats thread");
 
@@ -557,7 +564,9 @@ void *pinba_stats_main(void *arg) /* {{{ */
             goto sleep;
           }
         }
-        memset(rep_job_data_arr, 0, sizeof(struct reports_job_data) * base_reports_alloc);
+        if (base_reports_alloc > 0) {
+          memset(rep_job_data_arr, 0, sizeof(struct reports_job_data) * base_reports_alloc);
+        }
 
         th_pool_barrier_start(barrier1);
 
@@ -586,7 +595,9 @@ void *pinba_stats_main(void *arg) /* {{{ */
             }
           }
 
-          memset(rtag_rep_job_data_arr, 0, sizeof(struct reports_job_data) * rtag_reports_alloc);
+          if (rtag_reports_alloc > 0) {
+            memset(rtag_rep_job_data_arr, 0, sizeof(struct reports_job_data) * rtag_reports_alloc);
+          }
 
           th_pool_barrier_start(barrier4);
           for (i = 0; i < D->rtag_reports_arr.size; i++) {
@@ -623,7 +634,9 @@ void *pinba_stats_main(void *arg) /* {{{ */
             }
           }
 
-          memset(tag_rep_job_data_arr, 0, sizeof(struct reports_job_data) * tag_reports_alloc);
+          if (tag_reports_alloc > 0) {
+            memset(tag_rep_job_data_arr, 0, sizeof(struct reports_job_data) * tag_reports_alloc);
+          }
 
           /* update tag reports - one report per thread */
           th_pool_barrier_start(barrier2);
@@ -672,12 +685,26 @@ void *pinba_stats_main(void *arg) /* {{{ */
           }
           pthread_rwlock_unlock(&D->timer_lock);
         }
+
+        // Report deletion jobs and timer clearing have finished. The inactive
+        // raw records no longer expose their borrowed tag/timer word pointers.
+        unsigned int expired_id = prev_request_id;
+        for (unsigned int n = 0; n < num; n++) {
+          pinba_record_release_words(REQ_POOL(request_pool) + expired_id);
+          expired_id = (expired_id + 1 == request_pool->size) ? 0 : expired_id + 1;
+        }
       }
       /* }}} */
     }
     pthread_rwlock_unlock(&D->collector_lock);
 
   sleep:
+    // Sweep even without incoming traffic. Holding only words_lock avoids a
+    // collector/report lock-order dependency; owned words cannot be reclaimed.
+    if (launch.tv_sec != last_dictionary_collect) {
+      pinba_dictionary_collect(&D->dictionary, &D->words_lock);
+      last_dictionary_collect = launch.tv_sec;
+    }
     launch.tv_sec += D->settings.stats_gathering_period / 1000000;
     launch.tv_usec += D->settings.stats_gathering_period % 1000000;
 

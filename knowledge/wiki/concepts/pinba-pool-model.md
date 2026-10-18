@@ -10,6 +10,7 @@ sources:
 related:
   - wiki/concepts/pinba-data-flow.md
   - wiki/concepts/engine-row-references.md
+  - wiki/concepts/dictionary-word-lifetime.md
 confidence: high
 updated: 2026-10-18
 ---
@@ -30,6 +31,11 @@ preallocated, fixed-size, or allocation-free during ingestion.
 | Per-worker decoded-packet buffers | Two alternating sets of linear buffers; initialized by `pinba_temp_pool_size`, grown by `pinba_pool_push()`, optionally capped by `pinba_temp_pool_size_limit` |
 | Per-worker temporary records | Growable staging pools used after decoding, including expansion of nested requests. Their counts are reset after transfer |
 | Reports, tag arrays, dictionaries | Separately allocated memory; request-ring capacity alone is not an engine-wide memory budget |
+
+Dictionary words now have counted owners and are reclaimed after raw expiration
+and final report release; see [[dictionary-word-lifetime]]. The raw request owns
+its packet's word-pointer array so both request tags and timer values remain
+valid. This does not make all report/tag registries or allocator capacity bounded.
 
 The timer growth increment is `PINBA_TIMER_POOL_GROW_SIZE` (2,621,440 slots),
 possibly increased for a large incoming batch. This can produce substantial
@@ -53,12 +59,12 @@ ingestion.
 
 Verified against the system-variable declarations in `src/ha_pinba.cc`:
 
-| Variable | Default | Meaning |
+| Variable | Declared default | Meaning |
 |----------|---------|---------|
 | `pinba_request_pool_size` | 1,000,000 | Fixed request-ring slots, including its reserved slot |
 | `pinba_timer_pool_size` | 100,000 | Initial timer-ring capacity |
 | `pinba_temp_pool_size` | 10,000 | Initial slots per staging pool, per worker |
-| `pinba_temp_pool_size_limit` | 0 | No growth limit by default |
+| `pinba_temp_pool_size_limit` | 0 | The pool interprets zero as unlimited, but the system-variable declaration also specifies minimum 1000; the server can clamp the effective value |
 | `pinba_stats_gathering_period` | 10,000 microseconds | Scheduled collection/expiration cadence, not a guarantee under contention |
 | `pinba_stats_history` | 900 seconds | Expiration window |
 | `pinba_data_job_size` | 2,048 | Declared packet-processing batch setting; not total queue capacity |
@@ -66,6 +72,12 @@ Verified against the system-variable declarations in `src/ha_pinba.cc`:
 Worker count is derived from online processors, with a fallback for small or
 unavailable counts. Total staging memory therefore scales with worker count,
 not just one configured pool size.
+
+During the MariaDB 11.8.6 audit, the server warned that the declared zero
+`temp_pool_size_limit` was adjusted to 1000. Check
+`SELECT @@global.pinba_temp_pool_size_limit` rather than assuming the declared
+default is the effective setting. This audit does not change that legacy
+configuration behavior.
 
 ## Monitoring limitations
 

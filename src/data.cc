@@ -19,6 +19,7 @@
 #include <string>
 
 #include "pinba.h"
+#include "pinba_dictionary.h"
 using namespace std;
 
 static time_t last_warning __attribute__((unused)) = 0;
@@ -2506,10 +2507,12 @@ void pinba_std_report_dtor(void *rprt) /* {{{ */
   }
 
   if (std_report->cond.tag_names) {
+    pinba_words_release(std_report->cond.tag_names, std_report->cond.tags_cnt);
     free(std_report->cond.tag_names);
   }
 
   if (std_report->cond.tag_values) {
+    pinba_words_release(std_report->cond.tag_values, std_report->cond.tags_cnt);
     free(std_report->cond.tag_values);
   }
 
@@ -2680,6 +2683,7 @@ void pinba_rtag_report_dtor(pinba_rtag_report *report, int lock) /* {{{ */
     free(report->index);
   }
 
+  pinba_words_release(report->tags, report->tags_cnt);
   free(report->tags);
   free(report);
 }
