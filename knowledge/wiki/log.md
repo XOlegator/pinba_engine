@@ -1018,3 +1018,19 @@ production-usability review of the Docker images, discovery that the published
   verifying that kernel refusal to create threads returns nullptr. Documented
   [[mysql-plugin-install]], updated [[index]], and added the ordinary lifecycle
   regression to both MariaDB CI jobs. Failure injection defaults to OFF.
+
+## 2026-10-18 — C06/F5: explicit fractional selectors and histogram configuration
+
+- Added opt-in `p=` COMMENT selectors with locale-independent complete decimal
+  parsing and exact weighted nearest ranks. Legacy suffixes preserve float/floor
+  ranks and prefix parsing, including `99.9` selecting p99; order and duplicate
+  selectors remain intact. No existing SQL layouts change automatically.
+- Inventoried repository DDL/comments across the engine, extension and Pinboard;
+  no fractional declarations were found. Production DDL was not accessed, so
+  compatibility is ensured by explicit opt-in rather than that inventory alone.
+- Rejected invalid histogram maxima before constructing reports, preserving
+  positive decimal truncation. Removed 32-bit rank narrowing for large counts.
+- All 95 unit tests pass. Actual UDP/SQL weighted p99.9/p99.99 and invalid-DDL
+  checks pass with the complete exercised ASan/UBSan SQL/lifecycle suite and clean
+  shutdown. Documented [[fractional-percentile-grammar]], public table syntax,
+  and updated [[index]].

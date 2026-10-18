@@ -20,6 +20,8 @@
 #pragma interface /* gcc class implementation */
 #endif
 
+#include "pinba_percentile.h"
+
 #define PINBA_MAX_KEYS 2
 
 typedef struct pinba_index_st { /* {{{ */
@@ -51,7 +53,7 @@ typedef struct pinba_share_st { /* {{{ */
   unsigned int params_num;
   char **cond_names;
   char **cond_values;
-  int *percentiles;
+  pinba_percentile *percentiles;
   unsigned int percentiles_num;
   unsigned int cond_num;
   char index[PINBA_MAX_LINE_LEN];

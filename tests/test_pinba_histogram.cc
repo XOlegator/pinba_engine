@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "pinba.h"
+#include "pinba_percentile.h"
 
 // Exercise the actual inline updater, including its weighted add/delete path.
 pinba_daemon *D = nullptr;
@@ -58,3 +59,38 @@ TEST_F(PinbaHistogram, ZeroAndInteriorBucketsAreUnchanged) {
 }
 
 }  // namespace
+
+TEST(PinbaPercentiles, ExactDecimalRanksAndStrictGrammar) {
+  pinba_percentile percentile{};
+  ASSERT_TRUE(pinba_parse_fractional_percentile("99.9", percentile));
+  EXPECT_EQ(pinba_percentile_rank(100000, percentile), 99900u);
+  ASSERT_TRUE(pinba_parse_fractional_percentile("99.99", percentile));
+  EXPECT_EQ(pinba_percentile_rank(100000, percentile), 99990u);
+  EXPECT_EQ(pinba_percentile_rank(3, percentile), 3u);
+  EXPECT_EQ(pinba_percentile_rank(0, percentile), 0u);
+  for (const char *invalid : {"", "NaN", "inf", "99e0", "99,9", "99.9x", " 99.9", "+99", ".9",
+                              "99.", "0", "100.01", "99.1234567890"}) {
+    EXPECT_FALSE(pinba_parse_fractional_percentile(invalid, percentile)) << invalid;
+  }
+  ASSERT_TRUE(pinba_parse_fractional_percentile("100", percentile));
+  EXPECT_EQ(pinba_percentile_rank(SIZE_MAX, percentile), SIZE_MAX);
+}
+
+TEST(PinbaPercentiles, LegacyFloatFloorRanksRemainUnchanged) {
+  for (size_t count : {0u, 1u, 3u, 100u, 100000u}) {
+    for (int percent : {1, 25, 90, 95, 99, 100}) {
+      const auto legacy = static_cast<unsigned int>(count * (static_cast<float>(percent) / 100));
+      EXPECT_EQ(pinba_percentile_rank(count, {static_cast<double>(percent), 0, 0}),
+                count == 0 ? 0u : std::max(1u, legacy));
+    }
+  }
+}
+
+TEST(PinbaPercentiles, RejectsHistogramConfigThatWouldCreateInvalidBuckets) {
+  int maximum = 0;
+  for (const char *invalid : {"0", "-1", "0.5", "NaN", "inf", "1e999", "2147483648", "10junk"}) {
+    EXPECT_FALSE(pinba_parse_histogram_max(invalid, maximum)) << invalid;
+  }
+  ASSERT_TRUE(pinba_parse_histogram_max("10.5", maximum));
+  EXPECT_EQ(maximum, 10);
+}

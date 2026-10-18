@@ -203,6 +203,14 @@ jobs:
           --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306
           --mysql-option=--user=pinba
 
+      - name: Fractional percentile regression (real UDP/SQL)
+        env:
+          MYSQL_PWD: pinba
+        run: >-
+          python3 -B scripts/fractional_percentile_test.py --mysql-client=mariadb
+          --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306
+          --mysql-option=--user=pinba
+
       - name: Histogram upper-boundary regression (real UDP/SQL)
         env:
           MYSQL_PWD: pinba
@@ -526,6 +534,14 @@ jobs:
           MYSQL_PWD: pinba
         run: >-
           python3 -B scripts/request_validation_test.py --mysql-client=mariadb
+          --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306
+          --mysql-option=--user=pinba
+
+      - name: Fractional percentile regression (real UDP/SQL)
+        env:
+          MYSQL_PWD: pinba
+        run: >-
+          python3 -B scripts/fractional_percentile_test.py --mysql-client=mariadb
           --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306
           --mysql-option=--user=pinba
 

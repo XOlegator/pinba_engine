@@ -498,6 +498,14 @@ static inline int pinba_parse_params(TABLE *table, unsigned char type, PINBA_SHA
           num = -1;
           goto out;
         }
+        if (std::string_view(p, equal - p) == "histogram_max_time") {
+          int maximum;
+          if (!pinba_parse_histogram_max(
+                  std::string_view(equal + 1, (comma ? comma : end) - equal - 1), maximum)) {
+            num = -1;
+            goto out;
+          }
+        }
         if (!parse_only) {
           share->cond_names = (char **)realloc(share->cond_names, (c_num + 1) * sizeof(char *));
           share->cond_names[c_num] = strndup(p, equal - p);
@@ -515,12 +523,19 @@ static inline int pinba_parse_params(TABLE *table, unsigned char type, PINBA_SHA
     share->cond_num = c_num;
   }
 
-  /* percentiles are just ints separated by commas: <report_name>:<params>:<conditions>:75,25 */
+  /* Legacy integer prefixes stay unchanged; p= explicitly selects exact decimal ranks. */
 
   if (colon[2]) {
-    int value;
     p = colon[2] + 1;
     end = str_copy + len;
+    const bool fractional = strncmp(p, "p=", 2) == 0;
+    if (fractional) {
+      p += 2;
+      if (p == end) {
+        num = -1;
+        goto out;
+      }
+    }
 
     if (p < end) {
       comma = strchr(p, ',');
@@ -529,16 +544,31 @@ static inline int pinba_parse_params(TABLE *table, unsigned char type, PINBA_SHA
           *comma = '\0';
         }
 
-        value = atoi(p);
-        if (value <= 0 || value > 100) {
-          num = -1;
-          goto out;
+        pinba_percentile percentile{};
+        if (fractional) {
+          if (!pinba_parse_fractional_percentile(p, percentile) || (comma && comma + 1 == end)) {
+            num = -1;
+            goto out;
+          }
+        } else {
+          const long value =
+              strtol(p, nullptr, 10);  // Preserve legacy prefix parsing, including 99.9 -> 99.
+          if (value <= 0 || value > 100) {
+            num = -1;
+            goto out;
+          }
+          percentile.value = value;
         }
 
         if (!parse_only) {
-          share->percentiles =
-              (int *)realloc(share->percentiles, (share->percentiles_num + 1) * sizeof(int));
-          share->percentiles[share->percentiles_num] = value;
+          auto *values = static_cast<pinba_percentile *>(
+              realloc(share->percentiles, (share->percentiles_num + 1) * sizeof(pinba_percentile)));
+          if (!values) {
+            num = -1;
+            goto out;
+          }
+          share->percentiles = values;
+          share->percentiles[share->percentiles_num] = percentile;
           share->percentiles_num++;
         }
         p = comma ? comma + 1 : end;
@@ -580,7 +610,7 @@ static inline int pinba_parse_conditions(PINBA_SHARE *share, pinba_std_report *r
       report->flags |= PINBA_REPORT_CONDITIONAL;
       report->cond.max_time = strtod(share->cond_values[i], nullptr);
     } else if (strcmp(share->cond_names[i], "histogram_max_time") == 0) {
-      report->histogram_max_time = strtod(share->cond_values[i], nullptr);
+      pinba_parse_histogram_max(share->cond_values[i], report->histogram_max_time);
       report->histogram_segment =
           (float)report->histogram_max_time / (float)D->settings.histogram_size;
     } else if (strlen(share->cond_names[i]) > PINBA_TAG_PARAM_PREFIX_LEN &&
@@ -751,7 +781,7 @@ static inline int pinba_tags_to_string(pinba_word **tag_names, pinba_word **tag_
 /* }}} */
 
 static inline float pinba_histogram_value(pinba_std_report *report, void *data,
-                                          unsigned int percent_value) /* {{{ */
+                                          size_t percent_value) /* {{{ */
 {
   size_t i, num;
   float rem;
@@ -3944,15 +3974,16 @@ inline int ha_pinba::tag_values_fetch_by_timer_id(unsigned char *) /* {{{ */
 }
 /* }}} */
 
-#define REPORT_PERCENTILE_FIELD(last_field_num, data, cnt)                                  \
-  if (PINBA_FIELD_INDEX(*field) > (last_field_num) &&                                       \
-      PINBA_FIELD_INDEX(*field) <= (last_field_num) + share->percentiles_num) {             \
-    int p_num = PINBA_FIELD_INDEX(*field) - (last_field_num) - 1;                           \
-    (*field)->set_notnull();                                                                \
-    (*field)->store(pinba_histogram_value((pinba_std_report *)report, data,                 \
-                                          cnt * ((float)share->percentiles[p_num] / 100))); \
-  } else {                                                                                  \
-    (*field)->set_null();                                                                   \
+#define REPORT_PERCENTILE_FIELD(last_field_num, data, cnt)                               \
+  if (PINBA_FIELD_INDEX(*field) > (last_field_num) &&                                    \
+      PINBA_FIELD_INDEX(*field) <= (last_field_num) + share->percentiles_num) {          \
+    int p_num = PINBA_FIELD_INDEX(*field) - (last_field_num) - 1;                        \
+    (*field)->set_notnull();                                                             \
+    (*field)->store(                                                                     \
+        pinba_histogram_value((pinba_std_report *)report, data,                          \
+                              pinba_percentile_rank((cnt), share->percentiles[p_num]))); \
+  } else {                                                                               \
+    (*field)->set_null();                                                                \
   }
 
 #define REPORT_FETCH_TOP_BLOCK(report_num)                                                    \

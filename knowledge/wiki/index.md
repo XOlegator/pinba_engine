@@ -11,7 +11,7 @@ updated: 2026-10-18
 
 Master catalog. Maintained by LLM agents.
 
-## Concepts (33 articles)
+## Concepts (34 articles)
 
 | Article | Key Topic |
 |---------|-----------|
@@ -19,6 +19,7 @@ Master catalog. Maintained by LLM agents.
 | [[request-structure-validation]] | Flattened timer validation, storage bounds, compact skipping and nested-tree ownership |
 | [[report-percentile-field-mapping]] | fetch_row hardcoded field indices, report3 p90 off-by-one (2013→2.11.5), SQL regression test |
 | [[histogram-boundary-semantics]] | Saturating upper-edge buckets, weighted add/delete, unit and UDP/SQL regression coverage |
+| [[fractional-percentile-grammar]] | Opt-in p= decimal selectors, exact weighted ranks, legacy parsing and histogram configuration validation |
 | [[engine-row-references]] | Filesort position/rnd_pos contract, physical pool slots, request/timer sort regression and wraparound |
 | [[pinba-udp-protocol]] | Protobuf message format, timer parallel arrays, field versions |
 | [[protobuf-runtime-strategy]] | Engine (C++ protobuf + shim) vs extension (protobuf-c); shared `pinba.proto` contract; fields 22/23; drift guard |
