@@ -25,9 +25,10 @@ class PinbaDictionary : public ::testing::Test {
     pthread_rwlock_destroy(&lock);
   }
 
-  pinba_word *intern(const std::string &value) {
+  pinba_word *intern(const std::string &value, pinba_dictionary_budget budget = {}) {
     pthread_rwlock_rdlock(&lock);
-    auto *word = pinba_dictionary_intern_rdlock(&dictionary, &lock, value.c_str(), value.size());
+    auto *word =
+        pinba_dictionary_intern_rdlock(&dictionary, &lock, value.c_str(), value.size(), budget);
     pthread_rwlock_unlock(&lock);
     return word;
   }
@@ -171,4 +172,27 @@ TEST(PinbaRuntime, KeepsNativeWidthCountersAndConcurrentHighWatermarks) {
   EXPECT_EQ(pinba_count_get(pinba_metric::queue_peak), 4000u);
   pinba_peak(pinba_metric::queue_peak, 1);
   EXPECT_EQ(pinba_count_get(pinba_metric::queue_peak), 4000u);
+}
+
+TEST_F(PinbaDictionary, AdmissionLimitsKeepExistingIdentityAndRecoverAfterCollection) {
+  pinba_word_owner first(intern("first", {1, 0}));
+  ASSERT_NE(first.get(), nullptr);
+  pinba_word_owner same(intern("first", {1, 1}));
+  EXPECT_EQ(first.get(), same.get());
+  EXPECT_EQ(intern("other", {1, 0}), nullptr);
+  first.reset();
+  same.reset();
+  EXPECT_EQ(pinba_dictionary_collect(&dictionary, &lock), 1u);
+  pinba_word_owner next(intern("other", {1, 0}));
+  EXPECT_NE(next.get(), nullptr);
+}
+
+TEST_F(PinbaDictionary, KnownByteBudgetChecksBoundaryAndAvoidsUnsignedUnderflow) {
+  const uint64_t charge = sizeof(pinba_word) + 2 * (5 + 1);
+  EXPECT_EQ(intern("first", {0, charge - 1}), nullptr);
+  pinba_word_owner first(intern("first", {0, charge}));
+  ASSERT_NE(first.get(), nullptr);
+  EXPECT_EQ(intern("other", {0, charge}), nullptr);
+  pinba_word_owner same(intern("first", {0, 1}));
+  EXPECT_EQ(first.get(), same.get());
 }

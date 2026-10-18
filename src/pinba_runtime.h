@@ -46,6 +46,9 @@
   X(tags_created, tag_descriptors_created)                     \
   X(tags_reused, tag_descriptor_lookups_reused)                \
   X(tags_collected, tag_descriptors_collected)                 \
+  X(tag_gc_runs, tag_gc_runs)                                  \
+  X(tag_gc_ns, tag_gc_ns)                                      \
+  X(tag_gc_deferred, tag_gc_deferred)                          \
   X(tag_rejects, tag_limit_rejected)                           \
   X(staging_slots, staging_capacity_slots)                     \
   X(staging_bytes, staging_capacity_bytes)                     \

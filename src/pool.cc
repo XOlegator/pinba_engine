@@ -702,6 +702,7 @@ void *pinba_stats_main(void *arg) /* {{{ */
     // collector/report lock-order dependency; owned words cannot be reclaimed.
     if (launch.tv_sec != last_dictionary_collect) {
       pinba_dictionary_collect(&D->dictionary, &D->words_lock);
+      pinba_collect_unused_tags();
       last_dictionary_collect = launch.tv_sec;
     }
     launch.tv_sec += D->settings.stats_gathering_period / 1000000;

@@ -1068,3 +1068,13 @@ production-usability review of the Docker images, discovery that the published
   [[runtime-diagnostics]], updated [[pinba-pool-model]] and [[index]]. Known bytes
   deliberately exclude unmeasured container/row/allocator allocations; no RSS
   or complete per-report allocator attribution is inferred from struct sizes.
+
+## 2026-10-18 — Admission budgets and optional descriptor collection
+
+Cross-checked and extended `dictionary-word-lifetime` against dictionary/tag
+admission, SQL cursor ownership and collector code. Documented opt-in startup
+word/known-byte/name limits, whole-Request preparation refusal, configuration
+pins, non-reused IDs, descriptor GC owners, live scans across ID holes and exact
+row references. Defaults retain persistent tag catalogs and unlimited admission.
+Updated the index. These budgets do not bound process RSS or all engine memory.
+

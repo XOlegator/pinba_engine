@@ -107,6 +107,9 @@ void pinba_tag_dtor(pinba_tag *tag);
 int pinba_tag_put(const unsigned char *name);
 pinba_tag *pinba_tag_get_by_name(char *name);
 pinba_tag *pinba_tag_get_by_id(size_t id);
+pinba_tag *pinba_tag_get_after(size_t id, bool exact);
+pinba_tag *pinba_tag_next_name(char *key, size_t capacity, bool first);
+void pinba_collect_unused_tags();
 pinba_tag *pinba_tag_lookup_or_create_locked(const char *name, size_t len);
 
 typedef struct _pinba_tag_metrics_snapshot {

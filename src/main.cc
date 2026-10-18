@@ -495,7 +495,7 @@ void pinba_collector_shutdown(void) /* {{{ */
   index[0] = '\0';
   for (tag = (pinba_tag *)pinba_map_first(D->tag.name_index, index); tag != nullptr;
        tag = (pinba_tag *)pinba_map_next(D->tag.name_index, index)) {
-    free(tag);
+    delete tag;
   }
 
   index[0] = '\0';
@@ -630,10 +630,30 @@ static inline int request_to_record(Pinba__Request *request,
       record_ex->words[i] = nullptr;
       record_ex->words_cnt++;
 
-      record_ex->words[i] = pinba_dictionary_word_get_or_insert_rdlock(str, str_len);
+      record_ex->words[i] = pinba_dictionary_intern_rdlock(
+          &D->dictionary, &D->words_lock, str, str_len,
+          {D->settings.ingest_dictionary_words_limit, D->settings.ingest_dictionary_bytes_limit});
       if (!record_ex->words[i]) {
         pthread_rwlock_unlock(&D->words_lock);
         return -1;
+      }
+    }
+    /* Preflight descriptor admission before publishing any part of a Request.
+       Staging words pin these names across lock upgrades and the GC pass. */
+    if (D->settings.tag_gc_enabled || D->settings.tag_names_limit) {
+      size_t offset = 0;
+      for (size_t timer = 0; timer < request->n_timer_hit_count; ++timer) {
+        const size_t count = request->timer_tag_count[timer];
+        if (request->timer_hit_count[timer] && count) {
+          for (size_t n = 0; n < count; ++n) {
+            auto *word = record_ex->words[request->timer_tag_name[offset + n]];
+            if (!pinba_tag_lookup_or_create_locked(word->str, word->len)) {
+              pthread_rwlock_unlock(&D->words_lock);
+              return -1;
+            }
+          }
+        }
+        offset += count;
       }
     }
     /* }}} */

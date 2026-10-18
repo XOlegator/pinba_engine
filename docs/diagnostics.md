@@ -31,6 +31,7 @@ observation, not a transactional snapshot.
 | `udp_decode_ns`, `request_prepare_ns`, `report_update_ns` | Accumulated stage wall times; parallel worker times are summed |
 | `dictionary_write_wait_ns`, `report_lock_wait_ns` | Waits for dictionary/tag insertion upgrades and report-update write locks |
 | `dictionary_gc_runs`, `dictionary_gc_ns` | Dictionary sweeps and wall time including lock acquisition |
+| `tag_gc_runs`, `tag_gc_ns`, `tag_gc_deferred` | Opt-in descriptor sweeps, total wall time including lock acquisition, and passes deferred after selector-snapshot allocation failure |
 | `workers`, `healthy` | Ready collector/data/stats workers (worker-pool threads are additional); no worker has requested shutdown |
 
 For quiescent measurement intervals after all queued batches complete:
@@ -77,3 +78,5 @@ structural failures, a nested batch and zero-length input. An optional test-only
 failure file exercises mixed raw-copy rejects, failed report-job admission and
 deferred/recovered expiration; see `scripts/lifecycle_test.py` for test-build
 requirements. Failure controls compile out of ordinary builds.
+
+See [memory admission](memory-admission.md) for opt-in word/byte/name budgets and descriptor collection.

@@ -247,6 +247,29 @@ jobs:
             --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
             --mysql-option=--user=pinba
 
+      - name: Tag retention, collection and independent admission limits
+        env:
+          MYSQL_PWD: pinba
+        run: |
+          python3 -B scripts/tag_lifetime_test.py --mysql-client=mariadb \
+            --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
+            --mysql-option=--user=pinba
+          # Fresh registries in the disposable CI service; no production defaults change.
+          for mode in gc words bytes names; do
+            config='[mysqld]\nloose-pinba-tag-gc-enabled=1\n'
+            case "$mode" in
+              words) config+='loose-pinba-ingest-dictionary-words-limit=8\n' ;;
+              bytes) config+='loose-pinba-ingest-dictionary-bytes-limit=200\n' ;;
+              names) config+='loose-pinba-tag-names-limit=4\n' ;;
+            esac
+            printf '%b' "$config" \
+              | sudo tee /etc/mysql/mariadb.conf.d/zz-pinba-admission.cnf >/dev/null
+            sudo systemctl restart mariadb
+            python3 -B scripts/tag_lifetime_test.py --mysql-client=mariadb \
+              --mysql-option=--host=127.0.0.1 --mysql-option=--port=3306 \
+              --mysql-option=--user=pinba
+          done
+
       - name: Dump MariaDB error log on failure
         if: failure()
         run: |

@@ -46,8 +46,13 @@ struct pinba_words_releaser {
 using pinba_words_owner = std::unique_ptr<pinba_word *, pinba_words_releaser>;
 
 // Caller holds a read lock on entry and return. Returns one owned reference.
+struct pinba_dictionary_budget {
+  uint64_t max_words = 0;
+  uint64_t max_bytes = 0;
+};
 pinba_word *pinba_dictionary_intern_rdlock(void **dictionary, pthread_rwlock_t *lock,
-                                           const char *str, size_t length);
+                                           const char *str, size_t length,
+                                           pinba_dictionary_budget budget = {});
 // Acquires its own lock and returns one owned reference, or nullptr if absent.
 pinba_word *pinba_dictionary_lookup(void **dictionary, pthread_rwlock_t *lock, const char *str);
 // No other engine lock is needed: referenced words remain alive through owners.

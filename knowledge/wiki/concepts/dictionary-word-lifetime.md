@@ -82,22 +82,36 @@ It includes configured selectors that still have owners, and may include
 zero-reference words awaiting the next sweep. Existing SQL column positions
 and meanings remain intact; no migration or new client protocol is required.
 
-This is **not an engine-wide memory limit**. Live high-cardinality requests
-still need memory. The separate `pinba_tag` name/ID registry remains persistent
-until shutdown so existing `tag` lookups and IDs keep their semantics. A stream
-of new tag names can still grow that registry. Raw slot buffers, hash buckets,
-report allocations and allocator RSS may retain their high-water capacity.
-Reclamation of dictionary values alone does not promise decreasing RSS.
+Opt-in startup word/known-byte admission budgets and a tag-name count limit
+refuse new resources before publishing the Request. Zero defaults preserve
+unlimited admission. Existing words and descriptors remain usable at saturation;
+DDL word pins are exempt from UDP admission but contribute to observed totals.
+Known bytes charge structs and two string copies, not hash nodes or allocator
+metadata. See `docs/memory-admission.md` for the exact scope and rejection counters.
 
-Costs include atomic retains/releases and reusable per-raw-record dictionary
-pointer arrays. A sweep is linear in dictionary size under an exclusive lock;
-throughput and pause behavior require a production-representative load profile.
-No allocator switch, input cardinality limit, or loss-policy change is bundled
-with this correction.
+The separate timer-tag descriptor registry remains persistent by default.
+`pinba_tag_gc_enabled` explicitly opts into collecting descriptors without a
+staging/raw name owner, active report selector, or SQL cursor pin. IDs are
+monotonic and never reused within one initialization. An ordered live-ID index
+supports scans across collected holes; exact lookups and saved row references
+continue to identify the requested ID. Tag hash indexes no longer advertise
+ordered or reverse iteration. Registry lookups use `words_lock`; collection also
+holds `collector_lock` to exclude borrowed-pointer users and report construction.
+
+These are **not engine-wide memory limits**. Pools, decoded trees, report keys,
+hash buckets and allocator RSS have separate costs. Word collection and optional
+descriptor collection do not promise decreasing RSS. A configured selector or
+long cursor can keep its descriptor alive. Finite name admission limits bound
+registry count even when such owners prevent reclamation. With GC disabled,
+a name limit can remain exhausted until shutdown.
+
+Costs include atomic ownership, reusable raw dictionary pointer buffers,
+linear dictionary sweeps, and an additional ordered ID index only when tag GC
+is enabled. Measure throughput and tail latency with the intended workload.
 
 ## Verification
 
-`tests/test_pinba_dictionary.cc` covers shared identity, raw/staging ownership,
+`tests/test_pinba_dictionary.cc` covers admission boundaries/recovery, shared identity, raw/staging ownership,
 report pins, duplicate entries, truncation, high-cardinality churn, partial
 selector arrays, and concurrent lookup/intern/release/collection.
 
@@ -126,3 +140,7 @@ correction replaces integer/struct loads with fixed-size `memcpy`, preserving
 legacy hashes; see [[hash-memory-access]]. Sanitizer results cover the exercised
 paths and do not prove that every untested engine path is free of undefined
 behavior.
+
+`scripts/tag_lifetime_test.py` checks opt-in descriptor collection, report/cursor
+pins, monotonic IDs, SQL sorting with holes, default persistent names, independent
+word/byte/name limits and post-expiration admission recovery.

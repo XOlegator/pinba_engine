@@ -66,8 +66,8 @@ typedef struct pinba_share_st { /* {{{ */
    New instance of the class is created for each new thread.
    */
 class ha_pinba : public handler {
-  THR_LOCK_DATA lock; /* MySQL lock */
-  PINBA_SHARE *share; /* Shared lock info */
+  THR_LOCK_DATA lock;           /* MySQL lock */
+  PINBA_SHARE *share = nullptr; /* Shared lock info */
   char key_built_buffer[2048];
   size_t current_key_length;
   char *current_key;
@@ -76,6 +76,9 @@ class ha_pinba : public handler {
   size_t rec_buff_length;
   pinba_index_st this_index[PINBA_MAX_KEYS];
   my_off_t current_row_position = 0;
+  pinba_tag *tag_cursor = nullptr;
+  void pin_tag_cursor(pinba_tag *tag);
+  void release_tag_cursor();
 
   int read_row_by_key(unsigned char *buf, uint active_index, const unsigned char *key, uint key_len,
                       int exact);
@@ -87,7 +90,8 @@ class ha_pinba : public handler {
   inline int timers_fetch_row(unsigned char *buf, size_t index, size_t *new_index, int exact);
   inline int timers_fetch_row_by_request_id(unsigned char *, size_t index, size_t *new_index);
 
-  inline int tags_fetch_row(unsigned char *buf, size_t index, size_t *new_index);
+  inline int tags_fetch_row(unsigned char *buf, size_t index, size_t *new_index,
+                            bool exact = false);
   inline int tags_fetch_row_by_name(unsigned char *, char *name);
 
   inline int tag_values_fetch_next(unsigned char *buf, size_t *index, size_t *position);
@@ -144,7 +148,7 @@ class ha_pinba : public handler {
 
  public:
   ha_pinba(handlerton *hton, TABLE_SHARE *table_arg);
-  ~ha_pinba() {}
+  ~ha_pinba() { release_tag_cursor(); }
 
   const char *table_type() const { return "PINBA"; }
 
@@ -155,6 +159,9 @@ class ha_pinba : public handler {
   }
 
   ulong index_flags(uint, uint, bool) const {
+    if (table_share && table_share->comment.length == 3 &&
+        memcmp(table_share->comment.str, "tag", 3) == 0)
+      return HA_READ_NEXT | HA_ONLY_WHOLE_INDEX;
     return HA_READ_NEXT | HA_READ_PREV | HA_READ_ORDER | HA_ONLY_WHOLE_INDEX;
   }
 
@@ -179,6 +186,10 @@ class ha_pinba : public handler {
   int rnd_pos(unsigned char *buf, unsigned char *pos);  // required
   int rnd_end();
   int index_init(uint keynr, bool sorted);
+  int index_end() {
+    release_tag_cursor();
+    return 0;
+  }
   int index_read(unsigned char *buf, const unsigned char *key, uint key_len,
                  enum ha_rkey_function find_flag);
   int index_next(unsigned char *buf);

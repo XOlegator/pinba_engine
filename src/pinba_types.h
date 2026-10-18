@@ -15,6 +15,7 @@
 */
 
 #include <atomic>
+#include <map>
 
 #include "pinba_limits.h"
 #include "threadpool.h"
@@ -194,6 +195,7 @@ typedef struct _pinba_tag { /* {{{ */
   char name[PINBA_TAG_NAME_SIZE];
   unsigned char name_len;
   uint64_t hash;
+  std::atomic<size_t> cursor_references{0};
 } pinba_tag;
 /* }}} */
 
@@ -296,6 +298,10 @@ typedef struct _pinba_daemon_settings { /* {{{ */
   size_t data_job_size;
   size_t histogram_size;
   unsigned int log_level;
+  uint64_t ingest_dictionary_words_limit;
+  uint64_t ingest_dictionary_bytes_limit;
+  uint64_t tag_names_limit;
+  bool tag_gc_enabled;
 } pinba_daemon_settings;
 /* }}} */
 
@@ -339,8 +345,10 @@ typedef struct _pinba_daemon { /* {{{ */
   void *dictionary;
   size_t timertags_cnt;
   struct {
-    void *table;      /* ID -> NAME */
-    void *name_index; /* NAME -> */
+    void *table;                             /* ID -> NAME */
+    void *name_index;                        /* NAME -> */
+    size_t next_id = 0;                      // Never reuse an ID, including after collection.
+    std::map<size_t, pinba_tag *> live_ids;  // Only populated in opt-in GC mode.
   } tag;
   pinba_daemon_settings settings;
   void *base_reports;
