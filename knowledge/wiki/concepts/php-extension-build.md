@@ -9,7 +9,7 @@ related:
   - wiki/concepts/php-extension-test-infrastructure.md
   - wiki/concepts/cmake-build-system.md
 confidence: high
-updated: 2026-06-10
+updated: 2026-11-20
 ---
 
 # PHP Extension Build System
@@ -96,7 +96,7 @@ Sections relevant to this extension:
 | `--EXPECTF--` | Expected stdout with `%s`, `%d` printf-style wildcards |
 
 `run-tests.php` also has an `--EXTENSIONS--` section, but it is not supported by every
-`run-tests.php` version across the 8.2–8.5 matrix, so the portable `--SKIPIF--` is used
+`run-tests.php` version across the supported PHP matrix, so the portable `--SKIPIF--` is used
 instead. For coverage, sanitizer and JUnit tooling around the suite, see
 [[php-extension-test-infrastructure]].
 
@@ -105,7 +105,8 @@ which CI collects as artifacts.
 
 ## Multi-PHP Build Matrix
 
-The CI matrix builds across all currently supported PHP branches. The list of branches
+The required CI matrix covers PHP 8.0–8.6, including the Enterprise Linux 9 compatibility
+floor. PHP 8.7 nightly builds and runs PHPT in an advisory job. The list of branches
 is not hardcoded in `ci.yml` — it is read from `.github/php-versions.json`.
 
 ```yaml

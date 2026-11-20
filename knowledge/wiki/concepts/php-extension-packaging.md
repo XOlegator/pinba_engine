@@ -10,7 +10,7 @@ related:
   - wiki/concepts/launchpad-ppa-workflow.md
   - wiki/concepts/php-version-monitoring.md
 confidence: medium
-updated: 2026-06-07
+updated: 2026-11-20
 ---
 
 # PHP Extension Debian Packaging
@@ -27,6 +27,7 @@ Binary packages: **`php{X.Y}-pinba`** (one per PHP branch)
 | `php8.3-pinba` | `pinba.so` for PHP 8.3 |
 | `php8.4-pinba` | `pinba.so` for PHP 8.4 |
 | `php8.5-pinba` | `pinba.so` for PHP 8.5 |
+| `php8.6-pinba` | `pinba.so` for PHP 8.6 |
 
 PPA: `ppa:xolegator/packages`
 
@@ -34,8 +35,8 @@ PPA: `ppa:xolegator/packages`
 
 | Suite | Ubuntu Version | PHP Branches |
 |-------|---------------|-------------|
-| `noble` | 24.04 | 8.2, 8.3, 8.4, 8.5 |
-| `resolute` | 26.04 | 8.2, 8.3, 8.4, 8.5 |
+| `noble` | 24.04 | 8.2–8.6 (Ubuntu archive and `ondrej/php`) |
+| `resolute` | 26.04 | 8.5 (Ubuntu archive) |
 
 Source of truth for the matrix: `.github/packaging-matrix.json`
 
@@ -57,54 +58,24 @@ The MySQL plugin (`pinba_engine`) publishes two binary packages from one source 
 inside the source package selects which MySQL variant to build on Launchpad (since
 Launchpad can't see the GitHub Actions matrix).
 
-The PHP extension follows a different strategy:
-- One binary package per PHP version
-- `dh-php` or per-version `debian/phpX.Y-pinba.install` maps handle multiple packages
-- The PHP version list comes from `.github/php-versions.json` (auto-updated by discovery)
+The PHP extension builds one binary package per selected PHP branch.
+Launchpad uploads select branches from `.github/packaging-matrix.json` and set
+`PHP_VERSIONS` in `debian/php-ppa-build.mk`. The workflow also narrows
+`Build-Depends` to the corresponding PHP development packages.
 
 See [[debian-ppa-packaging]] for the MySQL plugin packaging pattern.
 
-## Planned debian/ Layout
+## Build and Installation
 
-```
-debian/
-├── control              — source + binary package declarations
-├── rules                — debhelper rules (calls phpize, configure, make per version)
-├── changelog            — version history (format: 1.2.0-1~noble1)
-├── copyright            — LGPL-2.1 declaration
-├── source/format        — "3.0 (quilt)"
-├── source/options       — dpkg-source options
-├── clean                — generated files to remove between builds
-├── php8.2-pinba.install — install map: pinba.so → PHP 8.2 extension_dir
-├── php8.3-pinba.install — install map: pinba.so → PHP 8.3 extension_dir
-├── php8.4-pinba.install — install map: pinba.so → PHP 8.4 extension_dir
-└── php8.5-pinba.install — install map: pinba.so → PHP 8.5 extension_dir
-```
+For each selected branch, `debian/rules` builds the extension with that branch's
+`phpize` and `php-config`. It uses `php-config` to locate the extension directory
+and generate the `phpapi` dependency. Each binary package includes its own
+AppStream metadata and installs `pinba.ini` under
+`/etc/php/<version>/mods-available/`. Its post-install script enables the module
+with `phpenmod -v <version> pinba`.
 
-## Install Map Pattern
-
-Each `php{X.Y}-pinba.install` file maps the compiled `.so` and the INI snippet:
-
-```
-# php8.4-pinba.install
-usr/lib/php/20230831/pinba.so
-etc/php/8.4/mods-available/pinba.ini
-```
-
-The postinst runs `phpenmod 8.4 pinba` (or uses debhelper triggers) to activate the INI.
-
-## Extension INI Template
-
-Installed at `/etc/php/8.4/mods-available/pinba.ini`:
-
-```ini
-; Pinba performance monitoring extension
-extension=pinba.so
-pinba.enabled=0
-```
-
-The extension is **disabled by default** — users must set `pinba.enabled=1` and configure
-`pinba.server` to enable sending. The INI template is intentionally minimal.
+Pinba loads when the package enables the module. Set `pinba.enabled=1` and
+configure `pinba.server` to send metrics.
 
 ## Version Scheme
 
@@ -134,26 +105,12 @@ Example: `1.2.0-1~noble1`
 - **The extension must install into the correct `extension_dir`** for each PHP version.
   Launchpad builds in a clean chroot — the correct `php8.X-dev` must be in `Build-Depends`.
 
-## Build-Depends
+## Build Dependencies and CI
 
-```
-Build-Depends:
-  debhelper-compat (= 13),
-  dh-php,
-  php8.2-dev,
-  php8.3-dev,
-  php8.4-dev,
-  php8.5-dev
-```
-
-Unlike the MySQL plugin (which needs `rapidjson-dev`), this extension has no external
-library dependencies at compile time — `protobuf-c` is bundled in the source tree.
-
-## Current Status
-
-- `docs/packaging.md` and `.github/packaging-matrix.json` describe the plan
-- `debian/` directory is not yet created (next development step)
-- CI proves the extension builds and tests pass across all four PHP versions
-- Launchpad upload workflow not yet written
+The default packaging build uses debhelper, pkgconf, the system `libprotobuf-c-dev`
+library and the PHP 8.2–8.6 development packages. Packaging CI builds all five
+binary packages on Noble, runs Lintian, and installs and loads the PHP 8.6
+package as a smoke test. The release workflow publishes signed source packages
+to Launchpad, where binaries are built for each target suite.
 
 See: [[php-extension-build]], [[debian-ppa-packaging]], [[launchpad-ppa-workflow]]

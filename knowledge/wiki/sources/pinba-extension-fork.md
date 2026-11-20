@@ -10,20 +10,20 @@ related:
   - wiki/concepts/php-version-monitoring.md
   - wiki/concepts/php-pinba-configuration.md
 confidence: high
-updated: 2026-06-07
+updated: 2026-11-20
 ---
 
 # PHP Pinba Extension — XOlegator Fork
 
 **Upstream:** tony2001/pinba_extension on GitHub. Final upstream release: 1.1.2 (Aug 2020).
-**Fork:** XOlegator/pinba_extension — modernized for PHP 8.2–8.5 with CI, PHPT tests, and packaging automation.
+**Fork:** XOlegator/pinba_extension — modernized for PHP 8.0–8.6 with CI, PHPT tests, and packaging automation.
 **Fork version:** 1.1.2 (fork; release-please tracking v1.2.0 as next release)
 
 ## Purpose
 
 The upstream extension is effectively unmaintained since 2020 and does not support PHP 8.2+.
 The fork goal is to:
-- Restore compatibility with all currently supported PHP branches (8.2, 8.3, 8.4, 8.5)
+- Restore compatibility with upstream-supported PHP branches (8.2–8.6)
 - Add CI matrix to catch per-version breakage early
 - Add Debian packaging automation for Ubuntu 24.04 and 26.04
 - Maintain stable API and protocol compatibility with upstream
@@ -82,7 +82,7 @@ DNS resolution is cached: the collector address is resolved at most once per
   (for glibc 2.33+), with compile-time fallback for older glibc
 - `pinba_timer_add()`: restored missing parameter for pre-completed timers
 - PHPT test suite added (8 tests for core extension behavior)
-- CI: GitHub Actions matrix across PHP 8.2/8.3/8.4/8.5
+- CI: required builds and PHPT on PHP 8.0–8.6, with advisory PHP 8.7 nightly
 - Governance: CONTRIBUTING.md, CODE_OF_CONDUCT.md, release-please automation
 
 ## PHPT Test Suite
