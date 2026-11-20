@@ -42,7 +42,7 @@ Master catalog. Maintained by LLM agents.
 | [[docker-tag-strategy]] | Docker Hub naming: rolling channels (8.0/8.4/mariadb-*), version-suffixed tags, all tags mutable → digest pinning; old `8.4-lts*` dead |
 | [[github-actions-docker]] | CI/CD workflow for Docker Hub build+push automation |
 | [[github-actions-ppa]] | GitHub Actions workflow: source package build, signing, multi-series, FTP upload with passive mode and retry |
-| [[github-actions-mysql-version-monitor]] | Weekly MySQL version monitor: auto-PR with vendor header update and full release cycle trigger |
+| [[github-actions-mysql-version-monitor]] | Weekly MySQL version monitor: auto-PR with vendor header update and full release cycle trigger, MySQL 8.4.13 CI baseline |
 | [[pinboard-architecture]] | Pinboard (Symfony 8), aggregation, UTC storage, complete date buckets, source-engine repair, docker compose |
 | [[debian-ppa-packaging]] | Debian/PPA packaging: debian/ structure, rules, versioning, Build-Depends, rapidjson |
 | [[appstream-metainfo-packaging]] | Author/License in Discover/GNOME Software via AppStream metainfo `<pkgname>` binding; per-package metainfo; release auto-refresh |

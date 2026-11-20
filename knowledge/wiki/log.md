@@ -1138,3 +1138,13 @@ captures production sources directly so GoogleTest function metadata is outside
 the report's scope.
 
 See [[cmake-build-system]] and [[index]].
+
+## 2026-11-20 — Revision: MySQL 8.4.13 build baseline
+
+The MySQL monitor updated the Resolute package target, vendored headers, and
+Docker runtime to 8.4.13 in PR #108. The CMake download preset and CI matrix
+now exercise the same patch version. The default Debian 8.4 build reads the
+version marker from the vendored headers so a monitor update keeps the build
+metadata in sync.
+
+See [[github-actions-mysql-version-monitor]] and [[mysql-plugin-abi]].

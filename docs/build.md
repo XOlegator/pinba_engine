@@ -73,7 +73,7 @@ Use one of these sources:
 Explicit source tree:
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPINBA_MYSQL_SOURCE_DIR=/path/to/mysql-8.4.9
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DPINBA_MYSQL_SOURCE_DIR=/path/to/mysql-8.4.13
 ```
 
 Opt-in source download:
