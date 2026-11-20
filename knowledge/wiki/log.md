@@ -1131,7 +1131,8 @@ Sources: [PHP 8.6.0 release](https://news-web.php.net/php.announce/518),
 ## 2026-11-20 — Revision: Pinba Engine CI on Ubuntu 26.04
 
 PR #109 exposed three runner compatibility issues. MariaDB Server setup requires
-skipping the unrelated MaxScale and Tools repositories. MySQL static analysis
+skipping the unrelated MaxScale and Tools repositories. MariaDB 10.11 uses
+Ubuntu 24.04 because its vendor does not publish Resolute packages. MySQL static analysis
 shares the repository's cppcheck suppressions with the local hook. MySQL coverage
 captures production sources directly so GoogleTest function metadata is outside
 the report's scope.
