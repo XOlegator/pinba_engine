@@ -44,7 +44,7 @@
 # module default stream moved from 8.0 to 8.4). Built on Fedora for now; the
 # MySQL-on-EL path (module mysql:8.4) is deferred — see rpm-matrix.json.
 %global db_series 8.4
-%global db_version 8.4.9
+%global db_version 8.4.13
 %global db_source_dir vendor/mysql-headers-%{db_series}
 %global cmake_flavor mysql
 %global db_pretty MySQL

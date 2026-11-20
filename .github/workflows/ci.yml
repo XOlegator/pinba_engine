@@ -44,7 +44,7 @@ jobs:
             mysql-version: "8.0.46"
           - mysql-series: "8.4"
             cmake-preset: release-download-mysql84-source
-            mysql-version: "8.4.9"
+            mysql-version: "8.4.13"
 
     steps:
       - uses: actions/checkout@v7
@@ -301,7 +301,7 @@ jobs:
             mysql-version: "8.0.46"
           - mysql-series: "8.4"
             cmake-preset: debug-download-mysql84-source
-            mysql-version: "8.4.9"
+            mysql-version: "8.4.13"
 
     steps:
       - uses: actions/checkout@v7
@@ -344,7 +344,7 @@ jobs:
             artifact-name: coverage-mysql80
           - mysql-series: "8.4"
             cmake-preset: coverage-download-mysql84-source
-            mysql-version: "8.4.9"
+            mysql-version: "8.4.13"
             build-dir: build-coverage84
             artifact-name: coverage-mysql84
 
@@ -696,7 +696,7 @@ jobs:
         uses: actions/cache@v6
         with:
           path: build-benchmark/_deps
-          key: deps-benchmark-mysql8.4.9-gbench1.9.1-h32131c
+          key: deps-benchmark-mysql8.4.13-gbench1.9.1-h32131c
 
       - name: Configure
         run: cmake --preset benchmark-download-mysql84-source
