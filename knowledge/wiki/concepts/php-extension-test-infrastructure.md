@@ -8,7 +8,7 @@ related:
   - wiki/concepts/php-extension-api.md
   - wiki/concepts/pinba-udp-protocol.md
 confidence: high
-updated: 2026-06-10
+updated: 2026-11-20
 ---
 
 # PHP Extension Test Infrastructure
@@ -32,7 +32,7 @@ re-load the same extension and assert on the same functions, worse than PHPT.
 ## Test format note: --SKIPIF-- over --EXTENSIONS--
 
 Modern `run-tests.php` has an `--EXTENSIONS--` section, but the version shipped with PHP 8.4
-locally does not support it, and the version varies across the 8.2–8.5 matrix. The portable
+locally does not support it, and the version varies across the supported PHP matrix. The portable
 choice is therefore `--SKIPIF-- <?php if (!extension_loaded("pinba")) print "skip"; ?>`,
 which every `run-tests.php` understands. The suite uses `--SKIPIF--`.
 

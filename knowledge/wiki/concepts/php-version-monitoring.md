@@ -9,7 +9,7 @@ related:
   - wiki/concepts/php-extension-packaging.md
   - wiki/concepts/github-actions-mysql-version-monitor.md
 confidence: high
-updated: 2026-06-07
+updated: 2026-11-20
 ---
 
 # PHP Version Monitoring
@@ -37,8 +37,8 @@ Job: discover
   4. Create PR: branch=ci/discover-php-versions, commit="ci(matrix): refresh supported PHP versions"
 ```
 
-The PR is created with `peter-evans/create-pull-request@v7`. The branch is auto-deleted
-on merge. The PR only appears if `php-versions.json` changed.
+The PR is created with `peter-evans/create-pull-request@v8`. The branch is auto-deleted
+on merge. The PR appears when the support or packaging matrix changes.
 
 ## Discovery Script: `update-php-support-matrix.php`
 
@@ -58,17 +58,18 @@ The PHP script:
 
 ```json
 {
-  "generated_at": "2026-06-07",
+  "generated_at": "2026-11-20",
   "source": "https://www.php.net/supported-versions.php",
   "targets": {
     "ubuntu": ["24.04", "26.04"],
-    "php": ["8.2", "8.3", "8.4", "8.5"]
+    "php": ["8.2", "8.3", "8.4", "8.5", "8.6"]
   },
   "notes": {
     "8.2": "security support only until 2026-12-31",
     "8.3": "security support only until 2027-12-31",
     "8.4": "active support until 2026-12-31",
-    "8.5": "active support until 2027-12-31"
+    "8.5": "active support until 2027-12-31",
+    "8.6": "active support until 2028-12-31"
   }
 }
 ```
@@ -79,20 +80,20 @@ The `notes` field is informational — it does not gate anything automatically.
 
 | Consumer | How it reads the file |
 |----------|-----------------------|
-| `ci.yml` | `jq -c '.targets.php'` → JSON array → `strategy.matrix` |
-| Future packaging workflow | `jq .targets.php` + `jq .targets.ubuntu` → upload matrix |
-| `.github/packaging-matrix.json` | Updated manually or by a future automation step |
+| `ci.yml` | Combines `targets.php` and `distro_native_floor` for required builds |
+| `release-assets.yml` | Verifies releases against `targets.php` |
+| `.github/packaging-matrix.json` | Intersects `targets.php` with each suite's APT indexes |
 
 ## Gating Rule
 
 **A discovered PHP branch must not be packaged automatically until CI is green.**
 
-The workflow only updates `php-versions.json` and creates a PR. CI runs against the
-updated matrix in that PR. If a new PHP branch (e.g., 8.6) fails CI, the PR is blocked
+The workflow refreshes both matrix files and creates a PR. CI runs against the
+updated matrix in that PR. If a new PHP branch fails CI, the PR is blocked
 until the extension is fixed. Only then is the branch confirmed as supported.
 
 This is intentionally human-gated: the packager reviews the PR, verifies CI passed,
-and merges. The packaging matrix is updated separately.
+and merges. PPA publication is dispatched manually after merge.
 
 ## Contrast with MySQL Version Monitor
 
