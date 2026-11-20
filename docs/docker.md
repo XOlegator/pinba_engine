@@ -127,17 +127,17 @@ All published tags are **mutable**, including the version-suffixed ones:
 For reproducible production deployments pin by digest:
 
 ```bash
-docker pull xolegator/pinba-engine@sha256:9828ea2339ecca2d2ad8c0d7e9a72353c50f271f6a267492cf99b80a496441d8 # 8.4 channel
+docker pull xolegator/pinba-engine@sha256:1217eefbd982ca7a7571f3363df79980a23b3eeb90e04b6dd295dc35b9f592a2 # 8.4 channel
 ```
 
 Current digests, updated automatically by CI on every image rebuild:
 
 | Channel | Digest |
 |---|---|
-| `8.0` | `sha256:2df70bb506397ea20bf3b6c45b9c5bd15198fb99f41cfc8205c55ede56511df4` |
-| `8.4` | `sha256:9828ea2339ecca2d2ad8c0d7e9a72353c50f271f6a267492cf99b80a496441d8` |
-| `mariadb-10.11` | `sha256:a3361261ff1d40aa6b136798f3b982a62a6fb793a95dafe38f5157342803a312` |
-| `mariadb-11.8` | `sha256:2008e1a14d3150302c702af5c7e42f5ce2739b65a9421a90b9d863ae235df435` |
+| `8.0` | `sha256:6560ff86bf22279b4987a6e05ba8c78fef14fba45220ce8d2bc4bdd2e01a645a` |
+| `8.4` | `sha256:1217eefbd982ca7a7571f3363df79980a23b3eeb90e04b6dd295dc35b9f592a2` |
+| `mariadb-10.11` | `sha256:2e605bb5540d9228cf5a4ae89634640ed4034db563d38179cd89560ca28a0225` |
+| `mariadb-11.8` | `sha256:d5fbf7b729ced137103726b8b6544d1f589ddd1e3537d22f7bf70dacd43486e9` |
 
 To resolve a digest yourself:
 
