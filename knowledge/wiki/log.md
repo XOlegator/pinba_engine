@@ -1127,3 +1127,13 @@ Sources: [PHP 8.6.0 release](https://news-web.php.net/php.announce/518),
 [PHP support lifecycle](https://www.php.net/supported-versions.php),
 [setup-php](https://github.com/shivammathur/setup-php), and
 [Pinba Extension](https://github.com/XOlegator/pinba_extension).
+
+## 2026-11-20 — Revision: Pinba Engine CI on Ubuntu 26.04
+
+PR #109 exposed three runner compatibility issues. MariaDB Server setup requires
+skipping the unrelated MaxScale and Tools repositories. MySQL static analysis
+shares the repository's cppcheck suppressions with the local hook. MySQL coverage
+captures production sources directly so GoogleTest function metadata is outside
+the report's scope.
+
+See [[cmake-build-system]] and [[index]].

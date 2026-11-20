@@ -85,6 +85,7 @@ jobs:
             --quiet \
             --suppress=preprocessorErrorDirective \
             --suppress=missingInclude \
+            --suppressions-list=.cppcheck-suppressions \
             "--suppress=*:build/*" \
             --file-filter='*/src/*.cc'
 
@@ -124,7 +125,7 @@ jobs:
       - name: Install MariaDB ${{ matrix.mariadb-series }} server
         run: |
           curl -fsSL https://r.mariadb.com/downloads/mariadb_repo_setup \
-            | sudo bash -s -- --mariadb-server-version="mariadb-${{ matrix.mariadb-series }}"
+            | sudo bash -s -- --skip-maxscale --skip-tools --mariadb-server-version="mariadb-${{ matrix.mariadb-series }}"
           sudo apt-get update -q
           sudo apt-get install -y --no-install-recommends mariadb-server mariadb-client
           sudo systemctl start mariadb || sudo service mariadb start
@@ -371,19 +372,15 @@ jobs:
 
       - name: Collect coverage
         run: |
+          # Apply the production source filter at capture time, before lcov
+          # encounters conflicting end lines emitted for GoogleTest functions.
           lcov \
             --capture \
             --directory ${{ matrix.build-dir }} \
+            --include "${GITHUB_WORKSPACE}/src/*" \
             --output-file ${{ matrix.artifact-name }}.info \
             --ignore-errors source,mismatch,mismatch,negative,negative,gcov,gcov \
             --rc geninfo_unexecuted_blocks=1
-          lcov \
-            --remove ${{ matrix.artifact-name }}.info \
-              '/usr/*' \
-              '*/build*/_deps/*' \
-              '*/tests/*' \
-            --output-file ${{ matrix.artifact-name }}.info \
-            --ignore-errors unused,unused
           lcov --summary ${{ matrix.artifact-name }}.info
 
       - name: Upload coverage report
@@ -437,7 +434,7 @@ jobs:
       - name: Install MariaDB ${{ matrix.mariadb-series }} server
         run: |
           curl -fsSL https://r.mariadb.com/downloads/mariadb_repo_setup \
-            | sudo bash -s -- --mariadb-server-version="mariadb-${{ matrix.mariadb-series }}"
+            | sudo bash -s -- --skip-maxscale --skip-tools --mariadb-server-version="mariadb-${{ matrix.mariadb-series }}"
           sudo apt-get update -q
           sudo apt-get install -y --no-install-recommends mariadb-server mariadb-client
           sudo systemctl start mariadb || sudo service mariadb start

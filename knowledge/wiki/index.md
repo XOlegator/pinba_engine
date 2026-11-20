@@ -37,7 +37,7 @@ Master catalog. Maintained by LLM agents.
 | [[php-extension-test-infrastructure]] | Coverage (gcov→Codecov), JUnit, ASan/UBSan via instrumented PHP (RTLD_DEEPBIND), `tools/run-tests.sh`; bugs found |
 | [[php-extension-packaging]] | Debian packaging for PHP extensions: php-pinba source, php{X.Y}-pinba binaries |
 | [[php-version-monitoring]] | Automated PHP version discovery: weekly cron, php.net parsing, PR gate |
-| [[cmake-build-system]] | Presets, MySQL headers sourcing, dependencies, and pinned CMake lint environment |
+| [[cmake-build-system]] | Presets, MySQL headers sourcing, dependencies, and pinned CMake lint environment (see [[log]] for CI runner changes) |
 | [[docker-build-strategy]] | Multi-stage build, builder-OS-matches-runtime rule, GLIBCXX incident, multi-arch, smoke test |
 | [[docker-tag-strategy]] | Docker Hub naming: rolling channels (8.0/8.4/mariadb-*), version-suffixed tags, all tags mutable → digest pinning; old `8.4-lts*` dead |
 | [[github-actions-docker]] | CI/CD workflow for Docker Hub build+push automation |
