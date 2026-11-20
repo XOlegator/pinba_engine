@@ -5,7 +5,7 @@ sources: []
 related:
   - wiki/index.md
 confidence: high
-updated: 2026-10-18
+updated: 2026-11-20
 ---
 
 # Activity Log
@@ -1106,3 +1106,35 @@ claims. Machine-specific JSON remains outside committed documentation.
 
 **Pages updated:** `concepts/runtime-diagnostics.md`,
 `concepts/dictionary-word-lifetime.md`.
+
+## 2026-11-20 — Revision: PHP 8.6 support and PHP 8.7 nightly
+
+The maintainer requested promotion of PHP 8.6 after the November 19 release, a PHP 8.7
+nightly check, and a review of PHP Docker image tags. The PHP 8.6.0 CLI container built
+and loaded the extension and passed all 16 PHPT tests. The extension branch promotes
+8.6 to required CI and release verification, moves advisory CI to 8.7 nightly, and
+updates the Docker FPM example to 8.6.0. Launchpad's Noble APT index lists
+`php8.6-dev`; the Resolute PPA index contains no packages, so the Resolute matrix
+continues to use the Ubuntu archive's PHP 8.5. A clean Ubuntu 24.04 container built
+all five Debian packages, installed `php8.6-pinba`, and loaded the extension.
+The November 19 PHP 8.7.0-dev build from php-builder also passed all 16 PHPT tests.
+
+Updated [[pinba-extension-fork]], [[php-extension-build]],
+[[php-extension-test-infrastructure]], [[php-extension-packaging]],
+[[php-version-monitoring]], and [[index]].
+
+Sources: [PHP 8.6.0 release](https://news-web.php.net/php.announce/518),
+[PHP support lifecycle](https://www.php.net/supported-versions.php),
+[setup-php](https://github.com/shivammathur/setup-php), and
+[Pinba Extension](https://github.com/XOlegator/pinba_extension).
+
+## 2026-11-20 — Revision: Pinba Engine CI on Ubuntu 26.04
+
+PR #109 exposed three runner compatibility issues. MariaDB Server setup requires
+skipping the unrelated MaxScale and Tools repositories. MariaDB 10.11 uses
+Ubuntu 24.04 because its vendor does not publish Resolute packages. MySQL static analysis
+shares the repository's cppcheck suppressions with the local hook. MySQL coverage
+captures production sources directly so GoogleTest function metadata is outside
+the report's scope.
+
+See [[cmake-build-system]] and [[index]].

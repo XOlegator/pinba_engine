@@ -4,7 +4,7 @@ type: index
 sources: []
 related: []
 confidence: high
-updated: 2026-10-18
+updated: 2026-11-20
 ---
 
 # Pinba Engine — Knowledge Base Index
@@ -33,11 +33,11 @@ Master catalog. Maintained by LLM agents.
 | [[mysql-plugin-migration-80-to-84]] | Porting checklist: ABI, build requirements, OS paths, OL9 builder rule |
 | [[php-pinba-configuration]] | php.ini settings, deployment scenarios, silent failure |
 | [[php-extension-api]] | Complete PHP function reference: timer lifecycle, request tags, overrides |
-| [[php-extension-build]] | phpize build system, PHPT tests, multi-PHP CI matrix |
+| [[php-extension-build]] | phpize, PHPT, required PHP 8.0–8.6 and advisory PHP 8.7 nightly |
 | [[php-extension-test-infrastructure]] | Coverage (gcov→Codecov), JUnit, ASan/UBSan via instrumented PHP (RTLD_DEEPBIND), `tools/run-tests.sh`; bugs found |
 | [[php-extension-packaging]] | Debian packaging for PHP extensions: php-pinba source, php{X.Y}-pinba binaries |
 | [[php-version-monitoring]] | Automated PHP version discovery: weekly cron, php.net parsing, PR gate |
-| [[cmake-build-system]] | Presets, MySQL headers sourcing, dependencies, and pinned CMake lint environment |
+| [[cmake-build-system]] | Presets, MySQL headers sourcing, dependencies, and pinned CMake lint environment (see [[log]] for CI runner changes) |
 | [[docker-build-strategy]] | Multi-stage build, builder-OS-matches-runtime rule, GLIBCXX incident, multi-arch, smoke test |
 | [[docker-tag-strategy]] | Docker Hub naming: rolling channels (8.0/8.4/mariadb-*), version-suffixed tags, all tags mutable → digest pinning; old `8.4-lts*` dead |
 | [[github-actions-docker]] | CI/CD workflow for Docker Hub build+push automation |
